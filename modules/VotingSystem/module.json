@@ -1,0 +1,163 @@
+{
+  "name": "VotingSystem",
+  "author": "Unknown",
+  "description": "Run vote rewards for your game server community through Takaro. VotingSystem gives players a /vote command and gives admins a simple module foundation for rewarding voting activity.\n\nUse this module to:\n- Add a player-facing vote command.\n- Connect voting behavior to a community reward workflow.\n- Encourage players to support server visibility.\n- Keep vote-related commands inside Takaro's module system.\n\nGood fit for server owners who use voting sites, vote rewards, or community growth loops and want that workflow represented in Takaro.",
+  "version": "latest",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "votingsite",
+      "votekey",
+      "novote",
+      "alreadyclaimed"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "votingsite": {
+        "title": "votingsite",
+        "description": "Site where players vote. Example: \nhttps://7daystodie-servers.com for 7 Days to Die;\nhttps://rust-servers.net for RUST\n\n",
+        "default": "https://7daystodie-servers.com",
+        "type": "string"
+      },
+      "votekey": {
+        "title": "votekey",
+        "description": "Vote key provided by the voting site",
+        "type": "string"
+      },
+      "novote": {
+        "title": "novote",
+        "description": "Message to send to the player when voting site reports no vote was cast. ",
+        "default": "You haven't voted yet. Please vote at https://7daystodie-servers.com first.",
+        "type": "string"
+      },
+      "alreadyclaimed": {
+        "title": "alreadyclaimed",
+        "description": "Message to send to the player when the voting site reports the vote reward was already claimed.",
+        "default": "You have already claimed your last vote.",
+        "type": "string"
+      },
+      "privatemessage": {
+        "title": "privatemessage",
+        "description": "Optional message to send to the player when the voting site reports a vote with no reward claimed yet. \nExample: Thanks for voting.\nLeave it blank if you want nothing to be sent instead.",
+        "default": "",
+        "type": "string"
+      },
+      "publicmessage": {
+        "title": "publicmessage",
+        "description": "Optional message to broadcast to all players online when vote is successful. Use {name} in the message to refer to the player name.\nExample: [00FF00]{name}[-] voted at 7daystodie-servers.com and was rewarded Takaro Coins!\nLeave it blank if you want nothing to be sent instead.\n",
+        "default": "",
+        "type": "string"
+      },
+      "currency": {
+        "title": "currency",
+        "description": "How much currency to add to the player in Takaro, if any.\nMake sure to enable economy for this server.",
+        "default": 0,
+        "type": "number",
+        "minimum": 0
+      },
+      "randomitemnumber": {
+        "title": "randomitemnumber",
+        "description": "Defines how many random items will be rewarded to the player, picked from randomitemlist config field.\nThe quantities for each item picked is defined on the mentioned config field.",
+        "default": 0,
+        "type": "number",
+        "minimum": 0,
+        "multipleOf": 1
+      },
+      "randomitemlist": {
+        "title": "Items",
+        "description": "List of items that will be used to select a random reward for the vote, as many times as defined at randomitemnumber.",
+        "x-component": "item",
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "minimum": 1,
+              "default": 1,
+              "multipleOf": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          },
+          "required": [
+            "item"
+          ],
+          "additionalProperties": false
+        },
+        "default": []
+      },
+      "fixedrewards": {
+        "title": "Items",
+        "description": "All the items in this list will be given as a reward for the vote.",
+        "x-component": "item",
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "minimum": 1,
+              "default": 1,
+              "multipleOf": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          },
+          "required": [
+            "item"
+          ],
+          "additionalProperties": false
+        },
+        "default": []
+      }
+    }
+  },
+  "uiSchema": {
+    "randomitemlist": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "fixedrewards": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    }
+  },
+  "commands": {
+    "vote": {
+      "trigger": "vote",
+      "description": "Claim rewards for voting for the server",
+      "helpText": "Claim rewards for voting for the server",
+      "function": "src/commands/vote/index.js",
+      "arguments": []
+    }
+  }
+}
