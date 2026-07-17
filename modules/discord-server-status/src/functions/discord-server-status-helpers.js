@@ -69,3 +69,62 @@ export async function buildCurrentStatus(gameServerId, config) {
     serverName,
   };
 }
+
+function statusMessageVariableKey(channelId) {
+  return `discord-server-status:status-message:${channelId}`;
+}
+
+async function getSavedStatusMessage(gameServerId, channelId) {
+  const key = statusMessageVariableKey(channelId);
+  const res = await takaro.variable.variableControllerSearch({
+    filters: { key: [key], gameServerId: [gameServerId] },
+    limit: 1,
+  });
+  const existing = res.data.data?.[0];
+  if (!existing) return null;
+
+  return {
+    id: existing.id,
+    key,
+    messageId: trimOrEmpty(existing.value),
+  };
+}
+
+async function saveStatusMessage(gameServerId, channelId, messageId) {
+  const key = statusMessageVariableKey(channelId);
+  const existing = await getSavedStatusMessage(gameServerId, channelId);
+  if (existing) {
+    await takaro.variable.variableControllerUpdate(existing.id, { value: messageId });
+    return;
+  }
+
+  await takaro.variable.variableControllerCreate({
+    key,
+    value: messageId,
+    gameServerId,
+  });
+}
+
+export async function sendOrUpdateDiscordStatusMessage(gameServerId, channelId, message) {
+  const saved = await getSavedStatusMessage(gameServerId, channelId);
+
+  if (saved?.messageId) {
+    try {
+      const updated = await takaro.discord.discordControllerUpdateMessage(channelId, saved.messageId, { message });
+      const updatedMessageId = trimOrEmpty(updated.data.data?.id) || saved.messageId;
+      if (updatedMessageId !== saved.messageId) {
+        await saveStatusMessage(gameServerId, channelId, updatedMessageId);
+      }
+      return { action: 'updated', messageId: updatedMessageId };
+    } catch (err) {
+      console.error(`discord-server-status: failed to update saved Discord status message ${saved.messageId}, posting a replacement: ${err}`);
+    }
+  }
+
+  const sent = await takaro.discord.discordControllerSendMessage(channelId, { message });
+  const messageId = trimOrEmpty(sent.data.data?.id);
+  if (messageId) {
+    await saveStatusMessage(gameServerId, channelId, messageId);
+  }
+  return { action: 'sent', messageId };
+}

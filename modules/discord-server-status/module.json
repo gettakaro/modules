@@ -60,6 +60,11 @@
         "type": "boolean",
         "default": true,
         "description": "If false, the scheduled Discord status cronjob skips posts when nobody is online. Manual Discord triggers still reply."
+      },
+      "updateStatusMessage": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, the scheduled cronjob edits one persistent Discord status message instead of posting a new message every run. If the saved message cannot be edited, the module posts a replacement and stores its ID."
       }
     },
     "required": [],
