@@ -1,0 +1,101 @@
+{
+  "name": "discord-server-status",
+  "author": "Takaro",
+  "description": "Post lightweight game-server status to Discord. Includes a Discord !status reply, an optional scheduled Discord status post, and an in-game /serverstatus command. The module reports Takaro-visible server name and online player count/list; host CPU/RAM/process stats require panel/core support and are intentionally not promised here.",
+  "version": "latest",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "discordChannelId": {
+        "type": "string",
+        "default": "",
+        "maxLength": 40,
+        "description": "Discord channel ID used by the scheduled status cronjob. Discord command replies use the hook channel when this is empty."
+      },
+      "discordTriggers": {
+        "type": "array",
+        "description": "Exact Discord messages that trigger a status reply. Matching is case-insensitive after trimming.",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "default": ["!status", "!serverstatus", "!players"]
+      },
+      "includePlayerNames": {
+        "type": "boolean",
+        "default": true,
+        "description": "Include online player names in status responses. Disable if you only want counts."
+      },
+      "maxPlayerNames": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 25,
+        "default": 10,
+        "description": "Maximum number of online player names to include when includePlayerNames is enabled."
+      },
+      "statusTemplate": {
+        "type": "string",
+        "default": "{serverName}: {onlineCount} {playerNoun} online. {playerListText}",
+        "maxLength": 400,
+        "description": "Status response template. Supports {serverName}, {onlineCount}, {playerNoun}, {playerList}, {playerListText}, and {generatedAt}."
+      },
+      "emptyPlayerListText": {
+        "type": "string",
+        "default": "Nobody is online right now.",
+        "maxLength": 160,
+        "description": "Text for {playerListText} when no players are online."
+      },
+      "playerListPrefix": {
+        "type": "string",
+        "default": "Players: ",
+        "maxLength": 80,
+        "description": "Prefix for {playerListText} when players are online."
+      },
+      "sendCronWhenEmpty": {
+        "type": "boolean",
+        "default": true,
+        "description": "If false, the scheduled Discord status cronjob skips posts when nobody is online. Manual Discord triggers still reply."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [],
+  "commands": {
+    "serverstatus": {
+      "trigger": "serverstatus",
+      "description": "Show the current Takaro-visible server status and online player count.",
+      "helpText": "Usage: /serverstatus — shows server name, online player count, and optionally player names.",
+      "function": "src/commands/serverstatus/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "discordStatus": {
+      "eventType": "discord-message",
+      "description": "Reply in Discord when a configured status trigger such as !status is posted.",
+      "function": "src/hooks/discord-status/index.js"
+    }
+  },
+  "cronJobs": {
+    "postDiscordStatus": {
+      "temporalValue": "*/15 * * * *",
+      "description": "Optionally post the current status to a configured Discord channel.",
+      "function": "src/cronjobs/post-discord-status/index.js"
+    }
+  },
+  "functions": {
+    "discord-server-status-helpers": {
+      "function": "src/functions/discord-server-status-helpers.js"
+    },
+    "discord-server-status-pure": {
+      "function": "src/functions/discord-server-status-pure.js"
+    }
+  }
+}
