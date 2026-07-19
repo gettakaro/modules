@@ -1,0 +1,56 @@
+{
+  "name": "discord-7d2d-status-bridge",
+  "description": "7 Days to Die Discord bridge with chat relay, monitoring events, blood moon notices, and an editable Polish server status message.",
+  "version": "latest",
+  "supportedGames": ["7 days to die"],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "chatChannelId": { "type": "string", "default": "", "description": "Discord channel ID for player chat relay." },
+      "monitoringChannelId": { "type": "string", "default": "", "description": "Discord channel ID for system/death/join/leave/blood moon/status messages." },
+      "relayDiscordToGame": { "type": "boolean", "default": true, "description": "Relay messages from the Discord chat channel into game chat." },
+      "relayGameToDiscord": { "type": "boolean", "default": true, "description": "Relay in-game chat messages to the Discord chat channel." },
+      "monitorJoins": { "type": "boolean", "default": true },
+      "monitorLeaves": { "type": "boolean", "default": true },
+      "monitorDeaths": { "type": "boolean", "default": true },
+      "updateStatusMessage": { "type": "boolean", "default": true, "description": "Update one persistent bot message with current server status instead of posting a new status every tick." },
+      "statusTemplate": { "type": "string", "maxLength": 500, "default": "{onlinePlayers} os. ⭔ Dzień {day} ⭔ {time}{bloodMoonIcon}", "description": "Server status message. Placeholders: {onlinePlayers}, {day}, {time}, {bloodMoonIcon}, {serverName}." },
+      "bloodMoonIcon": { "type": "string", "maxLength": 50, "default": " ⭔ 🩸" },
+      "timeConsoleCommand": { "type": "string", "enum": ["gettime"], "default": "gettime" },
+      "hordeIntervalDays": { "type": "integer", "minimum": 1, "default": 7 },
+      "firstHordeDay": { "type": "integer", "minimum": 1, "default": 7 },
+      "bloodMoonStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 22 },
+      "bloodMoonEndHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 4 },
+      "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "Dzisiaj zapowiadają Krwawy Księżyc..." },
+      "bloodMoonStartingMessage": { "type": "string", "maxLength": 500, "default": "Krwawy Księżyc wschodzi..." },
+      "bloodMoonEndingMessage": { "type": "string", "maxLength": 500, "default": "Krwawy Księżyc zachodzi..." }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [],
+  "commands": {
+    "serverstats": {
+      "trigger": "serverstats",
+      "description": "Show current 7D2D server stats.",
+      "helpText": "Shows online player count, current day, time, and blood moon indicator.",
+      "function": "src/commands/serverstats/index.js"
+    }
+  },
+  "hooks": {
+    "discordChatRelay": { "eventType": "discord-message", "description": "Relays Discord chat channel messages into game chat.", "function": "src/hooks/discord-chat-relay/index.js" },
+    "gameChatRelay": { "eventType": "chat-message", "description": "Relays in-game chat messages to Discord chat channel.", "function": "src/hooks/game-chat-relay/index.js" },
+    "monitorJoin": { "eventType": "player-connected", "description": "Sends player join messages to the monitoring channel.", "function": "src/hooks/monitor-join/index.js" },
+    "monitorLeave": { "eventType": "player-disconnected", "description": "Sends player leave messages to the monitoring channel.", "function": "src/hooks/monitor-leave/index.js" },
+    "monitorDeath": { "eventType": "player-death", "description": "Sends player death messages to the monitoring channel.", "function": "src/hooks/monitor-death/index.js" }
+  },
+  "cronJobs": {
+    "updateStatus": { "temporalValue": "*/5 * * * *", "description": "Updates the persistent Discord server status message.", "function": "src/cronjobs/update-status/index.js" },
+    "bloodMoonMonitor": { "temporalValue": "*/5 * * * *", "description": "Checks 7D2D time and sends blood moon day/start/end notices.", "function": "src/cronjobs/blood-moon-monitor/index.js" }
+  },
+  "functions": {
+    "discord-7d2d-status-helpers": { "function": "src/functions/discord-7d2d-status-helpers.js" }
+  }
+}
