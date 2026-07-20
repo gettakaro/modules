@@ -65,6 +65,16 @@ export function buildDaysUntilText(config, daysUntil) {
   return template.replace(/\{daysUntil\}/g, String(daysUntil));
 }
 
+function serializeConsoleOutput(value) {
+  if (typeof value === 'string') return value;
+
+  try {
+    return JSON.stringify(value ?? '');
+  } catch {
+    return String(value ?? '');
+  }
+}
+
 async function readCurrentDayFromConsole(gameServerId, config, takaro) {
   const command = String(config.timeConsoleCommand || 'gettime').trim();
   if (command === '') {
@@ -79,20 +89,20 @@ async function readCurrentDayFromConsole(gameServerId, config, takaro) {
     result?.data?.data?.message,
     result?.data?.data,
     result?.data,
-    result,
   ];
 
   for (const possibleOutput of possibleOutputs) {
-    const day = extractCurrentDay(
-      typeof possibleOutput === 'string' ? possibleOutput : JSON.stringify(possibleOutput ?? ''),
-    );
+    const day = extractCurrentDay(serializeConsoleOutput(possibleOutput));
     if (day !== null) {
       return { currentDay: day, source: 'console' };
     }
   }
 
   if (config.includeConsoleOutputInLogs ?? true) {
-    console.warn(`blood-moon-countdown: failed to parse day from console command '${command}'. Result: ${JSON.stringify(result)}`);
+    const diagnosticOutput = result?.data?.data?.rawResult ?? result?.data?.data ?? result?.data;
+    console.warn(
+      `blood-moon-countdown: failed to parse day from console command '${command}'. Result: ${serializeConsoleOutput(diagnosticOutput)}`,
+    );
   } else {
     console.warn(`blood-moon-countdown: failed to parse day from console command '${command}'.`);
   }
@@ -101,22 +111,11 @@ async function readCurrentDayFromConsole(gameServerId, config, takaro) {
 }
 
 export async function resolveCurrentDay(gameServerId, config, takaro) {
-  if (config.parseConsoleTime ?? true) {
-    try {
-      const parsed = await readCurrentDayFromConsole(gameServerId, config, takaro);
-      if (parsed) return parsed;
-    } catch (err) {
-      console.warn(`blood-moon-countdown: console time lookup failed: ${err}`);
-    }
-
-    if (!(config.allowManualFallbackOnParseFailure ?? false)) {
-      return null;
-    }
-  }
-
-  const fallbackDay = toPositiveInteger(config.manualCurrentDay, null);
-  if (fallbackDay !== null) {
-    return { currentDay: fallbackDay, source: 'manual' };
+  try {
+    const parsed = await readCurrentDayFromConsole(gameServerId, config, takaro);
+    if (parsed) return parsed;
+  } catch (err) {
+    console.warn(`blood-moon-countdown: console time lookup failed: ${err}`);
   }
 
   return null;

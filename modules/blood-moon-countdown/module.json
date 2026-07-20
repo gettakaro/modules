@@ -1,10 +1,10 @@
 {
   "name": "blood-moon-countdown",
   "author": "Takaro",
-  "description": "7 Days to Die helper commands and optional Discord replies that tell players how many in-game days remain until the next blood moon/horde night. The interval, first horde day, console command, manual fallback day, Discord triggers, and player-facing messages are editable in module config.",
+  "description": "7 Days to Die helper commands that tell players how many in-game days remain until the next blood moon/horde night using live server time.",
   "version": "latest",
   "supportedGames": [
-    "all"
+    "7 days to die"
   ],
   "config": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -28,22 +28,6 @@
         "maxLength": 80,
         "description": "Console command used to read current 7D2D game time. The output must include the current day, such as 'Day 12'."
       },
-      "manualCurrentDay": {
-        "type": "integer",
-        "minimum": 1,
-        "default": 1,
-        "description": "Manual current day used when parseConsoleTime is disabled, or as fallback when allowManualFallbackOnParseFailure is enabled."
-      },
-      "allowManualFallbackOnParseFailure": {
-        "type": "boolean",
-        "default": false,
-        "description": "When enabled, use manualCurrentDay if the console command fails or cannot be parsed. Leave disabled to avoid stale countdowns when live time lookup breaks."
-      },
-      "parseConsoleTime": {
-        "type": "boolean",
-        "default": true,
-        "description": "When enabled, /bloodmoon and /day7 run the console command and parse the current day. Disable to use manualCurrentDay only."
-      },
       "responseTemplate": {
         "type": "string",
         "default": "Blood moon: Day {nextHordeDay}. Current day: {currentDay}. {daysUntilText}.",
@@ -64,31 +48,19 @@
       },
       "parseErrorMessage": {
         "type": "string",
-        "default": "I couldn't read the current game day. Ask an admin to check the blood-moon-countdown module config or set manualCurrentDay.",
+        "default": "I couldn't read the current game day. Ask an admin to check the blood-moon-countdown module config and timeConsoleCommand.",
         "maxLength": 300,
-        "description": "Player-facing message when console time parsing fails and no manual fallback can be used."
+        "description": "Player-facing message when console time parsing fails."
       },
       "includeConsoleOutputInLogs": {
         "type": "boolean",
         "default": true,
         "description": "Log the raw console output when parsing fails. Useful while tuning timeConsoleCommand."
-      },
-      "discordTriggers": {
-        "type": "array",
-        "default": ["!bloodmoon", "!day7"],
-        "description": "Discord message triggers that make the module reply in Discord. Requires the discordBloodmoon hook to be configured with a Discord channel.",
-        "items": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 40
-        }
       }
     },
     "required": [],
     "additionalProperties": false
   },
-  "uiSchema": {},
-  "permissions": [],
   "commands": {
     "bloodmoon": {
       "trigger": "bloodmoon",
@@ -105,14 +77,6 @@
       "arguments": []
     }
   },
-  "hooks": {
-    "discordBloodmoon": {
-      "eventType": "discord-message",
-      "description": "Reply in Discord when someone types a configured trigger such as !bloodmoon or !day7.",
-      "function": "src/hooks/discord-bloodmoon/index.js"
-    }
-  },
-  "cronJobs": {},
   "functions": {
     "blood-moon-helpers": {
       "function": "src/functions/blood-moon-helpers.js"
