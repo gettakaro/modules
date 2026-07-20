@@ -133,6 +133,11 @@ export function isGlobalChatMessage(eventData) {
   return ['global', 'public', 'all'].includes(String(rawScope).toLowerCase());
 }
 
+export function isDiscordRelayEcho(eventData) {
+  const text = pickText(eventData?.msg, eventData?.message, eventData?.text, eventData?.chatMessage?.message);
+  return /^\[discord\]\s+/i.test(text);
+}
+
 export async function updatePersistentDiscordMessage(gameServerId, moduleId, channelId, message) {
   const safeMessage = sanitizeDiscordMessage(message);
   const key = `${STATUS_MESSAGE_KEY_PREFIX}${channelId}`;

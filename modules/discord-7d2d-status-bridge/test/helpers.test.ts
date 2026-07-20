@@ -11,16 +11,17 @@ interface HelperExports {
   renderTemplate: (template: string, status: Record<string, unknown>, config: Record<string, unknown>) => string;
   sanitizeDiscordMessage: (message: string) => string;
   isGlobalChatMessage: (eventData: Record<string, unknown>) => boolean;
+  isDiscordRelayEcho: (eventData: Record<string, unknown>) => boolean;
 }
 
 const helperPath = new URL('../src/functions/discord-7d2d-status-helpers.js', import.meta.url);
 let source = readFileSync(helperPath, 'utf8');
 source = source.replace("import { takaro } from '@takaro/helpers';", 'const takaro = {};');
 source = source.replace(/export /g, '');
-source += '\nmodule.exports = { parse7d2dTime, nextHordeDay, isBloodMoonDay, isBloodMoonActive, renderTemplate, sanitizeDiscordMessage, isGlobalChatMessage };';
+source += '\nmodule.exports = { parse7d2dTime, nextHordeDay, isBloodMoonDay, isBloodMoonActive, renderTemplate, sanitizeDiscordMessage, isGlobalChatMessage, isDiscordRelayEcho };';
 const sandbox: { module: { exports: HelperExports | Record<string, never> }; console: Console } = { module: { exports: {} }, console };
 vm.runInNewContext(source, sandbox, { filename: helperPath.pathname });
-const { parse7d2dTime, nextHordeDay, isBloodMoonDay, isBloodMoonActive, renderTemplate, sanitizeDiscordMessage, isGlobalChatMessage } = sandbox.module.exports as HelperExports;
+const { parse7d2dTime, nextHordeDay, isBloodMoonDay, isBloodMoonActive, renderTemplate, sanitizeDiscordMessage, isGlobalChatMessage, isDiscordRelayEcho } = sandbox.module.exports as HelperExports;
 
 describe('discord-7d2d-status-helpers', () => {
   it('parses active 7D2D gettime output', () => {
@@ -57,5 +58,11 @@ describe('discord-7d2d-status-helpers', () => {
     assert.equal(isGlobalChatMessage({ channel: 'team' }), false);
     assert.equal(isGlobalChatMessage({ type: 'whisper', recipient: 'player2' }), false);
     assert.equal(isGlobalChatMessage({ msg: 'missing scope defaults private' }), false);
+  });
+
+  it('detects Discord-to-game relay echoes', () => {
+    assert.equal(isDiscordRelayEcho({ msg: '[Discord] Alice: hello', channel: 'global' }), true);
+    assert.equal(isDiscordRelayEcho({ message: ' [discord] Bob: hello', chatType: 'public' }), true);
+    assert.equal(isDiscordRelayEcho({ text: 'normal game chat', channel: 'global' }), false);
   });
 });
