@@ -12,7 +12,9 @@ async function main() {
   const text = pickText(eventData?.msg, eventData?.message, eventData?.content, eventData?.text);
   if (!text) return;
   const author = pickAuthorName(eventData);
-  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, { message: `[Discord] ${author}: ${text}`, opts: {} });
+  const message = `[Discord] ${author}: ${text}`;
+  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, { message, opts: {} });
+  console.log(`discord-7d2d-status: relayed Discord message to game: ${message}`);
 }
 
 await main();

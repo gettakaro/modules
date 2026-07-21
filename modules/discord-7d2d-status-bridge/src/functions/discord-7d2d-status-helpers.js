@@ -3,6 +3,60 @@ import { takaro } from '@takaro/helpers';
 export const STATUS_MESSAGE_KEY_PREFIX = 'discord7d2d:statusMessage:';
 export const BLOOD_STATE_KEY = 'discord7d2d:bloodState';
 
+export const MESSAGE_PRESETS = {
+  en: {
+    joinMessageTemplate: '{player} joined the game.',
+    leaveMessageTemplate: '{player} left the game.',
+    deathMessageTemplate: '{player} died.',
+    deathWithReasonMessageTemplate: '{player} died: {reason}',
+    bloodMoonTodayMessage: 'Today is the Blood Moon day...',
+    bloodMoonStartingMessage: 'Blood Moon is starting...',
+    bloodMoonEndingMessage: 'Blood Moon is ending...',
+    serverStartingMessageTemplate: 'Server starting...',
+    serverOfflineMessageTemplate: 'Server is offline.',
+    statusTemplate: '{onlinePlayers} online ⭒ Day {day} ⭒ {time}{bloodMoonIcon}\nPlayers:\n{playerList}',
+    emptyPlayerListText: 'Nobody online',
+    unknownPlayerText: 'Player',
+  },
+  pl: {
+    joinMessageTemplate: '{player} dołącza do gry.',
+    leaveMessageTemplate: '{player} opuszcza grę.',
+    deathMessageTemplate: '{player} nie żyje.',
+    deathWithReasonMessageTemplate: '{player} nie żyje: {reason}',
+    bloodMoonTodayMessage: 'Dzisiaj zapowiadają Krwawy Księżyc...',
+    bloodMoonStartingMessage: 'Krwawy Księżyc wschodzi...',
+    bloodMoonEndingMessage: 'Krwawy Księżyc zachodzi...',
+    serverStartingMessageTemplate: 'Serwer startuje...',
+    serverOfflineMessageTemplate: 'Serwer wyłączony.',
+    statusTemplate: '{onlinePlayers} os. ⭒ Dzień {day} ⭒ {time}{bloodMoonIcon}\nLista graczy:\n{playerList}',
+    emptyPlayerListText: 'Brak graczy online',
+    unknownPlayerText: 'Gracz',
+  },
+};
+
+export function getLanguage(config = {}) {
+  return Object.hasOwn(MESSAGE_PRESETS, config.language) ? config.language : 'en';
+}
+
+export function resolveMessage(config = {}, key) {
+  const override = config[key];
+  if (typeof override === 'string' && override.trim()) return override;
+  const language = getLanguage(config);
+  return MESSAGE_PRESETS[language]?.[key] ?? MESSAGE_PRESETS.en[key] ?? '';
+}
+
+export function renderMessage(config, key, values = {}) {
+  let rendered = resolveMessage(config, key);
+  for (const [placeholder, value] of Object.entries(values)) {
+    rendered = rendered.split(`{${placeholder}}`).join(String(value ?? ''));
+  }
+  const unknown = [...new Set(rendered.match(/\{[A-Za-z][A-Za-z0-9]*\}/g) ?? [])];
+  if (unknown.length > 0) {
+    console.warn(`discord-7d2d-status: unknown template placeholders: ${unknown.join(', ')}`);
+  }
+  return rendered;
+}
+
 export function parse7d2dTime(raw) {
   const text = String(raw ?? '');
   const dayMatch = text.match(/\bDay\s*:?\s*(\d+)\b/i) || text.match(/\bD\s*:?\s*(\d+)\b/i) || text.match(/(?:Game|World)\s*time.*?\b(\d+)\b/i);
@@ -32,12 +86,32 @@ export function isBloodMoonActive(parsed, firstHordeDay = 7, interval = 7, start
   return false;
 }
 
+export async function getOnlinePlayers(gameServerId) {
+  const limit = 100;
+  const records = [];
+  let page = 0;
+  let total = 0;
+  do {
+    const res = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({
+      filters: { gameServerId: [gameServerId], online: [true] },
+      extend: ['player'],
+      limit,
+      page,
+    });
+    records.push(...res.data.data);
+    total = res.data.meta?.total ?? records.length;
+    page += 1;
+  } while (records.length < total);
+
+  const playerNames = records
+    .map((record) => record.player?.name || record.gameId)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  return { onlinePlayers: total, playerNames };
+}
+
 export async function getOnlineCount(gameServerId) {
-  const res = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({
-    filters: { gameServerId: [gameServerId], online: [true] },
-    limit: 1,
-  });
-  return res.data.meta?.total ?? res.data.data.length;
+  return (await getOnlinePlayers(gameServerId)).onlinePlayers;
 }
 
 export async function getServerName(gameServerId) {
@@ -61,26 +135,35 @@ export async function executeTimeCommand(gameServerId, command = 'gettime') {
 }
 
 export async function getStatus(gameServerId, config) {
-  const [onlinePlayers, serverName, rawTime] = await Promise.all([
-    getOnlineCount(gameServerId),
+  const [players, serverName, rawTime] = await Promise.all([
+    getOnlinePlayers(gameServerId),
     getServerName(gameServerId),
     executeTimeCommand(gameServerId, config.timeConsoleCommand ?? 'gettime'),
   ]);
   const parsed = parse7d2dTime(rawTime);
+  if (!parsed) console.warn(`discord-7d2d-status: could not parse 7D2D time: ${rawTime}`);
   const day = parsed?.day ?? '?';
   const time = parsed?.time ?? '?';
   const active = isBloodMoonActive(parsed, config.firstHordeDay ?? 7, config.hordeIntervalDays ?? 7, config.bloodMoonStartHour ?? 22, config.bloodMoonEndHour ?? 4);
-  return { onlinePlayers, serverName, rawTime, parsed, day, time, bloodMoonActive: active };
+  return { ...players, serverName, rawTime, parsed, day, time, bloodMoonActive: active };
 }
 
 export function renderTemplate(template, status, config) {
-  const bloodMoonIcon = status.bloodMoonActive ? (config.bloodMoonIcon ?? ' ⭔ 🩸') : '';
-  return String(template ?? '{onlinePlayers} os. ⭔ Dzień {day} ⭔ {time}{bloodMoonIcon}')
-    .replace(/\{onlinePlayers\}/g, String(status.onlinePlayers))
-    .replace(/\{serverName\}/g, String(status.serverName))
-    .replace(/\{day\}/g, String(status.day))
-    .replace(/\{time\}/g, String(status.time))
-    .replace(/\{bloodMoonIcon\}/g, bloodMoonIcon);
+  const effectiveConfig = typeof template === 'string' && template.trim()
+    ? { ...config, statusTemplate: template }
+    : config;
+  const bloodMoonIcon = status.bloodMoonActive ? (config.bloodMoonIcon ?? ' ⭒ 🩸') : '';
+  const playerList = status.playerNames?.length
+    ? status.playerNames.join('\n')
+    : resolveMessage(config, 'emptyPlayerListText');
+  return renderMessage(effectiveConfig, 'statusTemplate', {
+    onlinePlayers: status.onlinePlayers,
+    playerList,
+    serverName: status.serverName,
+    day: status.day,
+    time: status.time,
+    bloodMoonIcon,
+  });
 }
 
 async function findVariable(gameServerId, moduleId, key) {
@@ -107,11 +190,12 @@ export function getDiscordChannelFromHook(data, configuredChannelId, hookName) {
 }
 
 export async function sendDiscord(channelId, message) {
+  const safeMessage = sanitizeDiscordMessage(message);
   if (!channelId) {
-    console.log(`discord-7d2d-status: no Discord channel configured, skipped message: ${message}`);
+    console.log(`discord-7d2d-status: no Discord channel configured, skipped message: ${safeMessage}`);
     return null;
   }
-  return takaro.discord.discordControllerSendMessage(channelId, { message: sanitizeDiscordMessage(message) });
+  return takaro.discord.discordControllerSendMessage(channelId, { message: safeMessage });
 }
 
 export function sanitizeDiscordMessage(message) {

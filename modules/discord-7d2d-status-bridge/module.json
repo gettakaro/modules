@@ -1,12 +1,13 @@
 {
   "name": "discord-7d2d-status-bridge",
-  "description": "7 Days to Die Discord bridge with chat relay, monitoring events, blood moon notices, and an editable Polish server status message.",
+  "description": "7 Days to Die Discord bridge with chat relay, localized monitoring events, blood moon notices, and a persistent customizable server status message.",
   "version": "latest",
   "supportedGames": ["7 days to die"],
   "config": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
+      "language": { "type": "string", "enum": ["en", "pl"], "default": "en", "description": "Built-in message preset. Any non-empty message override takes precedence." },
       "chatChannelId": { "type": "string", "default": "", "description": "Discord channel ID for player chat relay." },
       "monitoringChannelId": { "type": "string", "default": "", "description": "Discord channel ID for system/death/join/leave/blood moon/status messages." },
       "relayDiscordToGame": { "type": "boolean", "default": true, "description": "Relay messages from the Discord chat channel into game chat." },
@@ -14,17 +15,25 @@
       "monitorJoins": { "type": "boolean", "default": true },
       "monitorLeaves": { "type": "boolean", "default": true },
       "monitorDeaths": { "type": "boolean", "default": true },
+      "joinMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional join-message override. Placeholder: {player}." },
+      "leaveMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional leave-message override. Placeholder: {player}." },
+      "deathMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional death-message override. Placeholder: {player}." },
+      "deathWithReasonMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional death-message override when a reason is available. Placeholders: {player}, {reason}." },
+      "serverStartingMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional server-online message override. Placeholder: {serverName}." },
+      "serverOfflineMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional server-offline message override. Placeholder: {serverName}." },
+      "emptyPlayerListText": { "type": "string", "maxLength": 100, "default": "", "description": "Optional text shown when no players are online." },
+      "unknownPlayerText": { "type": "string", "maxLength": 100, "default": "", "description": "Optional fallback when an event has no player name." },
       "updateStatusMessage": { "type": "boolean", "default": true, "description": "Update one persistent bot message with current server status instead of posting a new status every tick." },
-      "statusTemplate": { "type": "string", "maxLength": 500, "default": "{onlinePlayers} os. ⭔ Dzień {day} ⭔ {time}{bloodMoonIcon}", "description": "Server status message. Placeholders: {onlinePlayers}, {day}, {time}, {bloodMoonIcon}, {serverName}." },
-      "bloodMoonIcon": { "type": "string", "maxLength": 50, "default": " ⭔ 🩸" },
+      "statusTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional server-status override. Placeholders: {onlinePlayers}, {playerList}, {day}, {time}, {bloodMoonIcon}, {serverName}." },
+      "bloodMoonIcon": { "type": "string", "maxLength": 50, "default": " ⭒ 🩸" },
       "timeConsoleCommand": { "type": "string", "enum": ["gettime"], "default": "gettime" },
       "hordeIntervalDays": { "type": "integer", "minimum": 1, "default": 7 },
       "firstHordeDay": { "type": "integer", "minimum": 1, "default": 7 },
       "bloodMoonStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 22 },
       "bloodMoonEndHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 4 },
-      "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "Dzisiaj zapowiadają Krwawy Księżyc..." },
-      "bloodMoonStartingMessage": { "type": "string", "maxLength": 500, "default": "Krwawy Księżyc wschodzi..." },
-      "bloodMoonEndingMessage": { "type": "string", "maxLength": 500, "default": "Krwawy Księżyc zachodzi..." }
+      "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-day message override." },
+      "bloodMoonStartingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-starting message override." },
+      "bloodMoonEndingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-ending message override." }
     },
     "required": [],
     "additionalProperties": false
@@ -44,7 +53,8 @@
     "gameChatRelay": { "eventType": "chat-message", "description": "Relays in-game chat messages to Discord chat channel.", "function": "src/hooks/game-chat-relay/index.js" },
     "monitorJoin": { "eventType": "player-connected", "description": "Sends player join messages to the monitoring channel.", "function": "src/hooks/monitor-join/index.js" },
     "monitorLeave": { "eventType": "player-disconnected", "description": "Sends player leave messages to the monitoring channel.", "function": "src/hooks/monitor-leave/index.js" },
-    "monitorDeath": { "eventType": "player-death", "description": "Sends player death messages to the monitoring channel.", "function": "src/hooks/monitor-death/index.js" }
+    "monitorDeath": { "eventType": "player-death", "description": "Sends player death messages to the monitoring channel.", "function": "src/hooks/monitor-death/index.js" },
+    "monitorServerStatus": { "eventType": "server-status-changed", "description": "Sends server online and offline messages to the monitoring channel.", "function": "src/hooks/monitor-server-status/index.js" }
   },
   "cronJobs": {
     "updateStatus": { "temporalValue": "*/5 * * * *", "description": "Updates the persistent Discord server status message.", "function": "src/cronjobs/update-status/index.js" },
