@@ -1,0 +1,162 @@
+{
+  "name": "test-playtime-item-rewards",
+  "description": "Grant configurable item rewards after accumulated playtime intervals, with optional role-specific profiles.",
+  "version": "latest",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "playtimeIntervalMinutes": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 120,
+        "description": "Accumulated playtime required between reward cycles."
+      },
+      "selectionMode": {
+        "type": "string",
+        "enum": [
+          "single",
+          "multiple"
+        ],
+        "default": "single",
+        "description": "Grant at most one passing item or every item whose chance passes."
+      },
+      "rewardMessage": {
+        "type": "string",
+        "default": "{playerName} received {items} after {intervalMinutes} minutes of playtime.",
+        "description": "Broadcast after a successful reward. Supports {playerName}, {playerId}, {gameId}, {items}, {itemCount}, {profileName}, and {intervalMinutes}."
+      },
+      "items": {
+        "type": "array",
+        "default": [],
+        "description": "Default item pool.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "Game item identifier accepted by the connector."
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "default": ""
+            },
+            "dropChance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 100,
+              "description": "Independent percentage chance that this item enters the reward selection."
+            },
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "roleOverrides": {
+        "type": "array",
+        "default": [],
+        "description": "Reward profile overrides for Takaro roles, including Discord-synced roles.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "roleName": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "priority": {
+              "type": "integer",
+              "default": 0
+            },
+            "playtimeIntervalMinutes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "selectionMode": {
+              "type": "string",
+              "enum": [
+                "single",
+                "multiple"
+              ]
+            },
+            "rewardMessage": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "quality": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "dropChance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 100
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "roleName"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [],
+  "commands": {},
+  "hooks": {},
+  "cronJobs": {
+    "grant-playtime-item-rewards": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Grant item rewards to online players who reached a new playtime interval.",
+      "function": "src/cronjobs/grant-playtime-item-rewards/index.js"
+    }
+  },
+  "functions": {
+    "playtime-item-reward-helpers": {
+      "function": "src/functions/playtime-item-reward-helpers.js"
+    }
+  }
+}
