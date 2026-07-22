@@ -1,6 +1,6 @@
 {
-  "name": "test-playtime-item-rewards",
-  "description": "Grant configurable item rewards after accumulated playtime intervals, with optional role-specific profiles.",
+  "name": "playtime-item-rewards",
+  "description": "Grant configurable item-only rewards after accumulated playtime intervals, with independent drop chances, success-only announcements, and role-specific reward profiles.",
   "version": "latest",
   "supportedGames": [
     "all"

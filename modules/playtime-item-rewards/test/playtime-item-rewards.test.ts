@@ -84,11 +84,11 @@ describe('playtime-item-rewards', () => {
   });
 
   it('pushes and installs the item-only reward module', async () => {
-    assert.equal(
-      fs.existsSync(path.join(MODULE_DIR, 'module.json')),
-      true,
-      'Expected the playtime-item-rewards module manifest to exist',
-    );
+    const manifestPath = path.join(MODULE_DIR, 'module.json');
+    assert.equal(fs.existsSync(manifestPath), true, 'Expected the playtime-item-rewards module manifest to exist');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { name?: string; description?: string };
+    assert.equal(manifest.name, 'playtime-item-rewards');
+    assert.match(manifest.description ?? '', /item(?:-only)? rewards/i);
 
     await installModule(client, versionId, ctx!.gameServer.id, {
       userConfig: DEFAULT_CONFIG,
