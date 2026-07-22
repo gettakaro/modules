@@ -51,12 +51,17 @@ function normalizeSelectionMode(value, fallback = 'single') {
   return value === 'multiple' || value === 'single' ? value : fallback;
 }
 
+function normalizeMessageDelivery(value, fallback = 'broadcast') {
+  return ['broadcast', 'private', 'both', 'off'].includes(value) ? value : fallback;
+}
+
 function defaultProfile(config) {
   return {
     profileName: 'default',
     intervalMinutes: positiveInteger(config?.playtimeIntervalMinutes, DEFAULT_INTERVAL_MINUTES),
     selectionMode: normalizeSelectionMode(config?.selectionMode),
     rewardMessage: trimOrEmpty(config?.rewardMessage) || DEFAULT_REWARD_MESSAGE,
+    messageDelivery: normalizeMessageDelivery(config?.messageDelivery),
     items: normalizeItems(config?.items),
   };
 }
@@ -104,6 +109,9 @@ function resolveProfile(config, assignments, gameServerId) {
     rewardMessage: override.rewardMessage === undefined
       ? base.rewardMessage
       : trimOrEmpty(override.rewardMessage),
+    messageDelivery: override.messageDelivery === undefined
+      ? base.messageDelivery
+      : normalizeMessageDelivery(override.messageDelivery, base.messageDelivery),
     items: override.items === undefined ? base.items : normalizeItems(override.items),
   };
 }
@@ -329,6 +337,8 @@ function renderTemplate(template, placeholders) {
 }
 
 async function announceReward(gameServerId, player, profile, granted) {
+  const delivery = normalizeMessageDelivery(profile.messageDelivery);
+  if (delivery === 'off') return;
   if (!profile.rewardMessage) return;
   const itemSummary = granted.map((item) => `${item.amount}x ${item.name}`).join(', ');
   const message = renderTemplate(profile.rewardMessage, {
@@ -341,8 +351,19 @@ async function announceReward(gameServerId, player, profile, granted) {
     intervalMinutes: profile.intervalMinutes,
   });
   if (!message) return;
-  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, { message, opts: {} });
-  console.log(`playtime-item-rewards: announced "${message}"`);
+
+  if (delivery === 'broadcast' || delivery === 'both') {
+    await takaro.gameserver.gameServerControllerSendMessage(gameServerId, { message, opts: {} });
+  }
+
+  if ((delivery === 'private' || delivery === 'both') && trimOrEmpty(player.gameId)) {
+    await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {
+      message,
+      opts: { recipient: { gameId: player.gameId } },
+    });
+  }
+
+  console.log(`playtime-item-rewards: sent ${delivery} reward message "${message}"`);
 }
 
 export async function processPlaytimeItemRewards(gameServerId, mod) {

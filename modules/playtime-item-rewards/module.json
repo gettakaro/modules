@@ -27,7 +27,18 @@
       "rewardMessage": {
         "type": "string",
         "default": "{playerName} received {items} after {intervalMinutes} minutes of playtime.",
-        "description": "Broadcast after a successful reward. Supports {playerName}, {playerId}, {gameId}, {items}, {itemCount}, {profileName}, and {intervalMinutes}."
+        "description": "Message after a successful reward. Supports {playerName}, {playerId}, {gameId}, {items}, {itemCount}, {profileName}, and {intervalMinutes}."
+      },
+      "messageDelivery": {
+        "type": "string",
+        "enum": [
+          "broadcast",
+          "private",
+          "both",
+          "off"
+        ],
+        "default": "broadcast",
+        "description": "Where successful reward messages are sent: broadcast to the server, private message only to the rewarded player, both, or off."
       },
       "items": {
         "type": "array",
@@ -96,6 +107,15 @@
             },
             "rewardMessage": {
               "type": "string"
+            },
+            "messageDelivery": {
+              "type": "string",
+              "enum": [
+                "broadcast",
+                "private",
+                "both",
+                "off"
+              ]
             },
             "items": {
               "type": "array",

@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   playtimeIntervalMinutes: 120,
   selectionMode: 'single',
   rewardMessage: '{playerName} received {items} after {intervalMinutes} minutes of playtime.',
+  messageDelivery: 'broadcast',
   items: [
     {
       name: 'stone',
@@ -86,9 +87,15 @@ describe('playtime-item-rewards', () => {
   it('pushes and installs the item-only reward module', async () => {
     const manifestPath = path.join(MODULE_DIR, 'module.json');
     assert.equal(fs.existsSync(manifestPath), true, 'Expected the playtime-item-rewards module manifest to exist');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { name?: string; description?: string };
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      name?: string;
+      description?: string;
+      config?: { properties?: Record<string, { enum?: string[]; default?: string }> };
+    };
     assert.equal(manifest.name, 'playtime-item-rewards');
     assert.match(manifest.description ?? '', /item(?:-only)? rewards/i);
+    assert.deepEqual(manifest.config?.properties?.messageDelivery?.enum, ['broadcast', 'private', 'both', 'off']);
+    assert.equal(manifest.config?.properties?.messageDelivery?.default, 'broadcast');
 
     await installModule(client, versionId, ctx!.gameServer.id, {
       userConfig: DEFAULT_CONFIG,
