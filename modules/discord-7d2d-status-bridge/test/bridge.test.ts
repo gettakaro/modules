@@ -273,6 +273,14 @@ describe('discord-7d2d-status-bridge integration', () => {
     assert.ok(logs.length > 0);
   });
 
+  it('checks blood moon transitions every minute without changing status updates', () => {
+    const bloodMoonMonitor = mod.latestVersion.cronJobs.find((cronjob) => cronjob.name === 'bloodMoonMonitor');
+    const updateStatus = mod.latestVersion.cronJobs.find((cronjob) => cronjob.name === 'updateStatus');
+
+    assert.equal(bloodMoonMonitor?.temporalValue, '* * * * *');
+    assert.equal(updateStatus?.temporalValue, '*/5 * * * *');
+  });
+
   it('uses English monitoring messages by default', async () => {
     await installWithConfig();
 

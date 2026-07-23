@@ -58,7 +58,7 @@
   },
   "cronJobs": {
     "updateStatus": { "temporalValue": "*/5 * * * *", "description": "Updates the persistent Discord server status message.", "function": "src/cronjobs/update-status/index.js" },
-    "bloodMoonMonitor": { "temporalValue": "*/5 * * * *", "description": "Checks 7D2D time and sends blood moon day/start/end notices.", "function": "src/cronjobs/blood-moon-monitor/index.js" }
+    "bloodMoonMonitor": { "temporalValue": "* * * * *", "description": "Checks 7D2D phase transitions every minute and sends blood moon day/start/end notices.", "function": "src/cronjobs/blood-moon-monitor/index.js" }
   },
   "functions": {
     "discord-7d2d-status-helpers": { "function": "src/functions/discord-7d2d-status-helpers.js" }
