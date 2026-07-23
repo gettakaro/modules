@@ -29,8 +29,11 @@ const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 
 const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
 const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
 const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
-if (DISCORD_TEST_CHANNEL_ID && DISCORD_FORBIDDEN_CHANNEL_ID && DISCORD_TEST_CHANNEL_ID === DISCORD_FORBIDDEN_CHANNEL_ID) {
-  throw new Error('Live Discord smoke gates require distinct accessible and forbidden channel IDs');
+const DISCORD_NOT_FOUND_CHANNEL_ID = process.env.TAKARO_DISCORD_NOT_FOUND_CHANNEL_ID?.trim();
+const LIVE_DISCORD_CHANNEL_IDS = [DISCORD_TEST_CHANNEL_ID, DISCORD_FORBIDDEN_CHANNEL_ID, DISCORD_NOT_FOUND_CHANNEL_ID]
+  .filter((channelId): channelId is string => Boolean(channelId));
+if (new Set(LIVE_DISCORD_CHANNEL_IDS).size !== LIVE_DISCORD_CHANNEL_IDS.length) {
+  throw new Error('Live Discord smoke gates require distinct channel IDs');
 }
 
 interface BridgeExecutionResult {
@@ -462,6 +465,43 @@ describe('discord-7d2d-status-bridge integration', () => {
     const diagnostic = execution.logs.find((message) => message.includes('Takaro or Discord'));
     assert.ok(diagnostic, `Expected an authorization-layer diagnostic, logs: ${JSON.stringify(execution.logs)}`);
     assert.match(diagnostic, /guild is enabled and authorized in Takaro/);
+  });
+
+  it('[live smoke] does not replace a persistent status message for a generic channel 404', {
+    skip: DISCORD_NOT_FOUND_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_NOT_FOUND_CHANNEL_ID',
+  }, async () => {
+    assert.ok(DISCORD_NOT_FOUND_CHANNEL_ID);
+    const previousMessageId = '888888888888888888';
+    await installWithConfig({ monitoringChannelId: DISCORD_NOT_FOUND_CHANNEL_ID });
+    await setModuleVariable(
+      client,
+      ctx.gameServer.id,
+      mod.id,
+      `discord7d2d:statusMessage:${DISCORD_NOT_FOUND_CHANNEL_ID}`,
+      previousMessageId,
+    );
+
+    const execution = await triggerCronjobExecution('updateStatus');
+
+    assert.equal(execution.success, false, `Expected Discord update to fail, logs: ${JSON.stringify(execution.logs)}`);
+    assertLogContains(execution.logs, 'HTTP 404');
+    assert.equal(
+      execution.logs.filter((message) => (
+        message.includes(`POST /discord/channels/${DISCORD_NOT_FOUND_CHANNEL_ID}/message`)
+      )).length,
+      0,
+      `A generic channel 404 must not send a replacement message: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.ok(
+      !execution.logs.some((message) => message.includes('prior Discord status message') && message.includes('is missing')),
+      `A generic channel 404 must not be described as a missing prior message: ${JSON.stringify(execution.logs)}`,
+    );
+    const diagnostic = execution.logs.find((message) => (
+      message.includes(`channel ${DISCORD_NOT_FOUND_CHANNEL_ID} or its guild`)
+    ));
+    assert.ok(diagnostic, `Expected a channel-or-guild 404 diagnostic, logs: ${JSON.stringify(execution.logs)}`);
+    assert.match(diagnostic, /not found or is unavailable/);
+    assert.doesNotMatch(diagnostic, /Unknown Message/);
   });
 
   it('uses localized or overridden empty-player-list text', async () => {

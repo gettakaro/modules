@@ -242,11 +242,15 @@ export function normalizeDiscordError(channelId, err) {
   const discordCode = discordErrorCode(err);
   const codeText = discordCode === null ? '' : `, Discord code ${discordCode}`;
   const guidance = 'verify the Discord guild is enabled and authorized in Takaro; use a normal text channel and grant the Takaro bot View Channel, Send Messages, and Read Message History; private or archived threads may still reject the bot.';
+  if (discordCode === 10008) {
+    const errorDetails = status === null ? 'Discord code 10008' : `HTTP ${status}, Discord code 10008`;
+    return errorWithSafeCause(`Discord reported Unknown Message for the prior status message in channel ${channelId} (${errorDetails}): the previous status message no longer exists.`, err);
+  }
   if (status === 403) {
     return errorWithSafeCause(`Takaro or Discord refused delivery to channel ${channelId} (HTTP 403${codeText}): ${guidance}`, err);
   }
   if (status === 404) {
-    return errorWithSafeCause(`Discord channel ${channelId} was not found or is unavailable to the Takaro bot (HTTP 404${codeText}): ${guidance}`, err);
+    return errorWithSafeCause(`Discord channel ${channelId} or its guild was not found or is unavailable to the Takaro bot (HTTP 404${codeText}): ${guidance}`, err);
   }
 
   const statusText = status === null ? '' : ` (HTTP ${status})`;
@@ -255,8 +259,8 @@ export function normalizeDiscordError(channelId, err) {
   return errorWithSafeCause(`Discord delivery to channel ${channelId} failed${statusText}${reason}`, err);
 }
 
-function isMissingDiscordMessage(err) {
-  return discordErrorStatus(err) === 404 || discordErrorCode(err) === 10008;
+function shouldReplaceMissingMessage(err) {
+  return discordErrorCode(err) === 10008;
 }
 
 export async function sendDiscord(channelId, message) {
@@ -306,7 +310,7 @@ export async function updatePersistentDiscordMessage(gameServerId, moduleId, cha
       return existingId;
     } catch (err) {
       const reason = normalizeDiscordError(channelId, err);
-      if (!isMissingDiscordMessage(err)) throw reason;
+      if (!shouldReplaceMissingMessage(err)) throw reason;
       console.error(`discord-7d2d-status: prior Discord status message ${existingId} is missing, sending replacement: ${reason.message}`);
     }
   }
