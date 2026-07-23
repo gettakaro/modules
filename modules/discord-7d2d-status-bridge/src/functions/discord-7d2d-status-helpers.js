@@ -134,18 +134,23 @@ export async function executeTimeCommand(gameServerId, command = 'gettime') {
   return JSON.stringify(data);
 }
 
-export async function getStatus(gameServerId, config) {
-  const [players, serverName, rawTime] = await Promise.all([
-    getOnlinePlayers(gameServerId),
-    getServerName(gameServerId),
-    executeTimeCommand(gameServerId, config.timeConsoleCommand ?? 'gettime'),
-  ]);
+export async function getTimeStatus(gameServerId, config) {
+  const rawTime = await executeTimeCommand(gameServerId, config.timeConsoleCommand ?? 'gettime');
   const parsed = parse7d2dTime(rawTime);
   if (!parsed) console.warn(`discord-7d2d-status: could not parse 7D2D time: ${rawTime}`);
   const day = parsed?.day ?? '?';
   const time = parsed?.time ?? '?';
   const active = isBloodMoonActive(parsed, config.firstHordeDay ?? 7, config.hordeIntervalDays ?? 7, config.bloodMoonStartHour ?? 22, config.bloodMoonEndHour ?? 4);
-  return { ...players, serverName, rawTime, parsed, day, time, bloodMoonActive: active };
+  return { rawTime, parsed, day, time, bloodMoonActive: active };
+}
+
+export async function getStatus(gameServerId, config) {
+  const [players, serverName, timeStatus] = await Promise.all([
+    getOnlinePlayers(gameServerId),
+    getServerName(gameServerId),
+    getTimeStatus(gameServerId, config),
+  ]);
+  return { ...players, serverName, ...timeStatus };
 }
 
 export function renderTemplate(template, status, config) {

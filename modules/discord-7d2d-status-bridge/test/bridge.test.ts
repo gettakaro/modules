@@ -281,6 +281,33 @@ describe('discord-7d2d-status-bridge integration', () => {
     assert.equal(updateStatus?.temporalValue, '*/5 * * * *');
   });
 
+  it('polls blood moon time without loading players or server metadata', async () => {
+    const execution = await triggerCronjobExecution('bloodMoonMonitor');
+
+    assert.equal(execution.success, true, `Expected blood moon polling to succeed, logs: ${JSON.stringify(execution.logs)}`);
+    assert.ok(
+      !execution.logs.some((message) => message.includes('POST /gameserver/player/search')),
+      `Blood moon polling must not search players: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.ok(
+      !execution.logs.some((message) => message.includes(`GET /gameserver/${ctx.gameServer.id}`)),
+      `Blood moon polling must not fetch server metadata: ${JSON.stringify(execution.logs)}`,
+    );
+  });
+
+  it('does not rewrite an unchanged blood moon phase', async () => {
+    await triggerCronjob('bloodMoonMonitor');
+    const repeated = await triggerCronjobExecution('bloodMoonMonitor');
+
+    assert.equal(repeated.success, true, `Expected repeated blood moon polling to succeed, logs: ${JSON.stringify(repeated.logs)}`);
+    assert.ok(
+      !repeated.logs.some((message) => (
+        /POST \/variables(?:\s|$)/.test(message) || message.includes('PUT /variables/')
+      )),
+      `An unchanged blood moon phase must not be written again: ${JSON.stringify(repeated.logs)}`,
+    );
+  });
+
   it('uses English monitoring messages by default', async () => {
     await installWithConfig();
 

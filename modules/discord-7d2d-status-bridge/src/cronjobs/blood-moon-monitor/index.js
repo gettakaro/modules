@@ -1,5 +1,5 @@
 import { data } from '@takaro/helpers';
-import { BLOOD_STATE_KEY, getDiscordChannelFromHook, getStatus, isBloodMoonDay, readVariable, resolveMessage, sendDiscord, writeVariable } from './discord-7d2d-status-helpers.js';
+import { BLOOD_STATE_KEY, getDiscordChannelFromHook, getTimeStatus, isBloodMoonDay, readVariable, resolveMessage, sendDiscord, writeVariable } from './discord-7d2d-status-helpers.js';
 
 function phaseFor(status, config) {
   const parsed = status.parsed;
@@ -19,10 +19,11 @@ async function main() {
   const { gameServerId, module: mod } = data;
   const config = mod.userConfig;
   const channelId = getDiscordChannelFromHook(data, config.monitoringChannelId, 'bloodMoonMonitor');
-  const status = await getStatus(gameServerId, config);
+  const status = await getTimeStatus(gameServerId, config);
   const phase = phaseFor(status, config);
   const prev = await readVariable(gameServerId, mod.moduleId, BLOOD_STATE_KEY, null);
-  if (phase.messageKey && prev !== phase.key) await sendDiscord(channelId, resolveMessage(config, phase.messageKey));
+  if (prev === phase.key) return;
+  if (phase.messageKey) await sendDiscord(channelId, resolveMessage(config, phase.messageKey));
   await writeVariable(gameServerId, mod.moduleId, BLOOD_STATE_KEY, phase.key);
 }
 
