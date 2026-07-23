@@ -26,7 +26,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MODULE_DIR = path.resolve(__dirname, '..');
 const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 'scripts', 'module-to-json.js');
-const TEST_MODULE_NAME = `test-discord-7d2d-status-bridge-${process.pid}`;
+const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
 
 interface WaitForBridgeEventOptions {
   eventName: EventSearchInputAllowedFiltersEventNameEnum;
@@ -197,7 +197,7 @@ describe('discord-7d2d-status-bridge integration', () => {
     client = await createClient();
     await cleanupTestModules(client);
     await cleanupTestGameServers(client);
-    ctx = await startMockServer(client);
+    ctx = await startMockServer(client, { serverNamePrefix: 'qa-discord-bridge-' });
     mod = await pushDisposableBridgeModule(client);
     playerNames = await Promise.all(ctx.players.map(async (playerOnGameserver) => {
       const player = await client.player.playerControllerGetOne(playerOnGameserver.playerId);

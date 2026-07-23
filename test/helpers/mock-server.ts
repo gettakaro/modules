@@ -35,6 +35,7 @@ async function retry<T>(fn: () => Promise<T>, maxAttempts: number, delayMs: numb
 
 export interface StartMockServerOptions {
   totalPlayers?: number;
+  serverNamePrefix?: string;
 }
 
 export async function startMockServer(
@@ -57,7 +58,7 @@ export async function startMockServer(
     mockserver: {
       registrationToken,
       identityToken,
-      name: `test-server-${identityToken}`,
+      name: `${options.serverNamePrefix ?? 'test-server-'}${identityToken}`,
     },
     ws: {
       url: wsUrl,
