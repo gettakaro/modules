@@ -29,6 +29,9 @@ const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 
 const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
 const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
 const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
+if (DISCORD_TEST_CHANNEL_ID && DISCORD_FORBIDDEN_CHANNEL_ID && DISCORD_TEST_CHANNEL_ID === DISCORD_FORBIDDEN_CHANNEL_ID) {
+  throw new Error('Live Discord smoke gates require distinct accessible and forbidden channel IDs');
+}
 
 interface BridgeExecutionResult {
   success: boolean;
@@ -110,6 +113,24 @@ async function pushDisposableBridgeModule(client: Client): Promise<ModuleOutputD
   }
 }
 
+async function setModuleVariable(
+  client: Client,
+  gameServerId: string,
+  moduleId: string,
+  key: string,
+  value: unknown,
+) {
+  const serialized = JSON.stringify(value);
+  const existing = await client.variable.variableControllerSearch({
+    filters: { key: [key], gameServerId: [gameServerId], moduleId: [moduleId] },
+  });
+  if (existing.data.data[0]) {
+    await client.variable.variableControllerUpdate(existing.data.data[0].id, { value: serialized });
+  } else {
+    await client.variable.variableControllerCreate({ key, value: serialized, gameServerId, moduleId });
+  }
+}
+
 describe('discord-7d2d-status-bridge integration', () => {
   let client: Client;
   let ctx: MockServerContext;
@@ -174,6 +195,9 @@ describe('discord-7d2d-status-bridge integration', () => {
       gameserverId: ctx.gameServer.id,
       moduleId: mod.id,
       after: beforeTrigger,
+      predicate: (candidate) => (
+        (candidate.meta as { cronjob?: { id?: string } }).cronjob?.id === cronjob.id
+      ),
     });
     const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
     const logs = (result?.logs ?? []).map((entry) => entry.msg);
@@ -363,8 +387,8 @@ describe('discord-7d2d-status-bridge integration', () => {
     assertLogContains(logs, `Players:\n${expectedPlayers.join('\n')}`);
   });
 
-  it('delivers a status message through the real Takaro Discord API', {
-    skip: DISCORD_TEST_CHANNEL_ID ? false : 'Set TAKARO_DISCORD_TEST_CHANNEL_ID to run real Discord delivery coverage',
+  it('[live smoke] delivers a status message through the real Takaro Discord API', {
+    skip: DISCORD_TEST_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_TEST_CHANNEL_ID',
   }, async () => {
     assert.ok(DISCORD_TEST_CHANNEL_ID);
     await installWithConfig({
@@ -382,8 +406,8 @@ describe('discord-7d2d-status-bridge integration', () => {
     assertLogContains(execution.logs, `/discord/channels/${DISCORD_TEST_CHANNEL_ID}/message 200 OK`);
   });
 
-  it('explains how to fix a forbidden Discord monitoring channel', {
-    skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID to run forbidden-channel coverage',
+  it('[live smoke] explains both Takaro and Discord authorization for a forbidden monitoring channel', {
+    skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID',
   }, async () => {
     assert.ok(DISCORD_FORBIDDEN_CHANNEL_ID);
     await installWithConfig({
@@ -399,10 +423,45 @@ describe('discord-7d2d-status-bridge integration', () => {
     ));
     assert.ok(diagnostic, `Expected an actionable diagnostic naming the forbidden channel, logs: ${JSON.stringify(execution.logs)}`);
     assert.match(diagnostic, /normal text channel/);
+    assert.match(diagnostic, /Takaro or Discord/);
+    assert.match(diagnostic, /guild is enabled and authorized in Takaro/);
     assert.match(diagnostic, /View Channel/);
     assert.match(diagnostic, /Send Messages/);
     assert.match(diagnostic, /Read Message History/);
     assert.match(diagnostic, /private or archived threads may still reject the bot/);
+  });
+
+  it('[live smoke] does not replace a persistent status message when its update is forbidden', {
+    skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID',
+  }, async () => {
+    assert.ok(DISCORD_FORBIDDEN_CHANNEL_ID);
+    const previousMessageId = '999999999999999999';
+    await installWithConfig({ monitoringChannelId: DISCORD_FORBIDDEN_CHANNEL_ID });
+    await setModuleVariable(
+      client,
+      ctx.gameServer.id,
+      mod.id,
+      `discord7d2d:statusMessage:${DISCORD_FORBIDDEN_CHANNEL_ID}`,
+      previousMessageId,
+    );
+
+    const execution = await triggerCronjobExecution('updateStatus');
+
+    assert.equal(execution.success, false, `Expected Discord update to fail, logs: ${JSON.stringify(execution.logs)}`);
+    assertLogContains(
+      execution.logs,
+      `/discord/channels/${DISCORD_FORBIDDEN_CHANNEL_ID}/messages/${previousMessageId}`,
+    );
+    assert.equal(
+      execution.logs.filter((message) => (
+        message.includes(`POST /discord/channels/${DISCORD_FORBIDDEN_CHANNEL_ID}/message`)
+      )).length,
+      0,
+      `A forbidden update must not send a replacement message: ${JSON.stringify(execution.logs)}`,
+    );
+    const diagnostic = execution.logs.find((message) => message.includes('Takaro or Discord'));
+    assert.ok(diagnostic, `Expected an authorization-layer diagnostic, logs: ${JSON.stringify(execution.logs)}`);
+    assert.match(diagnostic, /guild is enabled and authorized in Takaro/);
   });
 
   it('uses localized or overridden empty-player-list text', async () => {

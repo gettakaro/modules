@@ -194,9 +194,44 @@ function discordErrorStatus(err) {
   return Number.isInteger(status) ? status : null;
 }
 
-function errorWithCause(message, cause) {
+function safeIdentifier(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
+}
+
+function discordApiError(err) {
+  const value = err?.response?.data?.meta?.error;
+  return value && typeof value === 'object' ? value : null;
+}
+
+function discordErrorCode(err) {
+  const apiError = discordApiError(err);
+  if (!apiError) return null;
+  for (const value of [apiError.code, apiError.message, apiError.details]) {
+    if (Number.isInteger(value) && value >= 1000) return value;
+    if (typeof value !== 'string') continue;
+    if (/^\d{4,6}$/.test(value)) return Number(value);
+    const match = value.match(/(?:DiscordAPIError|discord(?:\s+error)?\s+code|["']?code["']?)[^0-9]{0,16}(\d{4,6})/i);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+function safeDiscordCause(err) {
+  const details = [];
+  const status = discordErrorStatus(err);
+  const discordCode = discordErrorCode(err);
+  const takaroCode = safeIdentifier(discordApiError(err)?.code);
+  const requestCode = safeIdentifier(err?.code);
+  if (status !== null) details.push(`HTTP ${status}`);
+  if (discordCode !== null) details.push(`Discord code ${discordCode}`);
+  if (takaroCode && !/^\d+$/.test(takaroCode)) details.push(`Takaro code ${takaroCode}`);
+  if (requestCode) details.push(`request code ${requestCode}`);
+  return new Error(details.length > 0 ? `Discord request failed (${details.join(', ')})` : 'Discord request failed');
+}
+
+function errorWithSafeCause(message, err) {
   try {
-    return new Error(message, { cause });
+    return new Error(message, { cause: safeDiscordCause(err) });
   } catch (_err) {
     return new Error(message);
   }
@@ -204,19 +239,24 @@ function errorWithCause(message, cause) {
 
 export function normalizeDiscordError(channelId, err) {
   const status = discordErrorStatus(err);
-  const guidance = 'use a normal text channel and grant the Takaro bot View Channel, Send Messages, and Read Message History; private or archived threads may still reject the bot.';
+  const discordCode = discordErrorCode(err);
+  const codeText = discordCode === null ? '' : `, Discord code ${discordCode}`;
+  const guidance = 'verify the Discord guild is enabled and authorized in Takaro; use a normal text channel and grant the Takaro bot View Channel, Send Messages, and Read Message History; private or archived threads may still reject the bot.';
   if (status === 403) {
-    return errorWithCause(`Discord delivery to channel ${channelId} was forbidden (HTTP 403): ${guidance}`, err);
+    return errorWithSafeCause(`Takaro or Discord refused delivery to channel ${channelId} (HTTP 403${codeText}): ${guidance}`, err);
   }
   if (status === 404) {
-    return errorWithCause(`Discord channel ${channelId} was not found or is unavailable to the Takaro bot (HTTP 404): ${guidance}`, err);
+    return errorWithSafeCause(`Discord channel ${channelId} was not found or is unavailable to the Takaro bot (HTTP 404${codeText}): ${guidance}`, err);
   }
 
-  const reason = err instanceof Error && err.message
-    ? err.message
-    : (typeof err === 'string' && err ? err : 'Unknown error');
   const statusText = status === null ? '' : ` (HTTP ${status})`;
-  return errorWithCause(`Discord delivery to channel ${channelId} failed${statusText}: ${reason}`, err);
+  const requestCode = safeIdentifier(err?.code);
+  const reason = requestCode ? `: request code ${requestCode}` : '';
+  return errorWithSafeCause(`Discord delivery to channel ${channelId} failed${statusText}${reason}`, err);
+}
+
+function isMissingDiscordMessage(err) {
+  return discordErrorStatus(err) === 404 || discordErrorCode(err) === 10008;
 }
 
 export async function sendDiscord(channelId, message) {
@@ -266,7 +306,8 @@ export async function updatePersistentDiscordMessage(gameServerId, moduleId, cha
       return existingId;
     } catch (err) {
       const reason = normalizeDiscordError(channelId, err);
-      console.error(`discord-7d2d-status: failed to update Discord status message ${existingId}, sending replacement: ${reason.message}`);
+      if (!isMissingDiscordMessage(err)) throw reason;
+      console.error(`discord-7d2d-status: prior Discord status message ${existingId} is missing, sending replacement: ${reason.message}`);
     }
   }
   const sent = await sendDiscord(channelId, safeMessage);
