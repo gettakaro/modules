@@ -15,7 +15,6 @@ The module cannot grant Discord permissions or make Takaro's bot join an inacces
 ### Discord monitoring delivery
 
 - Keep `monitoringChannelId`; do not introduce webhooks.
-- Add a `discordbridgecheck` command that sends a small test message to the monitoring channel and privately confirms success to the invoking player.
 - Centralize Discord API error classification in the shared helper.
 - For HTTP 403, log and throw an actionable error that names the channel and asks the operator to use a normal text channel and grant the Takaro bot `View Channel`, `Send Messages`, and `Read Message History`. Explicitly call out private or archived threads.
 - Preserve other API errors and include their status/code without leaking credentials.
@@ -31,7 +30,7 @@ The module cannot grant Discord permissions or make Takaro's bot join an inacces
 
 - Add `privateBloodMoonNoticeOnFirstJoin`, defaulting to `false` so existing installations do not gain unsolicited private messages.
 - Add an optional `privateBloodMoonTodayMessage` override with English and Polish presets.
-- On `player-connected`, reuse the status helper. If the option is enabled, today is a Blood Moon day, and the joining player is the only online player, send the resolved message with `player.pm`.
+- The one-minute Blood Moon monitor remains the source of truth by persisting its current phase. On `player-connected`, read that phase and query only the online-player list. If the option is enabled, the phase is `today` or `start`, and the joining player is the only online player, send the resolved message with `player.pm`.
 - Discord join monitoring and the private in-game notice remain independent: a Discord delivery failure must still fail visibly, while the private notice uses the game messaging path.
 
 ## Testing
