@@ -26,6 +26,11 @@ function getPlaytimeBucket(playtimeSeconds, intervalMinutes) {
   return Math.floor(seconds / (intervalMinutes * 60));
 }
 
+function randomIntegerInclusive(minimum, maximum) {
+  if (maximum <= minimum) return minimum;
+  return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+}
+
 function moduleIdFrom(mod) {
   return trimOrEmpty(mod?.moduleId || mod?.id);
 }
@@ -56,9 +61,14 @@ function normalizeMessageDelivery(value, fallback = 'broadcast') {
 }
 
 function defaultProfile(config) {
+  const intervalMinimumMinutes = positiveInteger(config?.playtimeIntervalMinutes, DEFAULT_INTERVAL_MINUTES);
+  const configuredMaximum = config?.playtimeIntervalMaximumMinutes === undefined
+    ? intervalMinimumMinutes
+    : positiveInteger(config.playtimeIntervalMaximumMinutes, intervalMinimumMinutes);
   return {
     profileName: 'default',
-    intervalMinutes: positiveInteger(config?.playtimeIntervalMinutes, DEFAULT_INTERVAL_MINUTES),
+    intervalMinimumMinutes,
+    intervalMaximumMinutes: Math.max(intervalMinimumMinutes, configuredMaximum),
     selectionMode: normalizeSelectionMode(config?.selectionMode),
     rewardMessage: trimOrEmpty(config?.rewardMessage) || DEFAULT_REWARD_MESSAGE,
     messageDelivery: normalizeMessageDelivery(config?.messageDelivery),
@@ -67,7 +77,15 @@ function defaultProfile(config) {
 }
 
 function profileStateKey(profile) {
-  return JSON.stringify([profile.profileName, profile.intervalMinutes]);
+  return JSON.stringify([
+    profile.profileName,
+    profile.intervalMinimumMinutes,
+    profile.intervalMaximumMinutes,
+  ]);
+}
+
+function legacyProfileStateKey(profile) {
+  return JSON.stringify([profile.profileName, profile.intervalMinimumMinutes]);
 }
 
 function activeRoleNames(assignments, gameServerId) {
@@ -98,11 +116,24 @@ function resolveProfile(config, assignments, gameServerId) {
 
   if (matches.length === 0) return base;
   const override = matches[0].override;
+  const intervalMinimumMinutes = override.playtimeIntervalMinutes === undefined
+    ? base.intervalMinimumMinutes
+    : positiveInteger(override.playtimeIntervalMinutes, base.intervalMinimumMinutes);
+  let intervalMaximumMinutes;
+  if (override.playtimeIntervalMaximumMinutes !== undefined) {
+    intervalMaximumMinutes = positiveInteger(
+      override.playtimeIntervalMaximumMinutes,
+      intervalMinimumMinutes,
+    );
+  } else if (override.playtimeIntervalMinutes !== undefined) {
+    intervalMaximumMinutes = intervalMinimumMinutes;
+  } else {
+    intervalMaximumMinutes = base.intervalMaximumMinutes;
+  }
   return {
     profileName: trimOrEmpty(override.roleName) || base.profileName,
-    intervalMinutes: override.playtimeIntervalMinutes === undefined
-      ? base.intervalMinutes
-      : positiveInteger(override.playtimeIntervalMinutes, base.intervalMinutes),
+    intervalMinimumMinutes,
+    intervalMaximumMinutes: Math.max(intervalMinimumMinutes, intervalMaximumMinutes),
     selectionMode: override.selectionMode === undefined
       ? base.selectionMode
       : normalizeSelectionMode(override.selectionMode, base.selectionMode),
@@ -142,6 +173,23 @@ function parseState(variable, playerId) {
     ) {
       throw new Error('consumedBuckets must be a JSON object');
     }
+    if (
+      parsed.schedules !== undefined
+      && (!parsed.schedules || typeof parsed.schedules !== 'object' || Array.isArray(parsed.schedules))
+    ) {
+      throw new Error('schedules must be a JSON object');
+    }
+    for (const schedule of Object.values(parsed.schedules || {})) {
+      if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+        throw new Error('each schedule must be a JSON object');
+      }
+      if (!Number.isInteger(schedule.intervalMinutes) || schedule.intervalMinutes < 1) {
+        throw new Error('schedule intervalMinutes must be a positive integer');
+      }
+      if (!Number.isFinite(schedule.eligibleAtPlaytimeSeconds) || schedule.eligibleAtPlaytimeSeconds < 0) {
+        throw new Error('schedule eligibleAtPlaytimeSeconds must be a non-negative number');
+      }
+    }
     return {
       ...parsed,
       lastConsumedBucket: Math.max(0, Math.floor(Number(parsed.lastConsumedBucket) || 0)),
@@ -159,6 +207,23 @@ function consumedBucketFor(state, profileKey) {
   }
   if (!state.lastProfileKey || state.lastProfileKey === profileKey) return state.lastConsumedBucket;
   return 0;
+}
+
+function createSchedule(profile, cycleStartPlaytimeSeconds) {
+  const intervalMinutes = randomIntegerInclusive(
+    profile.intervalMinimumMinutes,
+    profile.intervalMaximumMinutes,
+  );
+  const cycleStart = Math.max(0, Number(cycleStartPlaytimeSeconds) || 0);
+  return {
+    intervalMinutes,
+    eligibleAtPlaytimeSeconds: cycleStart + intervalMinutes * 60,
+  };
+}
+
+function schedulesMatch(left, right) {
+  return left?.intervalMinutes === right?.intervalMinutes
+    && left?.eligibleAtPlaytimeSeconds === right?.eligibleAtPlaytimeSeconds;
 }
 
 async function readState(gameServerId, moduleId, playerId) {
@@ -183,6 +248,37 @@ async function writeState(gameServerId, moduleId, playerId, variable, state) {
   return created.data.data.id;
 }
 
+async function ensureSchedule(gameServerId, moduleId, playerId, profile) {
+  const profileKey = profileStateKey(profile);
+  const current = await readState(gameServerId, moduleId, playerId);
+  if (!current.state) {
+    throw new Error('persisted reward state is corrupt; refusing to schedule until it is repaired');
+  }
+
+  const existing = current.state.schedules?.[profileKey];
+  if (existing) return { profileKey, schedule: existing };
+
+  const legacyKey = legacyProfileStateKey(profile);
+  const legacyBucket = consumedBucketFor(current.state, legacyKey);
+  const cycleStartPlaytimeSeconds = legacyBucket * profile.intervalMinimumMinutes * 60;
+  const schedule = createSchedule(profile, cycleStartPlaytimeSeconds);
+  await writeState(gameServerId, moduleId, playerId, current.variable, {
+    ...current.state,
+    schedules: {
+      ...(current.state.schedules || {}),
+      [profileKey]: schedule,
+    },
+    updatedAt: new Date().toISOString(),
+  });
+
+  const confirmed = await readState(gameServerId, moduleId, playerId);
+  const confirmedSchedule = confirmed.state?.schedules?.[profileKey];
+  if (!confirmed.state || !confirmedSchedule) {
+    throw new Error('could not persist reward schedule');
+  }
+  return { profileKey, schedule: confirmedSchedule };
+}
+
 function claimIsLive(claim) {
   if (!claim?.claimedAt) return false;
   if (claim.deliveryStartedAt) return true;
@@ -190,16 +286,24 @@ function claimIsLive(claim) {
   return Number.isFinite(claimedAt) && Date.now() - claimedAt < CLAIM_TIMEOUT_MS;
 }
 
-async function acquireBucketClaim(gameServerId, moduleId, playerId, profileKey, bucket) {
+async function acquireScheduleClaim(gameServerId, moduleId, playerId, profileKey, schedule, playtimeSeconds) {
   const current = await readState(gameServerId, moduleId, playerId);
   if (!current.state) {
     throw new Error('persisted reward state is corrupt; refusing to grant until it is repaired');
   }
-  if (bucket <= consumedBucketFor(current.state, profileKey)) return null;
+  const currentSchedule = current.state.schedules?.[profileKey];
+  if (!schedulesMatch(currentSchedule, schedule)) return null;
+  if (playtimeSeconds < currentSchedule.eligibleAtPlaytimeSeconds) return null;
   if (current.state.claim && claimIsLive(current.state.claim)) return null;
 
   const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  const claim = { token, profileKey, bucket, claimedAt: new Date().toISOString() };
+  const claim = {
+    token,
+    profileKey,
+    intervalMinutes: currentSchedule.intervalMinutes,
+    eligibleAtPlaytimeSeconds: currentSchedule.eligibleAtPlaytimeSeconds,
+    claimedAt: new Date().toISOString(),
+  };
   await writeState(gameServerId, moduleId, playerId, current.variable, {
     ...current.state,
     claim,
@@ -231,25 +335,37 @@ async function markDeliveryStarted(gameServerId, moduleId, playerId, claim) {
     : null;
 }
 
-async function completeBucket(gameServerId, moduleId, playerId, claim, outcome) {
+async function completeCycle(gameServerId, moduleId, playerId, claim, outcome, playtimeSeconds, profile) {
   const current = await readState(gameServerId, moduleId, playerId);
   if (!current.state) {
     console.error(`playtime-item-rewards: state became corrupt while completing player ${playerId}`);
     return false;
   }
   if (current.state.claim?.token !== claim.token) {
-    console.error(`playtime-item-rewards: lost bucket claim for player ${playerId}`);
+    console.error(`playtime-item-rewards: lost cycle claim for player ${playerId}`);
+    return false;
+  }
+  const currentSchedule = current.state.schedules?.[claim.profileKey];
+  if (!schedulesMatch(currentSchedule, claim)) {
+    console.error(`playtime-item-rewards: reward schedule changed while completing player ${playerId}`);
     return false;
   }
 
+  const legacyKey = legacyProfileStateKey(profile);
+  const consumedBucket = getPlaytimeBucket(playtimeSeconds, profile.intervalMinimumMinutes);
+  const nextSchedule = createSchedule(profile, playtimeSeconds);
   await writeState(gameServerId, moduleId, playerId, current.variable, {
     ...current.state,
+    schedules: {
+      ...(current.state.schedules || {}),
+      [claim.profileKey]: nextSchedule,
+    },
     consumedBuckets: {
       ...(current.state.consumedBuckets || {}),
-      [claim.profileKey]: claim.bucket,
+      [legacyKey]: consumedBucket,
     },
-    lastConsumedBucket: claim.bucket,
-    lastProfileKey: claim.profileKey,
+    lastConsumedBucket: consumedBucket,
+    lastProfileKey: legacyKey,
     claim: null,
     lastOutcome: outcome,
     updatedAt: new Date().toISOString(),
@@ -336,7 +452,7 @@ function renderTemplate(template, placeholders) {
   ));
 }
 
-async function announceReward(gameServerId, player, profile, granted) {
+async function announceReward(gameServerId, player, profile, granted, intervalMinutes) {
   const delivery = normalizeMessageDelivery(profile.messageDelivery);
   if (delivery === 'off') return;
   if (!profile.rewardMessage) return;
@@ -348,7 +464,7 @@ async function announceReward(gameServerId, player, profile, granted) {
     items: itemSummary,
     itemCount: granted.reduce((sum, item) => sum + item.amount, 0),
     profileName: profile.profileName,
-    intervalMinutes: profile.intervalMinutes,
+    intervalMinutes,
   });
   if (!message) return;
 
@@ -390,9 +506,14 @@ export async function processPlaytimeItemRewards(gameServerId, mod) {
     let itemGrantSucceeded = false;
     try {
       const profile = resolveProfile(config, player.roles, gameServerId);
-      const profileKey = profileStateKey(profile);
-      const bucket = getPlaytimeBucket(player.playtimeSeconds, profile.intervalMinutes);
-      if (bucket < 1) continue;
+      const playtimeSeconds = Math.max(0, Number(player.playtimeSeconds) || 0);
+      const { profileKey, schedule } = await ensureSchedule(
+        gameServerId,
+        moduleId,
+        player.playerId,
+        profile,
+      );
+      if (playtimeSeconds < schedule.eligibleAtPlaytimeSeconds) continue;
 
       if (profile.items.length === 0) {
         console.error(`playtime-item-rewards: profile ${profile.profileName} has no valid items for player ${player.name}`);
@@ -400,14 +521,29 @@ export async function processPlaytimeItemRewards(gameServerId, mod) {
         continue;
       }
 
-      claim = await acquireBucketClaim(gameServerId, moduleId, player.playerId, profileKey, bucket);
+      claim = await acquireScheduleClaim(
+        gameServerId,
+        moduleId,
+        player.playerId,
+        profileKey,
+        schedule,
+        playtimeSeconds,
+      );
       if (!claim) continue;
       summary.playersEligible++;
 
       const selected = selectItems(profile);
       if (selected.length === 0) {
-        const completed = await completeBucket(gameServerId, moduleId, player.playerId, claim, 'no-drop');
-        if (!completed) throw new Error('could not persist no-drop bucket completion');
+        const completed = await completeCycle(
+          gameServerId,
+          moduleId,
+          player.playerId,
+          claim,
+          'no-drop',
+          playtimeSeconds,
+          profile,
+        );
+        if (!completed) throw new Error('could not persist no-drop cycle completion');
         claim = null;
         summary.noDrop++;
         console.log(`playtime-item-rewards: no item chance passed for ${player.name} using profile ${profile.profileName}`);
@@ -415,7 +551,7 @@ export async function processPlaytimeItemRewards(gameServerId, mod) {
       }
 
       claim = await markDeliveryStarted(gameServerId, moduleId, player.playerId, claim);
-      if (!claim) throw new Error('lost bucket claim before item delivery');
+      if (!claim) throw new Error('lost cycle claim before item delivery');
 
       const result = await grantItems(gameServerId, player, selected);
       if (result.granted.length === 0) {
@@ -428,9 +564,17 @@ export async function processPlaytimeItemRewards(gameServerId, mod) {
       itemGrantSucceeded = true;
       let stateCompleted = false;
       try {
-        stateCompleted = await completeBucket(gameServerId, moduleId, player.playerId, claim, 'granted');
+        stateCompleted = await completeCycle(
+          gameServerId,
+          moduleId,
+          player.playerId,
+          claim,
+          'granted',
+          playtimeSeconds,
+          profile,
+        );
       } catch (err) {
-        console.error(`playtime-item-rewards: items granted but bucket completion failed for ${player.name}: ${err}`);
+        console.error(`playtime-item-rewards: items granted but cycle completion failed for ${player.name}: ${err}`);
       }
       if (!stateCompleted) {
         summary.failed++;
@@ -447,7 +591,7 @@ export async function processPlaytimeItemRewards(gameServerId, mod) {
       );
 
       try {
-        await announceReward(gameServerId, player, profile, result.granted);
+        await announceReward(gameServerId, player, profile, result.granted, claim?.intervalMinutes || schedule.intervalMinutes);
       } catch (err) {
         console.error(`playtime-item-rewards: items granted but announcement failed for ${player.name}: ${err}`);
       }
