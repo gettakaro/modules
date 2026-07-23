@@ -39,6 +39,15 @@ const DEFAULT_CONFIG = {
 
 type ExecutionMeta = { result?: { success?: boolean; logs?: Array<{ msg: string }> } };
 
+type ConfigProperty = {
+  type?: string;
+  minimum?: number;
+  default?: number | string;
+  description?: string;
+  enum?: string[];
+  items?: { properties?: Record<string, ConfigProperty> };
+};
+
 type RewardState = {
   lastConsumedBucket?: number;
   lastOutcome?: string;
@@ -90,12 +99,22 @@ describe('playtime-item-rewards', () => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
       name?: string;
       description?: string;
-      config?: { properties?: Record<string, { enum?: string[]; default?: string }> };
+      config?: { properties?: Record<string, ConfigProperty> };
     };
     assert.equal(manifest.name, 'playtime-item-rewards');
     assert.match(manifest.description ?? '', /item(?:-only)? rewards/i);
     assert.deepEqual(manifest.config?.properties?.messageDelivery?.enum, ['broadcast', 'private', 'both', 'off']);
     assert.equal(manifest.config?.properties?.messageDelivery?.default, 'broadcast');
+    assert.equal(manifest.config?.properties?.playtimeIntervalMaximumMinutes?.type, 'integer');
+    assert.equal(manifest.config?.properties?.playtimeIntervalMaximumMinutes?.minimum, 1);
+    assert.match(
+      manifest.config?.properties?.playtimeIntervalMaximumMinutes?.description ?? '',
+      /leave.*empty.*fixed/i,
+    );
+    assert.equal(
+      manifest.config?.properties?.roleOverrides?.items?.properties?.playtimeIntervalMaximumMinutes?.type,
+      'integer',
+    );
 
     await installModule(client, versionId, ctx!.gameServer.id, {
       userConfig: DEFAULT_CONFIG,

@@ -13,7 +13,12 @@
         "type": "integer",
         "minimum": 1,
         "default": 120,
-        "description": "Accumulated playtime required between reward cycles."
+        "description": "Minimum reward interval in accumulated playtime minutes. This is also the fixed interval when playtimeIntervalMaximumMinutes is empty."
+      },
+      "playtimeIntervalMaximumMinutes": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Optional maximum reward interval in accumulated playtime minutes. Leave empty or set equal to playtimeIntervalMinutes for a fixed interval; set it higher to choose a random interval per player and reward cycle."
       },
       "selectionMode": {
         "type": "string",
@@ -96,7 +101,13 @@
             },
             "playtimeIntervalMinutes": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Optional role-specific minimum interval. Without a role-specific maximum, this is a fixed interval."
+            },
+            "playtimeIntervalMaximumMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional role-specific maximum interval. Leave empty for a fixed role interval, or set it higher than the effective minimum for a random interval."
             },
             "selectionMode": {
               "type": "string",
