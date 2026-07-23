@@ -27,6 +27,13 @@ const __dirname = path.dirname(__filename);
 const MODULE_DIR = path.resolve(__dirname, '..');
 const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 'scripts', 'module-to-json.js');
 const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
+const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
+const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
+
+interface BridgeExecutionResult {
+  success: boolean;
+  logs: string[];
+}
 
 interface WaitForBridgeEventOptions {
   eventName: EventSearchInputAllowedFiltersEventNameEnum;
@@ -153,7 +160,7 @@ describe('discord-7d2d-status-bridge integration', () => {
     return logs;
   }
 
-  async function triggerCronjob(name: string): Promise<string[]> {
+  async function triggerCronjobExecution(name: string): Promise<BridgeExecutionResult> {
     const cronjob = mod.latestVersion.cronJobs.find((candidate) => candidate.name === name);
     assert.ok(cronjob, `Expected cronjob '${name}' to exist`);
     const beforeTrigger = new Date();
@@ -170,8 +177,13 @@ describe('discord-7d2d-status-bridge integration', () => {
     });
     const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
     const logs = (result?.logs ?? []).map((entry) => entry.msg);
-    assert.equal(result?.success, true, `Expected cronjob '${name}' to succeed, logs: ${JSON.stringify(logs)}`);
-    return logs;
+    return { success: result?.success ?? false, logs };
+  }
+
+  async function triggerCronjob(name: string): Promise<string[]> {
+    const execution = await triggerCronjobExecution(name);
+    assert.equal(execution.success, true, `Expected cronjob '${name}' to succeed, logs: ${JSON.stringify(execution.logs)}`);
+    return execution.logs;
   }
 
   async function waitForOnlineCount(expected: number) {
@@ -349,6 +361,48 @@ describe('discord-7d2d-status-bridge integration', () => {
     assertLogContains(logs, `Day ?`);
     assertLogContains(logs, ctx.gameServer.name);
     assertLogContains(logs, `Players:\n${expectedPlayers.join('\n')}`);
+  });
+
+  it('delivers a status message through the real Takaro Discord API', {
+    skip: DISCORD_TEST_CHANNEL_ID ? false : 'Set TAKARO_DISCORD_TEST_CHANNEL_ID to run real Discord delivery coverage',
+  }, async () => {
+    assert.ok(DISCORD_TEST_CHANNEL_ID);
+    await installWithConfig({
+      monitoringChannelId: DISCORD_TEST_CHANNEL_ID,
+      updateStatusMessage: false,
+    });
+
+    const execution = await triggerCronjobExecution('updateStatus');
+
+    assert.equal(execution.success, true, `Expected Discord delivery to succeed, logs: ${JSON.stringify(execution.logs)}`);
+    assert.ok(
+      !execution.logs.some((message) => message.includes('skipped message:')),
+      `A skipped message is not Discord delivery evidence: ${JSON.stringify(execution.logs)}`,
+    );
+    assertLogContains(execution.logs, `/discord/channels/${DISCORD_TEST_CHANNEL_ID}/message 200 OK`);
+  });
+
+  it('explains how to fix a forbidden Discord monitoring channel', {
+    skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID to run forbidden-channel coverage',
+  }, async () => {
+    assert.ok(DISCORD_FORBIDDEN_CHANNEL_ID);
+    await installWithConfig({
+      monitoringChannelId: DISCORD_FORBIDDEN_CHANNEL_ID,
+      updateStatusMessage: false,
+    });
+
+    const execution = await triggerCronjobExecution('updateStatus');
+
+    assert.equal(execution.success, false, `Expected Discord delivery to fail, logs: ${JSON.stringify(execution.logs)}`);
+    const diagnostic = execution.logs.find((message) => (
+      message.includes(DISCORD_FORBIDDEN_CHANNEL_ID) && message.includes('normal text channel')
+    ));
+    assert.ok(diagnostic, `Expected an actionable diagnostic naming the forbidden channel, logs: ${JSON.stringify(execution.logs)}`);
+    assert.match(diagnostic, /normal text channel/);
+    assert.match(diagnostic, /View Channel/);
+    assert.match(diagnostic, /Send Messages/);
+    assert.match(diagnostic, /Read Message History/);
+    assert.match(diagnostic, /private or archived threads may still reject the bot/);
   });
 
   it('uses localized or overridden empty-player-list text', async () => {

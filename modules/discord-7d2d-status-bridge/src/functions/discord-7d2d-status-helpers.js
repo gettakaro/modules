@@ -189,13 +189,47 @@ export function getDiscordChannelFromHook(data, configuredChannelId, hookName) {
   return data?.module?.systemConfig?.hooks?.[hookName]?.discordChannelId || data?.discordChannelId || data?.eventData?.discordChannelId || data?.eventData?.channelId || '';
 }
 
+function discordErrorStatus(err) {
+  const status = err?.response?.status ?? err?.status;
+  return Number.isInteger(status) ? status : null;
+}
+
+function errorWithCause(message, cause) {
+  try {
+    return new Error(message, { cause });
+  } catch (_err) {
+    return new Error(message);
+  }
+}
+
+export function normalizeDiscordError(channelId, err) {
+  const status = discordErrorStatus(err);
+  const guidance = 'use a normal text channel and grant the Takaro bot View Channel, Send Messages, and Read Message History; private or archived threads may still reject the bot.';
+  if (status === 403) {
+    return errorWithCause(`Discord delivery to channel ${channelId} was forbidden (HTTP 403): ${guidance}`, err);
+  }
+  if (status === 404) {
+    return errorWithCause(`Discord channel ${channelId} was not found or is unavailable to the Takaro bot (HTTP 404): ${guidance}`, err);
+  }
+
+  const reason = err instanceof Error && err.message
+    ? err.message
+    : (typeof err === 'string' && err ? err : 'Unknown error');
+  const statusText = status === null ? '' : ` (HTTP ${status})`;
+  return errorWithCause(`Discord delivery to channel ${channelId} failed${statusText}: ${reason}`, err);
+}
+
 export async function sendDiscord(channelId, message) {
   const safeMessage = sanitizeDiscordMessage(message);
   if (!channelId) {
     console.log(`discord-7d2d-status: no Discord channel configured, skipped message: ${safeMessage}`);
     return null;
   }
-  return takaro.discord.discordControllerSendMessage(channelId, { message: safeMessage });
+  try {
+    return await takaro.discord.discordControllerSendMessage(channelId, { message: safeMessage });
+  } catch (err) {
+    throw normalizeDiscordError(channelId, err);
+  }
 }
 
 export function sanitizeDiscordMessage(message) {
@@ -231,7 +265,8 @@ export async function updatePersistentDiscordMessage(gameServerId, moduleId, cha
       await takaro.discord.discordControllerUpdateMessage(channelId, existingId, { message: safeMessage });
       return existingId;
     } catch (err) {
-      console.error(`discord-7d2d-status: failed to update Discord status message ${existingId}, sending replacement: ${err}`);
+      const reason = normalizeDiscordError(channelId, err);
+      console.error(`discord-7d2d-status: failed to update Discord status message ${existingId}, sending replacement: ${reason.message}`);
     }
   }
   const sent = await sendDiscord(channelId, safeMessage);
