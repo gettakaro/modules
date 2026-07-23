@@ -115,11 +115,6 @@ async function main() {
     const storedPending = await readVariable(gameServerId, mod.moduleId, BLOOD_PENDING_KEY, null);
     await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
 
-    if (previousObserved !== state.observedKey) {
-      await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
-      await writeVariable(gameServerId, mod.moduleId, BLOOD_STATE_KEY, state.observedKey);
-    }
-
     let delivered = normalizeAnnouncementKeys(storedDelivered);
     if (storedDelivered === null && isAnnouncementKey(previousObserved)) {
       delivered = addAnnouncementKey(delivered, previousObserved);
@@ -127,6 +122,11 @@ async function main() {
     if (!sameHistory(storedDelivered, delivered)) {
       await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
       await writeVariable(gameServerId, mod.moduleId, BLOOD_DELIVERED_KEY, delivered);
+    }
+
+    if (previousObserved !== state.observedKey) {
+      await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
+      await writeVariable(gameServerId, mod.moduleId, BLOOD_STATE_KEY, state.observedKey);
     }
 
     let pending = normalizeAnnouncementKeys(storedPending)

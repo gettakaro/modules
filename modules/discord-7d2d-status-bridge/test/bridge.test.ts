@@ -31,7 +31,14 @@ const TEST_TIME_DAY_7_NOON = 'say Day 7 12:00';
 const TEST_TIME_DAY_7_START = 'say Day 7 22:00';
 const TEST_TIME_DAY_8_AFTER_END = 'say Day 8 05:00';
 const TEST_TIME_COMMANDS = [TEST_TIME_DAY_7_NOON, TEST_TIME_DAY_7_START, TEST_TIME_DAY_8_AFTER_END];
-const TEST_FAR_FUTURE_CRON = '0 0 1 1 *';
+const dormantCronDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const TEST_DORMANT_CRON = [
+  dormantCronDate.getUTCMinutes(),
+  dormantCronDate.getUTCHours(),
+  dormantCronDate.getUTCDate(),
+  dormantCronDate.getUTCMonth() + 1,
+  '*',
+].join(' ');
 const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
 const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
 const DISCORD_NOT_FOUND_CHANNEL_ID = process.env.TAKARO_DISCORD_NOT_FOUND_CHANNEL_ID?.trim();
@@ -112,7 +119,7 @@ async function pushDisposableBridgeModule(client: Client): Promise<ModuleOutputD
     moduleJson.versions[0].configSchema = JSON.stringify(configSchema);
     const bloodMoonMonitor = moduleJson.versions[0].cronJobs.find((cronjob) => cronjob.name === 'bloodMoonMonitor');
     assert.ok(bloodMoonMonitor, 'Expected disposable import to contain bloodMoonMonitor');
-    bloodMoonMonitor.temporalValue = TEST_FAR_FUTURE_CRON;
+    bloodMoonMonitor.temporalValue = TEST_DORMANT_CRON;
 
     const existing = await client.module.moduleControllerSearch({
       filters: { name: [TEST_MODULE_NAME] },
@@ -420,7 +427,7 @@ describe('discord-7d2d-status-bridge integration', () => {
 
     assert.equal(manifest.cronJobs.bloodMoonMonitor.temporalValue, '* * * * *');
     assert.equal(manifest.cronJobs.updateStatus.temporalValue, '*/5 * * * *');
-    assert.equal(importedBloodMoonMonitor?.temporalValue, TEST_FAR_FUTURE_CRON);
+    assert.equal(importedBloodMoonMonitor?.temporalValue, TEST_DORMANT_CRON);
   });
 
   it('imports the opt-in private Blood Moon notice config with safe defaults', () => {
@@ -865,6 +872,15 @@ describe('discord-7d2d-status-bridge integration', () => {
     await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:6');
     await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
     await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+    const stateRecords = await client.variable.variableControllerSearch({
+      filters: {
+        key: ['discord7d2d:bloodState'],
+        gameServerId: [noticeCtx.gameServer.id],
+        moduleId: [mod.id],
+      },
+    });
+    const stateRecord = stateRecords.data.data[0];
+    assert.ok(stateRecord, 'Expected seeded legacy state record');
 
     const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
 
@@ -874,6 +890,38 @@ describe('discord-7d2d-status-bridge integration', () => {
       ['start:6'],
     );
     assertLogContains(execution.logs, 'skipped message: Today is the Blood Moon day...');
+    const commandFinished = execution.logs.findIndex((message) => (
+      message.includes(`/gameserver/${noticeCtx.gameServer.id}/command 200 OK`)
+    ));
+    const deliveredCreated = execution.logs.findIndex((message, index) => (
+      index > commandFinished && /POST \/variables(?:\s|$)/.test(message)
+    ));
+    const observedUpdated = execution.logs.findIndex((message) => (
+      message.includes(`PUT /variables/${stateRecord.id}`)
+    ));
+    const pendingCreated = execution.logs.findIndex((message, index) => (
+      index > observedUpdated && /POST \/variables(?:\s|$)/.test(message)
+    ));
+    const announcementAttempted = execution.logs.findIndex((message) => (
+      message.includes('skipped message: Today is the Blood Moon day...')
+    ));
+    assert.ok(commandFinished >= 0, `Expected current-time command proof: ${JSON.stringify(execution.logs)}`);
+    assert.ok(
+      deliveredCreated > commandFinished,
+      `Delivered history must initialize after deriving current state: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.ok(
+      observedUpdated > deliveredCreated,
+      `Delivered history must persist before observed state changes: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.ok(
+      pendingCreated > observedUpdated,
+      `Observed state must persist before pending work: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.ok(
+      announcementAttempted > pendingCreated,
+      `Pending work must persist before Discord delivery: ${JSON.stringify(execution.logs)}`,
+    );
   });
 
   it('bounds delivered Blood Moon announcement history to 32 unique keys', async () => {
