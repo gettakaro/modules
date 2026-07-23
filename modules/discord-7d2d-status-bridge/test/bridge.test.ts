@@ -137,8 +137,10 @@ async function setModuleVariable(
 describe('discord-7d2d-status-bridge integration', () => {
   let client: Client;
   let ctx: MockServerContext;
+  let noticeCtx: MockServerContext;
   let mod: ModuleOutputDTO;
   let installed = false;
+  let noticeInstalled = false;
   let playerName: string;
   let playerNames: string[];
 
@@ -154,13 +156,33 @@ describe('discord-7d2d-status-bridge integration', () => {
     installed = true;
   }
 
-  async function triggerHook(
+  async function installNoticeWithConfig(userConfig: Record<string, unknown> = {}) {
+    if (noticeInstalled) {
+      await uninstallModule(client, mod.id, noticeCtx.gameServer.id);
+      noticeInstalled = false;
+    }
+    await installModule(client, mod.latestVersion.id, noticeCtx.gameServer.id, {
+      userConfig: { chatChannelId: '', monitoringChannelId: '', ...userConfig },
+      systemConfig: { hooks: { discordChatRelay: { discordChannelId: '1' } } },
+    });
+    noticeInstalled = true;
+  }
+
+  async function triggerHookExecution(
     eventType: HookTriggerDTOEventTypeEnum,
-    options: { playerId?: string; eventMeta?: Record<string, unknown>; expectedLog?: string } = {},
-  ): Promise<string[]> {
+    options: {
+      playerId?: string;
+      eventMeta?: Record<string, unknown>;
+      expectedLog?: string;
+      serverContext?: MockServerContext;
+    } = {},
+  ): Promise<BridgeExecutionResult> {
+    const hook = mod.latestVersion.hooks.find((candidate) => candidate.eventType === eventType);
+    assert.ok(hook, `Expected hook for '${eventType}' to exist`);
+    const target = options.serverContext ?? ctx;
     const beforeTrigger = new Date();
     await client.hook.hookControllerTrigger({
-      gameServerId: ctx.gameServer.id,
+      gameServerId: target.gameServer.id,
       moduleId: mod.id,
       playerId: options.playerId,
       eventType,
@@ -168,20 +190,36 @@ describe('discord-7d2d-status-bridge integration', () => {
     });
     const event = await waitForBridgeEvent(client, {
       eventName: EventSearchInputAllowedFiltersEventNameEnum.HookExecuted,
-      gameserverId: ctx.gameServer.id,
+      gameserverId: target.gameServer.id,
       moduleId: mod.id,
       after: beforeTrigger,
-      predicate: options.expectedLog
-        ? (candidate) => {
+      predicate: (candidate) => {
+        const meta = candidate.meta as { hook?: { id?: string }; result?: { logs?: Array<{ msg: string }> } };
+        if (meta.hook?.id !== hook.id) return false;
+        if (options.expectedLog) {
           const result = (candidate.meta as { result?: { logs?: Array<{ msg: string }> } }).result;
           return (result?.logs ?? []).some((entry) => entry.msg.includes(options.expectedLog!));
         }
-        : undefined,
+        return true;
+      },
     });
     const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
     const logs = (result?.logs ?? []).map((entry) => entry.msg);
-    assert.equal(result?.success, true, `Expected hook '${eventType}' to succeed, logs: ${JSON.stringify(logs)}`);
-    return logs;
+    return { success: result?.success ?? false, logs };
+  }
+
+  async function triggerHook(
+    eventType: HookTriggerDTOEventTypeEnum,
+    options: {
+      playerId?: string;
+      eventMeta?: Record<string, unknown>;
+      expectedLog?: string;
+      serverContext?: MockServerContext;
+    } = {},
+  ): Promise<string[]> {
+    const execution = await triggerHookExecution(eventType, options);
+    assert.equal(execution.success, true, `Expected hook '${eventType}' to succeed, logs: ${JSON.stringify(execution.logs)}`);
+    return execution.logs;
   }
 
   async function triggerCronjobExecution(name: string): Promise<BridgeExecutionResult> {
@@ -237,6 +275,7 @@ describe('discord-7d2d-status-bridge integration', () => {
     await cleanupTestModules(client);
     await cleanupTestGameServers(client);
     ctx = await startMockServer(client, { serverNamePrefix: 'qa-discord-bridge-' });
+    noticeCtx = await startMockServer(client, { serverNamePrefix: 'qa-discord-notice-', totalPlayers: 1 });
     mod = await pushDisposableBridgeModule(client);
     playerNames = await Promise.all(ctx.players.map(async (playerOnGameserver) => {
       const player = await client.player.playerControllerGetOne(playerOnGameserver.playerId);
@@ -253,6 +292,12 @@ describe('discord-7d2d-status-bridge integration', () => {
 
   after(async () => {
     if (mod && ctx) {
+      if (noticeInstalled && noticeCtx) {
+        await uninstallModule(client, mod.id, noticeCtx.gameServer.id).catch((err) => {
+          const status = (err as { response?: { status?: number } }).response?.status;
+          console.error(`Cleanup: failed to uninstall bridge notice test module (HTTP ${status ?? 'unknown'})`);
+        });
+      }
       if (installed) {
         await uninstallModule(client, mod.id, ctx.gameServer.id).catch((err) => {
           const status = (err as { response?: { status?: number } }).response?.status;
@@ -265,6 +310,7 @@ describe('discord-7d2d-status-bridge integration', () => {
       });
     }
     if (ctx) await stopMockServer(ctx.server, client, ctx.gameServer.id);
+    if (noticeCtx) await stopMockServer(noticeCtx.server, client, noticeCtx.gameServer.id);
   });
 
   it('imports under a disposable name and scopes hook events to that module', async () => {
@@ -279,6 +325,148 @@ describe('discord-7d2d-status-bridge integration', () => {
 
     assert.equal(bloodMoonMonitor?.temporalValue, '* * * * *');
     assert.equal(updateStatus?.temporalValue, '*/5 * * * *');
+  });
+
+  it('imports the opt-in private Blood Moon notice config with safe defaults', () => {
+    const configSchema = JSON.parse(mod.latestVersion.configSchema) as {
+      properties?: Record<string, { type?: string; default?: unknown; maxLength?: number; description?: string }>;
+    };
+    const enabled = configSchema.properties?.privateBloodMoonNoticeOnFirstJoin;
+    const message = configSchema.properties?.privateBloodMoonTodayMessage;
+
+    assert.deepEqual(
+      { type: enabled?.type, default: enabled?.default },
+      { type: 'boolean', default: false },
+    );
+    assert.ok(enabled?.description, 'Expected the private notice toggle to have a description');
+    assert.deepEqual(
+      { type: message?.type, maxLength: message?.maxLength, default: message?.default },
+      { type: 'string', maxLength: 500, default: '' },
+    );
+    assert.ok(message?.description, 'Expected the private notice message to have a description');
+  });
+
+  it('privately sends the exact English Blood Moon Today wording to the first online player', async () => {
+    await installNoticeWithConfig({
+      monitorJoins: false,
+      privateBloodMoonNoticeOnFirstJoin: true,
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const logs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assertLogContains(logs, `/gameserver/${noticeCtx.gameServer.id}/message 200 OK`);
+    assertLogContains(logs, 'private blood moon first-join notice sent: Today is the Blood Moon day...');
+    assert.ok(
+      !logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/command`)),
+      `Join notice must use persisted phase without executing gettime: ${JSON.stringify(logs)}`,
+    );
+  });
+
+  it('uses the exact Polish Blood Moon Today wording for a persisted start phase', async () => {
+    await installNoticeWithConfig({ language: 'pl', privateBloodMoonNoticeOnFirstJoin: true });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:7');
+
+    const logs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assertLogContains(logs, `/gameserver/${noticeCtx.gameServer.id}/message 200 OK`);
+    assertLogContains(logs, 'private blood moon first-join notice sent: Dzisiaj zapowiadają Krwawy Księżyc...');
+  });
+
+  it('supports a non-empty private Blood Moon message override', async () => {
+    await installNoticeWithConfig({
+      privateBloodMoonNoticeOnFirstJoin: true,
+      privateBloodMoonTodayMessage: 'Custom private Blood Moon warning',
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const logs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assertLogContains(logs, 'private blood moon first-join notice sent: Custom private Blood Moon warning');
+  });
+
+  it('does not privately notify when the option is disabled by default', async () => {
+    await installNoticeWithConfig();
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const logs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assert.ok(!logs.some((message) => message.includes('private blood moon first-join notice sent:')));
+    assert.ok(!logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/message`)));
+  });
+
+  it('does not privately notify for missing, normal, or ended Blood Moon state', async () => {
+    await installNoticeWithConfig({ privateBloodMoonNoticeOnFirstJoin: true });
+    for (const phase of [null, 'normal:6', 'end:7']) {
+      await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', phase);
+
+      const logs = await triggerHook('player-connected', {
+        playerId: noticeCtx.players[0].playerId,
+        serverContext: noticeCtx,
+      });
+
+      assert.ok(
+        !logs.some((message) => message.includes('private blood moon first-join notice sent:')),
+        `Phase ${JSON.stringify(phase)} must not send a private notice: ${JSON.stringify(logs)}`,
+      );
+      assert.ok(
+        !logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/message`)),
+        `Phase ${JSON.stringify(phase)} must not call the game message API: ${JSON.stringify(logs)}`,
+      );
+    }
+  });
+
+  it('does not privately notify a missing player', async () => {
+    await installNoticeWithConfig({ privateBloodMoonNoticeOnFirstJoin: true });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const logs = await triggerHook('player-connected', { serverContext: noticeCtx });
+
+    assert.ok(!logs.some((message) => message.includes('private blood moon first-join notice sent:')));
+    assert.ok(!logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/message`)));
+  });
+
+  it('does not privately notify when more than one player is online', async () => {
+    await installWithConfig({ privateBloodMoonNoticeOnFirstJoin: true });
+    await setModuleVariable(client, ctx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const logs = await triggerHook('player-connected', { playerId: ctx.players[0].playerId });
+
+    assert.ok(!logs.some((message) => message.includes('private blood moon first-join notice sent:')));
+    assert.ok(!logs.some((message) => message.includes(`/gameserver/${ctx.gameServer.id}/message`)));
+  });
+
+  it('[live smoke] delivers the private notice before a configured Discord join failure remains visible', {
+    skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID',
+  }, async () => {
+    assert.ok(DISCORD_FORBIDDEN_CHANNEL_ID);
+    await installNoticeWithConfig({
+      monitoringChannelId: DISCORD_FORBIDDEN_CHANNEL_ID,
+      privateBloodMoonNoticeOnFirstJoin: true,
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+
+    const execution = await triggerHookExecution('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assert.equal(execution.success, false, `Configured Discord failure must fail the hook: ${JSON.stringify(execution.logs)}`);
+    assertLogContains(execution.logs, `/gameserver/${noticeCtx.gameServer.id}/message 200 OK`);
+    assertLogContains(execution.logs, 'private blood moon first-join notice sent: Today is the Blood Moon day...');
+    assertLogContains(execution.logs, `Takaro or Discord refused delivery to channel ${DISCORD_FORBIDDEN_CHANNEL_ID}`);
   });
 
   it('polls blood moon time without loading players or server metadata', async () => {

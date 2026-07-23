@@ -15,6 +15,7 @@
       "monitorJoins": { "type": "boolean", "default": true },
       "monitorLeaves": { "type": "boolean", "default": true },
       "monitorDeaths": { "type": "boolean", "default": true },
+      "privateBloodMoonNoticeOnFirstJoin": { "type": "boolean", "default": false, "description": "Privately notify the first player online when the persisted Blood Moon phase is today or starting." },
       "joinMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional join-message override. Placeholder: {player}." },
       "leaveMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional leave-message override. Placeholder: {player}." },
       "deathMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional death-message override. Placeholder: {player}." },
@@ -32,6 +33,7 @@
       "bloodMoonStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 22 },
       "bloodMoonEndHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 4 },
       "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-day message override." },
+      "privateBloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional private first-player Blood Moon notice override. The selected language preset is used when empty." },
       "bloodMoonStartingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-starting message override." },
       "bloodMoonEndingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-ending message override." }
     },
