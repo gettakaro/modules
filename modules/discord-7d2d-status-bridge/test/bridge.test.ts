@@ -134,6 +134,20 @@ async function setModuleVariable(
   }
 }
 
+async function deleteModuleVariable(
+  client: Client,
+  gameServerId: string,
+  moduleId: string,
+  key: string,
+) {
+  const existing = await client.variable.variableControllerSearch({
+    filters: { key: [key], gameServerId: [gameServerId], moduleId: [moduleId] },
+  });
+  await Promise.all(
+    existing.data.data.map((variable) => client.variable.variableControllerDelete(variable.id)),
+  );
+}
+
 describe('discord-7d2d-status-bridge integration', () => {
   let client: Client;
   let ctx: MockServerContext;
@@ -407,9 +421,30 @@ describe('discord-7d2d-status-bridge integration', () => {
     assert.ok(!logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/message`)));
   });
 
-  it('does not privately notify for missing, normal, or ended Blood Moon state', async () => {
+  it('does not privately notify when the Blood Moon state variable is absent', async () => {
     await installNoticeWithConfig({ privateBloodMoonNoticeOnFirstJoin: true });
-    for (const phase of [null, 'normal:6', 'end:7']) {
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    const variables = await client.variable.variableControllerSearch({
+      filters: {
+        key: ['discord7d2d:bloodState'],
+        gameServerId: [noticeCtx.gameServer.id],
+        moduleId: [mod.id],
+      },
+    });
+    assert.equal(variables.data.data.length, 0, 'Expected no persisted Blood Moon state record');
+
+    const logs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+
+    assert.ok(!logs.some((message) => message.includes('private blood moon first-join notice sent:')));
+    assert.ok(!logs.some((message) => message.includes(`/gameserver/${noticeCtx.gameServer.id}/message`)));
+  });
+
+  it('does not privately notify for normal or ended Blood Moon state', async () => {
+    await installNoticeWithConfig({ privateBloodMoonNoticeOnFirstJoin: true });
+    for (const phase of ['normal:6', 'end:7']) {
       await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', phase);
 
       const logs = await triggerHook('player-connected', {
