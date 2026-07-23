@@ -140,6 +140,17 @@ export async function getServerName(gameServerId) {
   }
 }
 
+export async function getCurrentModuleInstallation(gameServerId, moduleId) {
+  try {
+    const res = await takaro.module.moduleInstallationsControllerGetModuleInstallation(moduleId, gameServerId);
+    return res.data.data ?? null;
+  } catch (err) {
+    const status = err?.response?.status ?? err?.status;
+    if (status === 404) return null;
+    throw err;
+  }
+}
+
 export async function executeTimeCommand(gameServerId, command = 'gettime') {
   const res = await takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, { command });
   const data = res?.data?.data ?? res?.data ?? res;

@@ -4,6 +4,7 @@ import {
   BLOOD_DELIVERED_KEY,
   BLOOD_PENDING_KEY,
   BLOOD_STATE_KEY,
+  getCurrentModuleInstallation,
   getDiscordChannelFromHook,
   getTimeStatus,
   isBloodMoonDay,
@@ -87,11 +88,25 @@ function messageKeyFor(announcementKey) {
 
 async function main() {
   const { gameServerId, module: mod } = data;
-  const config = mod.userConfig;
-  const channelId = getDiscordChannelFromHook(data, config.monitoringChannelId, 'bloodMoonMonitor');
   const lockOwner = await acquireBloodMonitorLock(gameServerId, mod.moduleId);
 
   try {
+    const installation = await getCurrentModuleInstallation(gameServerId, mod.moduleId);
+    await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
+    if (!installation) {
+      console.log('discord-7d2d-status: module installation no longer exists, skipped Blood Moon monitor');
+      return;
+    }
+    const config = installation.userConfig ?? {};
+    const currentData = {
+      ...data,
+      module: {
+        ...mod,
+        userConfig: config,
+        systemConfig: installation.systemConfig ?? {},
+      },
+    };
+    const channelId = getDiscordChannelFromHook(currentData, config.monitoringChannelId, 'bloodMoonMonitor');
     const status = await getTimeStatus(gameServerId, config);
     await renewBloodMonitorLock(gameServerId, mod.moduleId, lockOwner);
     const state = stateFor(status, config);

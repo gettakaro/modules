@@ -29,6 +29,8 @@ Allow deterministic test commands such as `say Day 7 12:00` and `say Day 8 05:00
 - Seed an expired monitor lock and assert it is reclaimed and released through the real variable API.
 - Trigger concurrent cron executions with existing pending work and assert one waits for the scoped lock without losing any keys.
 - Seed another active owner and assert acquisition backs off for the bounded interval, fails clearly, and preserves that owner's record.
+- Hold an older queued execution across reinstall and assert it resolves the current installation config instead of writing stale state.
+- Uninstall while a queued execution is held and assert the eventual 404 exits without state mutation while releasing the lock.
 - With the environment-provided forbidden Discord channel, assert the cron fails after persisting observed state, leaves the failed announcement pending, retries it, and the join hook can still PM from the current observed state.
 
 **Step 3: Run RED**
@@ -51,7 +53,7 @@ Return one observed key and an ordered list of announcement descriptors. Consecu
 
 **Step 3: Order persistence and delivery**
 
-Acquire a scoped unique variable lock before reading game time or state. Use an owner token plus expiry, bounded polling with 50-250ms backoff, stale deletion by record ID, owner-checked renewal around external work and mutations, and owner-checked `finally` release. Keep the lease above Takaro's production function runtime bound. Read legacy state/history, persist observed state first, migrate any legacy announcement-shaped state, merge and persist pending work, then send pending announcements in order. Persist each successful key before removing it from pending; keep failures and skips pending. Recover scoped variable create conflicts with a bounded re-search and backoff.
+Acquire a scoped unique variable lock before reading game time or state. Use an owner token plus expiry, bounded polling with 50-250ms backoff, stale deletion by record ID, owner-checked renewal around external work and mutations, and owner-checked `finally` release. Keep the lease above Takaro's production function runtime bound. Fetch the current installation after lock acquisition so an older queued snapshot cannot apply stale user or system config; treat a 404 during an uninstall gap as a safe no-op. Read legacy state/history, persist observed state first, migrate any legacy announcement-shaped state, merge and persist pending work, then send pending announcements in order. Persist each successful key before removing it from pending; keep failures and skips pending. Recover scoped variable create conflicts with a bounded re-search and backoff.
 
 **Step 4: Run GREEN and refactor**
 

@@ -31,6 +31,7 @@ const TEST_TIME_DAY_7_NOON = 'say Day 7 12:00';
 const TEST_TIME_DAY_7_START = 'say Day 7 22:00';
 const TEST_TIME_DAY_8_AFTER_END = 'say Day 8 05:00';
 const TEST_TIME_COMMANDS = [TEST_TIME_DAY_7_NOON, TEST_TIME_DAY_7_START, TEST_TIME_DAY_8_AFTER_END];
+const TEST_FAR_FUTURE_CRON = '0 0 1 1 *';
 const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
 const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
 const DISCORD_NOT_FOUND_CHANNEL_ID = process.env.TAKARO_DISCORD_NOT_FOUND_CHANNEL_ID?.trim();
@@ -97,7 +98,10 @@ async function pushDisposableBridgeModule(client: Client): Promise<ModuleOutputD
     const moduleJson = JSON.parse(fs.readFileSync(tempFile, 'utf-8')) as {
       name: string;
       supportedGames?: string[];
-      versions: Array<{ configSchema: string }>;
+      versions: Array<{
+        configSchema: string;
+        cronJobs: Array<{ name: string; temporalValue: string }>;
+      }>;
     };
     moduleJson.name = TEST_MODULE_NAME;
     moduleJson.supportedGames = [];
@@ -106,6 +110,9 @@ async function pushDisposableBridgeModule(client: Client): Promise<ModuleOutputD
     };
     configSchema.properties.timeConsoleCommand.enum.push(...TEST_TIME_COMMANDS);
     moduleJson.versions[0].configSchema = JSON.stringify(configSchema);
+    const bloodMoonMonitor = moduleJson.versions[0].cronJobs.find((cronjob) => cronjob.name === 'bloodMoonMonitor');
+    assert.ok(bloodMoonMonitor, 'Expected disposable import to contain bloodMoonMonitor');
+    bloodMoonMonitor.temporalValue = TEST_FAR_FUTURE_CRON;
 
     const existing = await client.module.moduleControllerSearch({
       filters: { name: [TEST_MODULE_NAME] },
@@ -406,11 +413,14 @@ describe('discord-7d2d-status-bridge integration', () => {
   });
 
   it('checks blood moon transitions every minute without changing status updates', () => {
-    const bloodMoonMonitor = mod.latestVersion.cronJobs.find((cronjob) => cronjob.name === 'bloodMoonMonitor');
-    const updateStatus = mod.latestVersion.cronJobs.find((cronjob) => cronjob.name === 'updateStatus');
+    const manifest = JSON.parse(fs.readFileSync(path.join(MODULE_DIR, 'module.json'), 'utf-8')) as {
+      cronJobs: Record<string, { temporalValue: string }>;
+    };
+    const importedBloodMoonMonitor = mod.latestVersion.cronJobs.find((cronjob) => cronjob.name === 'bloodMoonMonitor');
 
-    assert.equal(bloodMoonMonitor?.temporalValue, '* * * * *');
-    assert.equal(updateStatus?.temporalValue, '*/5 * * * *');
+    assert.equal(manifest.cronJobs.bloodMoonMonitor.temporalValue, '* * * * *');
+    assert.equal(manifest.cronJobs.updateStatus.temporalValue, '*/5 * * * *');
+    assert.equal(importedBloodMoonMonitor?.temporalValue, TEST_FAR_FUTURE_CRON);
   });
 
   it('imports the opt-in private Blood Moon notice config with safe defaults', () => {
@@ -726,6 +736,109 @@ describe('discord-7d2d-status-bridge integration', () => {
       'An acquisition failure must not release the active owner',
     );
     await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock');
+  });
+
+  it('uses the current installation config when an older queued execution acquires the lock later', async () => {
+    await installNoticeWithConfig({
+      hordeIntervalDays: 1,
+      firstHordeDay: 7,
+      timeConsoleCommand: TEST_TIME_DAY_7_NOON,
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:7');
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered', ['start:7']);
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending', []);
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodMonitorLock',
+      { owner: 'test-config-change', acquiredAt: Date.now(), expiresAt: Date.now() + 60000 },
+    );
+    const cronjob = mod.latestVersion.cronJobs.find((candidate) => candidate.name === 'bloodMoonMonitor');
+    assert.ok(cronjob);
+    const beforeTrigger = new Date();
+
+    await client.cronjob.cronJobControllerTrigger({
+      gameServerId: noticeCtx.gameServer.id,
+      moduleId: mod.id,
+      cronjobId: cronjob.id,
+    });
+    await installNoticeWithConfig({
+      hordeIntervalDays: 1,
+      firstHordeDay: 7,
+      timeConsoleCommand: TEST_TIME_DAY_8_AFTER_END,
+    });
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock');
+
+    const event = await waitForBridgeEvent(client, {
+      eventName: EventSearchInputAllowedFiltersEventNameEnum.CronjobExecuted,
+      gameserverId: noticeCtx.gameServer.id,
+      moduleId: mod.id,
+      after: beforeTrigger,
+      predicate: (candidate) => (
+        (candidate.meta as { cronjob?: { id?: string } }).cronjob?.id === cronjob.id
+      ),
+    });
+    const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
+    const logs = (result?.logs ?? []).map((entry) => entry.msg);
+    assert.equal(result?.success, true, `Queued execution must succeed with current config: ${JSON.stringify(logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'today:8',
+      'A queued old installation snapshot must not overwrite current Blood Moon state',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['end:7', 'today:8'],
+    );
+  });
+
+  it('exits safely when a queued execution outlives its module installation', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'normal:6');
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodMonitorLock',
+      { owner: 'test-uninstall-gap', acquiredAt: Date.now(), expiresAt: Date.now() + 60000 },
+    );
+    const cronjob = mod.latestVersion.cronJobs.find((candidate) => candidate.name === 'bloodMoonMonitor');
+    assert.ok(cronjob);
+    const beforeTrigger = new Date();
+
+    await client.cronjob.cronJobControllerTrigger({
+      gameServerId: noticeCtx.gameServer.id,
+      moduleId: mod.id,
+      cronjobId: cronjob.id,
+    });
+    await uninstallModule(client, mod.id, noticeCtx.gameServer.id);
+    noticeInstalled = false;
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock');
+
+    const event = await waitForBridgeEvent(client, {
+      eventName: EventSearchInputAllowedFiltersEventNameEnum.CronjobExecuted,
+      gameserverId: noticeCtx.gameServer.id,
+      moduleId: mod.id,
+      after: beforeTrigger,
+      predicate: (candidate) => (
+        (candidate.meta as { cronjob?: { id?: string } }).cronjob?.id === cronjob.id
+      ),
+    });
+    const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
+    const logs = (result?.logs ?? []).map((entry) => entry.msg);
+    assert.equal(result?.success, true, `Uninstalled queued execution must exit safely: ${JSON.stringify(logs)}`);
+    assertLogContains(logs, 'module installation no longer exists, skipped Blood Moon monitor');
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'normal:6',
+      'An uninstalled queued execution must not mutate observed state',
+    );
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock'),
+      undefined,
+      'An uninstalled queued execution must still release its lock',
+    );
   });
 
   it('migrates a matching legacy announcement without duplicating it', async () => {
