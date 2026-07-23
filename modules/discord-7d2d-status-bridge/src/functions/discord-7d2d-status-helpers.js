@@ -2,6 +2,20 @@ import { takaro } from '@takaro/helpers';
 
 export const STATUS_MESSAGE_KEY_PREFIX = 'discord7d2d:statusMessage:';
 export const BLOOD_STATE_KEY = 'discord7d2d:bloodState';
+export const BLOOD_DELIVERED_KEY = 'discord7d2d:bloodDelivered';
+export const BLOOD_PENDING_KEY = 'discord7d2d:bloodPending';
+export const BLOOD_MONITOR_LOCK_KEY = 'discord7d2d:bloodMonitorLock';
+
+const BLOOD_MONITOR_LOCK_EXPIRY_MS = 120000;
+const BLOOD_MONITOR_LOCK_MAX_ATTEMPTS = 60;
+const BLOOD_MONITOR_LOCK_WAIT_MS = 5000;
+
+async function waitWithoutTimers(milliseconds) {
+  // Takaro's function VM does not expose setTimeout. Atomics.wait provides a
+  // bounded backoff without issuing extra API requests or busy-spinning.
+  const signal = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
+  Atomics.wait(signal, 0, 0, milliseconds);
+}
 
 export const MESSAGE_PRESETS = {
   en: {
@@ -178,6 +192,21 @@ async function findVariable(gameServerId, moduleId, key) {
   return res.data.data[0] ?? null;
 }
 
+function parseVariableRecord(record) {
+  if (!record) return null;
+  try { return JSON.parse(record.value); } catch (_err) { return null; }
+}
+
+async function deleteVariableRecord(record) {
+  if (!record) return;
+  try {
+    await takaro.variable.variableControllerDelete(record.id);
+  } catch (err) {
+    const status = err?.response?.status ?? err?.status;
+    if (status !== 404) throw err;
+  }
+}
+
 export async function readVariable(gameServerId, moduleId, key, fallback = null) {
   const record = await findVariable(gameServerId, moduleId, key);
   if (!record) return fallback;
@@ -188,7 +217,101 @@ export async function writeVariable(gameServerId, moduleId, key, value) {
   const existing = await findVariable(gameServerId, moduleId, key);
   const serialized = JSON.stringify(value);
   if (existing) await takaro.variable.variableControllerUpdate(existing.id, { value: serialized });
-  else await takaro.variable.variableControllerCreate({ key, value: serialized, gameServerId, moduleId });
+  else {
+    try {
+      await takaro.variable.variableControllerCreate({ key, value: serialized, gameServerId, moduleId });
+    } catch (err) {
+      const status = err?.response?.status ?? err?.status;
+      if (status !== 409) throw err;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const winner = await findVariable(gameServerId, moduleId, key);
+        if (winner) {
+          await takaro.variable.variableControllerUpdate(winner.id, { value: serialized });
+          return;
+        }
+        if (attempt < 2) await waitWithoutTimers(50 * (attempt + 1));
+      }
+      throw new Error(`Variable '${key}' was created concurrently but could not be found`);
+    }
+  }
+}
+
+export async function acquireBloodMonitorLock(gameServerId, moduleId) {
+  const owner = `blood-monitor:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const waitDeadline = Date.now() + BLOOD_MONITOR_LOCK_WAIT_MS;
+  let loggedWait = false;
+
+  for (let attempt = 0; attempt < BLOOD_MONITOR_LOCK_MAX_ATTEMPTS; attempt += 1) {
+    const now = Date.now();
+    try {
+      await takaro.variable.variableControllerCreate({
+        key: BLOOD_MONITOR_LOCK_KEY,
+        value: JSON.stringify({
+          owner,
+          acquiredAt: now,
+          expiresAt: now + BLOOD_MONITOR_LOCK_EXPIRY_MS,
+        }),
+        gameServerId,
+        moduleId,
+      });
+      return owner;
+    } catch (err) {
+      const status = err?.response?.status ?? err?.status;
+      if (status !== 409) throw err;
+    }
+
+    const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+    const lock = parseVariableRecord(existing);
+    const expiresAt = Number(lock?.expiresAt);
+    if (existing && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) {
+      console.warn(`discord-7d2d-status: reclaiming stale Blood Moon monitor lock owned by ${lock?.owner ?? 'unknown'}`);
+      await deleteVariableRecord(existing);
+      continue;
+    }
+
+    if (!loggedWait) {
+      console.log('discord-7d2d-status: Blood Moon monitor lock busy; waiting');
+      loggedWait = true;
+    }
+    if (attempt < BLOOD_MONITOR_LOCK_MAX_ATTEMPTS - 1 && Date.now() < waitDeadline) {
+      const backoffMs = Math.min(50 * (attempt + 1), 250);
+      await waitWithoutTimers(Math.min(backoffMs, waitDeadline - Date.now()));
+    }
+    if (Date.now() >= waitDeadline) break;
+  }
+
+  throw new Error(
+    `Timed out waiting for Blood Moon monitor lock after ${BLOOD_MONITOR_LOCK_WAIT_MS}ms`,
+  );
+}
+
+export async function renewBloodMonitorLock(gameServerId, moduleId, owner) {
+  const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+  const lock = parseVariableRecord(existing);
+  if (!existing || lock?.owner !== owner) {
+    throw new Error('Lost Blood Moon monitor lock ownership before completing state mutation');
+  }
+
+  const now = Date.now();
+  if (Number(lock.expiresAt) <= now) {
+    throw new Error('Blood Moon monitor lock lease expired before renewal');
+  }
+  await takaro.variable.variableControllerUpdate(existing.id, {
+    value: JSON.stringify({
+      ...lock,
+      owner,
+      renewedAt: now,
+      expiresAt: now + BLOOD_MONITOR_LOCK_EXPIRY_MS,
+    }),
+  });
+}
+
+export async function releaseBloodMonitorLock(gameServerId, moduleId, owner) {
+  const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+  const lock = parseVariableRecord(existing);
+  if (existing && lock?.owner === owner) {
+    await deleteVariableRecord(existing);
+  }
 }
 
 export function getDiscordChannelFromHook(data, configuredChannelId, hookName) {

@@ -27,6 +27,10 @@ const __dirname = path.dirname(__filename);
 const MODULE_DIR = path.resolve(__dirname, '..');
 const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 'scripts', 'module-to-json.js');
 const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
+const TEST_TIME_DAY_7_NOON = 'say Day 7 12:00';
+const TEST_TIME_DAY_7_START = 'say Day 7 22:00';
+const TEST_TIME_DAY_8_AFTER_END = 'say Day 8 05:00';
+const TEST_TIME_COMMANDS = [TEST_TIME_DAY_7_NOON, TEST_TIME_DAY_7_START, TEST_TIME_DAY_8_AFTER_END];
 const DISCORD_TEST_CHANNEL_ID = process.env.TAKARO_DISCORD_TEST_CHANNEL_ID?.trim();
 const DISCORD_FORBIDDEN_CHANNEL_ID = process.env.TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID?.trim();
 const DISCORD_NOT_FOUND_CHANNEL_ID = process.env.TAKARO_DISCORD_NOT_FOUND_CHANNEL_ID?.trim();
@@ -93,9 +97,15 @@ async function pushDisposableBridgeModule(client: Client): Promise<ModuleOutputD
     const moduleJson = JSON.parse(fs.readFileSync(tempFile, 'utf-8')) as {
       name: string;
       supportedGames?: string[];
+      versions: Array<{ configSchema: string }>;
     };
     moduleJson.name = TEST_MODULE_NAME;
     moduleJson.supportedGames = [];
+    const configSchema = JSON.parse(moduleJson.versions[0].configSchema) as {
+      properties: { timeConsoleCommand: { enum: string[] } };
+    };
+    configSchema.properties.timeConsoleCommand.enum.push(...TEST_TIME_COMMANDS);
+    moduleJson.versions[0].configSchema = JSON.stringify(configSchema);
 
     const existing = await client.module.moduleControllerSearch({
       filters: { name: [TEST_MODULE_NAME] },
@@ -146,6 +156,19 @@ async function deleteModuleVariable(
   await Promise.all(
     existing.data.data.map((variable) => client.variable.variableControllerDelete(variable.id)),
   );
+}
+
+async function readModuleVariable(
+  client: Client,
+  gameServerId: string,
+  moduleId: string,
+  key: string,
+) {
+  const existing = await client.variable.variableControllerSearch({
+    filters: { key: [key], gameServerId: [gameServerId], moduleId: [moduleId] },
+  });
+  const record = existing.data.data[0];
+  return record ? JSON.parse(record.value) as unknown : undefined;
 }
 
 describe('discord-7d2d-status-bridge integration', () => {
@@ -236,18 +259,21 @@ describe('discord-7d2d-status-bridge integration', () => {
     return execution.logs;
   }
 
-  async function triggerCronjobExecution(name: string): Promise<BridgeExecutionResult> {
+  async function triggerCronjobExecution(
+    name: string,
+    serverContext: MockServerContext = ctx,
+  ): Promise<BridgeExecutionResult> {
     const cronjob = mod.latestVersion.cronJobs.find((candidate) => candidate.name === name);
     assert.ok(cronjob, `Expected cronjob '${name}' to exist`);
     const beforeTrigger = new Date();
     await client.cronjob.cronJobControllerTrigger({
-      gameServerId: ctx.gameServer.id,
+      gameServerId: serverContext.gameServer.id,
       moduleId: mod.id,
       cronjobId: cronjob.id,
     });
     const event = await waitForBridgeEvent(client, {
       eventName: EventSearchInputAllowedFiltersEventNameEnum.CronjobExecuted,
-      gameserverId: ctx.gameServer.id,
+      gameserverId: serverContext.gameServer.id,
       moduleId: mod.id,
       after: beforeTrigger,
       predicate: (candidate) => (
@@ -259,10 +285,56 @@ describe('discord-7d2d-status-bridge integration', () => {
     return { success: result?.success ?? false, logs };
   }
 
-  async function triggerCronjob(name: string): Promise<string[]> {
-    const execution = await triggerCronjobExecution(name);
+  async function triggerCronjob(
+    name: string,
+    serverContext: MockServerContext = ctx,
+  ): Promise<string[]> {
+    const execution = await triggerCronjobExecution(name, serverContext);
     assert.equal(execution.success, true, `Expected cronjob '${name}' to succeed, logs: ${JSON.stringify(execution.logs)}`);
     return execution.logs;
+  }
+
+  async function triggerConcurrentCronjobExecutions(
+    name: string,
+    count: number,
+    serverContext: MockServerContext = ctx,
+  ): Promise<BridgeExecutionResult[]> {
+    const cronjob = mod.latestVersion.cronJobs.find((candidate) => candidate.name === name);
+    assert.ok(cronjob, `Expected cronjob '${name}' to exist`);
+    const beforeTrigger = new Date();
+    await Promise.all(Array.from({ length: count }, () => (
+      client.cronjob.cronJobControllerTrigger({
+        gameServerId: serverContext.gameServer.id,
+        moduleId: mod.id,
+        cronjobId: cronjob.id,
+      })
+    )));
+
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      const events = await client.event.eventControllerSearch({
+        filters: {
+          eventName: [EventSearchInputAllowedFiltersEventNameEnum.CronjobExecuted],
+          gameserverId: [serverContext.gameServer.id],
+          moduleId: [mod.id],
+        },
+        greaterThan: { createdAt: beforeTrigger.toISOString() },
+      });
+      const matching = events.data.data.filter((candidate) => (
+        (candidate.meta as { cronjob?: { id?: string } }).cronjob?.id === cronjob.id
+      ));
+      if (matching.length >= count) {
+        return matching.slice(0, count).map((event) => {
+          const result = (event.meta as { result?: { success?: boolean; logs?: Array<{ msg: string }> } }).result;
+          return {
+            success: result?.success ?? false,
+            logs: (result?.logs ?? []).map((entry) => entry.msg),
+          };
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error(`Timed out waiting for ${count} concurrent '${name}' executions`);
   }
 
   async function waitForOnlineCount(expected: number) {
@@ -483,6 +555,320 @@ describe('discord-7d2d-status-bridge integration', () => {
     assert.ok(!logs.some((message) => message.includes(`/gameserver/${ctx.gameServer.id}/message`)));
   });
 
+  it('persists observed phase but keeps an unconfigured-channel announcement pending', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const first = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(first.success, true, `Expected first Blood Moon observation to succeed: ${JSON.stringify(first.logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'today:7',
+    );
+    assert.deepEqual(
+      (await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered')) ?? [],
+      [],
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7'],
+    );
+    const observedWriteLog = first.logs.findIndex((message) => /POST \/variables(?:\s|$)/.test(message));
+    const firstAnnouncementLog = first.logs.findIndex((message) => (
+      message.includes('skipped message: Today is the Blood Moon day...')
+    ));
+    assert.ok(observedWriteLog >= 0, `Expected observed-state variable creation: ${JSON.stringify(first.logs)}`);
+    assert.ok(
+      firstAnnouncementLog > observedWriteLog,
+      `Observed state must be persisted before announcement delivery: ${JSON.stringify(first.logs)}`,
+    );
+
+    const repeated = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(repeated.success, true, `Expected repeated Blood Moon observation to succeed: ${JSON.stringify(repeated.logs)}`);
+    assertLogContains(repeated.logs, 'skipped message: Today is the Blood Moon day...');
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7'],
+    );
+  });
+
+  it('retains failed announcements in chronological order across a phase transition', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const today = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+    assert.equal(today.success, true, `Expected today observation to succeed: ${JSON.stringify(today.logs)}`);
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7'],
+    );
+
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_START });
+    const starting = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(starting.success, true, `Expected start observation to succeed: ${JSON.stringify(starting.logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'start:7',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7', 'start:7'],
+    );
+    const todayLog = starting.logs.findIndex((message) => message.includes('skipped message: Today is the Blood Moon day...'));
+    const startLog = starting.logs.findIndex((message) => message.includes('skipped message: Blood Moon is starting...'));
+    assert.ok(todayLog >= 0, `Expected pending today retry: ${JSON.stringify(starting.logs)}`);
+    assert.ok(startLog > todayLog, `Expected start after pending today: ${JSON.stringify(starting.logs)}`);
+
+    const repeated = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+    assert.equal(repeated.success, true, `Expected repeated start observation to succeed: ${JSON.stringify(repeated.logs)}`);
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7', 'start:7'],
+    );
+  });
+
+  it('serializes concurrent cron state machines without losing pending announcements', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock');
+    const existingPending = Array.from({ length: 3 }, (_value, index) => `end:${index + 1}`);
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodPending',
+      existingPending,
+    );
+
+    const executions = await triggerConcurrentCronjobExecutions('bloodMoonMonitor', 2, noticeCtx);
+
+    for (const execution of executions) {
+      assert.equal(execution.success, true, `Concurrent cron must serialize successfully: ${JSON.stringify(execution.logs)}`);
+    }
+    assert.ok(
+      executions.some((execution) => execution.logs.some((message) => message.includes('Blood Moon monitor lock busy; waiting'))),
+      `Expected one concurrent execution to wait for the lock: ${JSON.stringify(executions)}`,
+    );
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'today:7',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered'),
+      [],
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      [...existingPending, 'today:7'],
+    );
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock'),
+      undefined,
+      'The lock must be released after both executions finish',
+    );
+  });
+
+  it('reclaims an expired Blood Moon monitor lock by record id', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodMonitorLock',
+      { owner: 'abandoned-execution', acquiredAt: 1, expiresAt: 2 },
+    );
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expired lock recovery must succeed: ${JSON.stringify(execution.logs)}`);
+    assertLogContains(execution.logs, 'reclaiming stale Blood Moon monitor lock owned by abandoned-execution');
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock'),
+      undefined,
+      'The replacement owner must release its lock',
+    );
+  });
+
+  it('waits with bounded backoff and does not release another lock owner on timeout', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    const otherOwner = {
+      owner: 'active-other-execution',
+      acquiredAt: Date.now(),
+      expiresAt: Date.now() + 60000,
+    };
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodMonitorLock',
+      otherOwner,
+    );
+    const startedAt = Date.now();
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+    const elapsedMs = Date.now() - startedAt;
+
+    assert.equal(execution.success, false, `Lock acquisition timeout must fail clearly: ${JSON.stringify(execution.logs)}`);
+    assertLogContains(execution.logs, 'Blood Moon monitor lock busy; waiting');
+    assertLogContains(execution.logs, 'Timed out waiting for Blood Moon monitor lock after 5000ms');
+    assert.ok(elapsedMs >= 4500, `Expected real bounded backoff, but execution returned after ${elapsedMs}ms`);
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock'),
+      otherOwner,
+      'An acquisition failure must not release the active owner',
+    );
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodMonitorLock');
+  });
+
+  it('migrates a matching legacy announcement without duplicating it', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expected legacy migration to succeed: ${JSON.stringify(execution.logs)}`);
+    assert.ok(
+      !execution.logs.some((message) => message.includes('Today is the Blood Moon day...')),
+      `The current legacy announcement must not duplicate during migration: ${JSON.stringify(execution.logs)}`,
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered'),
+      ['today:7'],
+    );
+  });
+
+  it('migrates an earlier legacy announcement before recording current work', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:6');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expected legacy migration and current delivery to succeed: ${JSON.stringify(execution.logs)}`);
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered'),
+      ['start:6'],
+    );
+    assertLogContains(execution.logs, 'skipped message: Today is the Blood Moon day...');
+  });
+
+  it('bounds delivered Blood Moon announcement history to 32 unique keys', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    const oversizedHistory = [
+      'start:1',
+      'start:1',
+      ...Array.from({ length: 34 }, (_value, index) => `end:${index + 1}`),
+    ];
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'normal:6');
+    await setModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodDelivered',
+      oversizedHistory,
+    );
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending', []);
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expected bounded delivery tracking to succeed: ${JSON.stringify(execution.logs)}`);
+    const delivered = await readModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodDelivered',
+    ) as string[];
+    assert.equal(delivered.length, 32);
+    assert.equal(new Set(delivered).size, delivered.length);
+    assert.equal(delivered.at(-1), 'end:34');
+    assert.ok(!delivered.includes('today:7'));
+  });
+
+  it('bounds pending Blood Moon announcements to 32 unique chronological keys', async () => {
+    await installNoticeWithConfig({ timeConsoleCommand: TEST_TIME_DAY_7_NOON });
+    const oversizedPending = [
+      'start:1',
+      'start:1',
+      ...Array.from({ length: 34 }, (_value, index) => `end:${index + 1}`),
+    ];
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'normal:6');
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered', []);
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending', oversizedPending);
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expected bounded pending tracking to succeed: ${JSON.stringify(execution.logs)}`);
+    const pending = await readModuleVariable(
+      client,
+      noticeCtx.gameServer.id,
+      mod.id,
+      'discord7d2d:bloodPending',
+    ) as string[];
+    assert.equal(pending.length, 32);
+    assert.equal(new Set(pending).size, pending.length);
+    assert.equal(pending.at(-1), 'today:7');
+  });
+
+  it('keeps interval-one current state while prior end and current today remain pending in order', async () => {
+    await installNoticeWithConfig({
+      hordeIntervalDays: 1,
+      firstHordeDay: 7,
+      timeConsoleCommand: TEST_TIME_DAY_8_AFTER_END,
+      privateBloodMoonNoticeOnFirstJoin: true,
+      monitorJoins: false,
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:7');
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered', ['start:7']);
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending', []);
+
+    const first = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(first.success, true, `Expected interval-one overlap to succeed: ${JSON.stringify(first.logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'today:8',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered'),
+      ['start:7'],
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['end:7', 'today:8'],
+    );
+    const endLog = first.logs.findIndex((message) => message.includes('skipped message: Blood Moon is ending...'));
+    const todayLog = first.logs.findIndex((message) => message.includes('skipped message: Today is the Blood Moon day...'));
+    assert.ok(endLog >= 0, `Expected prior end announcement: ${JSON.stringify(first.logs)}`);
+    assert.ok(todayLog > endLog, `Expected current today announcement after prior end: ${JSON.stringify(first.logs)}`);
+
+    const repeated = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+    assert.equal(repeated.success, true, `Expected interval-one repeat to succeed: ${JSON.stringify(repeated.logs)}`);
+    assertLogContains(repeated.logs, 'skipped message: Blood Moon is ending...');
+    assertLogContains(repeated.logs, 'skipped message: Today is the Blood Moon day...');
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['end:7', 'today:8'],
+    );
+
+    const joinLogs = await triggerHook('player-connected', {
+      playerId: noticeCtx.players[0].playerId,
+      serverContext: noticeCtx,
+    });
+    assertLogContains(joinLogs, `/gameserver/${noticeCtx.gameServer.id}/message 200 OK`);
+    assertLogContains(joinLogs, 'private blood moon first-join notice sent: Today is the Blood Moon day...');
+  });
+
   it('[live smoke] delivers the private notice before a configured Discord join failure remains visible', {
     skip: DISCORD_FORBIDDEN_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_FORBIDDEN_CHANNEL_ID',
   }, async () => {
@@ -490,8 +876,35 @@ describe('discord-7d2d-status-bridge integration', () => {
     await installNoticeWithConfig({
       monitoringChannelId: DISCORD_FORBIDDEN_CHANNEL_ID,
       privateBloodMoonNoticeOnFirstJoin: true,
+      timeConsoleCommand: TEST_TIME_DAY_7_NOON,
     });
-    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'today:7');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const firstCron = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(firstCron.success, false, `Configured Discord failure must fail the cron: ${JSON.stringify(firstCron.logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'today:7',
+      'Observed phase must persist before Discord delivery',
+    );
+    assert.deepEqual(
+      (await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered')) ?? [],
+      [],
+      'A failed Discord announcement must remain pending',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['today:7'],
+    );
+    assertLogContains(firstCron.logs, `/discord/channels/${DISCORD_FORBIDDEN_CHANNEL_ID}/message`);
+
+    const retryCron = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(retryCron.success, false, `Pending Discord announcement must retry: ${JSON.stringify(retryCron.logs)}`);
+    assertLogContains(retryCron.logs, `/discord/channels/${DISCORD_FORBIDDEN_CHANNEL_ID}/message`);
 
     const execution = await triggerHookExecution('player-connected', {
       playerId: noticeCtx.players[0].playerId,
@@ -502,6 +915,50 @@ describe('discord-7d2d-status-bridge integration', () => {
     assertLogContains(execution.logs, `/gameserver/${noticeCtx.gameServer.id}/message 200 OK`);
     assertLogContains(execution.logs, 'private blood moon first-join notice sent: Today is the Blood Moon day...');
     assertLogContains(execution.logs, `Takaro or Discord refused delivery to channel ${DISCORD_FORBIDDEN_CHANNEL_ID}`);
+  });
+
+  it('[live smoke] records successful interval-one announcements individually and does not duplicate them', {
+    skip: DISCORD_TEST_CHANNEL_ID ? false : 'Live smoke gate skipped: set TAKARO_DISCORD_TEST_CHANNEL_ID',
+  }, async () => {
+    assert.ok(DISCORD_TEST_CHANNEL_ID);
+    await installNoticeWithConfig({
+      hordeIntervalDays: 1,
+      firstHordeDay: 7,
+      monitoringChannelId: DISCORD_TEST_CHANNEL_ID,
+      timeConsoleCommand: TEST_TIME_DAY_8_AFTER_END,
+    });
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState', 'start:7');
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered', ['start:7']);
+    await setModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending', []);
+
+    const first = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(first.success, true, `Expected Blood Moon Discord delivery to succeed: ${JSON.stringify(first.logs)}`);
+    const successfulSends = first.logs
+      .map((message, index) => ({ message, index }))
+      .filter(({ message }) => message.includes(`/discord/channels/${DISCORD_TEST_CHANNEL_ID}/message 200 OK`));
+    assert.equal(successfulSends.length, 2, `Expected prior end and current today Discord sends: ${JSON.stringify(first.logs)}`);
+    assert.ok(
+      first.logs.slice(successfulSends[0].index + 1, successfulSends[1].index)
+        .some((message) => message.includes('PUT /variables/')),
+      `First successful announcement must be recorded before the second send completes: ${JSON.stringify(first.logs)}`,
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered'),
+      ['start:7', 'end:7', 'today:8'],
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      [],
+    );
+
+    const repeated = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(repeated.success, true, `Expected completed announcement check to succeed: ${JSON.stringify(repeated.logs)}`);
+    assert.ok(
+      !repeated.logs.some((message) => message.includes(`/discord/channels/${DISCORD_TEST_CHANNEL_ID}/message`)),
+      `A successful announcement must not duplicate: ${JSON.stringify(repeated.logs)}`,
+    );
   });
 
   it('polls blood moon time without loading players or server metadata', async () => {
@@ -520,15 +977,31 @@ describe('discord-7d2d-status-bridge integration', () => {
 
   it('does not rewrite an unchanged blood moon phase', async () => {
     await triggerCronjob('bloodMoonMonitor');
+    const before = await client.variable.variableControllerSearch({
+      filters: {
+        key: ['discord7d2d:bloodState'],
+        gameServerId: [ctx.gameServer.id],
+        moduleId: [mod.id],
+      },
+    });
+    const beforeState = before.data.data[0];
+    assert.ok(beforeState, 'Expected the first cron to persist Blood Moon state');
+
     const repeated = await triggerCronjobExecution('bloodMoonMonitor');
 
     assert.equal(repeated.success, true, `Expected repeated blood moon polling to succeed, logs: ${JSON.stringify(repeated.logs)}`);
-    assert.ok(
-      !repeated.logs.some((message) => (
-        /POST \/variables(?:\s|$)/.test(message) || message.includes('PUT /variables/')
-      )),
-      `An unchanged blood moon phase must not be written again: ${JSON.stringify(repeated.logs)}`,
-    );
+    const after = await client.variable.variableControllerSearch({
+      filters: {
+        key: ['discord7d2d:bloodState'],
+        gameServerId: [ctx.gameServer.id],
+        moduleId: [mod.id],
+      },
+    });
+    const afterState = after.data.data[0];
+    assert.ok(afterState, 'Expected the Blood Moon state record to remain present');
+    assert.equal(afterState.id, beforeState.id);
+    assert.equal(afterState.value, beforeState.value);
+    assert.equal(afterState.updatedAt, beforeState.updatedAt, 'An unchanged Blood Moon phase must not be rewritten');
   });
 
   it('uses English monitoring messages by default', async () => {

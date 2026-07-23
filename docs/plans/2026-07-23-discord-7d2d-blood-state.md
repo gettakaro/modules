@@ -4,7 +4,7 @@
 
 **Goal:** Separate observed Blood Moon phase from Discord delivery history so private notices stay current and failed announcements retry without duplicates.
 
-**Architecture:** Continue storing the observed phase in `discord7d2d:bloodState` for join-hook compatibility. Store up to 32 delivered announcement keys in `discord7d2d:bloodDelivered`; persist observation and migration before sending, then record each successful announcement immediately.
+**Architecture:** Continue storing the observed phase in `discord7d2d:bloodState` for join-hook compatibility. Store up to 32 delivered keys in `discord7d2d:bloodDelivered` and 32 chronologically ordered retry keys in `discord7d2d:bloodPending`; persist observation, migration, and merged pending state before sending, then record each successful announcement before removing it from pending.
 
 **Tech Stack:** JavaScript Takaro functions, TypeScript Node test runner, real Takaro API, Takaro WebSocket mock game server.
 
@@ -24,6 +24,11 @@ Allow deterministic test commands such as `say Day 7 12:00` and `say Day 8 05:00
 - Run a cron with a parseable day/time response and assert observed state plus delivered-history values.
 - Seed a legacy announcement-shaped state with no delivered history and assert no duplicate current announcement.
 - For interval `1` at day 8 05:00, assert observed `today:8` and ordered completion of `end:7`, then `today:8`, once each.
+- Advance a failed `today:7` execution to `start:7` and assert both remain pending in chronological order.
+- Trigger concurrent cron executions against absent variables and assert create conflicts recover without duplicate keys.
+- Seed an expired monitor lock and assert it is reclaimed and released through the real variable API.
+- Trigger concurrent cron executions with existing pending work and assert one waits for the scoped lock without losing any keys.
+- Seed another active owner and assert acquisition backs off for the bounded interval, fails clearly, and preserves that owner's record.
 - With the environment-provided forbidden Discord channel, assert the cron fails after persisting observed state, leaves the failed announcement pending, retries it, and the join hook can still PM from the current observed state.
 
 **Step 3: Run RED**
@@ -38,7 +43,7 @@ Run the focused integration tests through the real Takaro API with Bearer/Author
 
 **Step 1: Add delivered-history state**
 
-Export `BLOOD_DELIVERED_KEY`. Normalize stored history to a unique string list capped at 32 entries.
+Export `BLOOD_DELIVERED_KEY` and `BLOOD_PENDING_KEY`. Normalize both stored lists to unique announcement keys capped at 32 entries.
 
 **Step 2: Derive observation and announcements separately**
 
@@ -46,7 +51,7 @@ Return one observed key and an ordered list of announcement descriptors. Consecu
 
 **Step 3: Order persistence and delivery**
 
-Read legacy state/history, persist observed state first, migrate any legacy announcement-shaped state before pending comparison, then send pending announcements in order. Persist each successful key immediately; do not record failures.
+Acquire a scoped unique variable lock before reading game time or state. Use an owner token plus expiry, bounded polling with 50-250ms backoff, stale deletion by record ID, owner-checked renewal around external work and mutations, and owner-checked `finally` release. Keep the lease above Takaro's production function runtime bound. Read legacy state/history, persist observed state first, migrate any legacy announcement-shaped state, merge and persist pending work, then send pending announcements in order. Persist each successful key before removing it from pending; keep failures and skips pending. Recover scoped variable create conflicts with a bounded re-search and backoff.
 
 **Step 4: Run GREEN and refactor**
 

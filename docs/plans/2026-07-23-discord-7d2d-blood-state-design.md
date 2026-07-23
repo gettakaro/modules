@@ -7,10 +7,14 @@ Keep the private first-player Blood Moon notice current even when Discord delive
 ## State model
 
 - `discord7d2d:bloodState` stores only the currently observed phase used by the join hook.
-- `discord7d2d:bloodDelivered` stores up to 32 unique announcement keys that Discord has accepted, or that the existing empty-channel skip path has completed.
+- `discord7d2d:bloodDelivered` stores up to 32 unique announcement keys that Discord has actually accepted.
+- `discord7d2d:bloodPending` stores up to 32 unique, chronologically ordered announcements that still need delivery.
+- `discord7d2d:bloodMonitorLock` serializes the complete observation and delivery state machine per server and module.
 - Announcement keys remain `today:<day>`, `start:<day>`, and `end:<day>` so legacy `bloodState` values can migrate without translation.
 
-Each cron execution persists the observed phase before attempting Discord. It then migrates any announcement-shaped legacy `bloodState` value into delivered history, derives pending announcements, and processes them in order. Each successful announcement is recorded immediately. A failed send is not recorded, so the next cron retries it without repeating earlier successes.
+Each cron execution persists the observed phase before attempting Discord. It then migrates any announcement-shaped legacy `bloodState` value into delivered history, merges newly due announcements into pending state, persists the merged pending list, and processes it in order. Each successful announcement is recorded in delivered history before it is removed from pending state. A failed send or an unconfigured-channel skip remains pending across later phase and day transitions without repeating earlier successes.
+
+Before reading game time or any state, each cron atomically creates the scoped lock with a unique owner token and expiry. A competing execution uses bounded 50-250ms backoff and never enters the state machine until it owns the lock. Because Takaro's function VM does not expose timers, the backoff uses standard `Atomics.wait` rather than issuing artificial API traffic. The owner re-checks and renews its lease after status retrieval, after state reads, before each state mutation, and around every pending send. The 120-second lease is comfortably above Takaro's 30-second production function limit, while renewal also protects longer local executions. Expired or malformed locks are reclaimed by record ID, and `finally` releases only a lock whose current owner token still matches. Acquisition timeout and non-404 release failures remain visible execution failures. Ordinary variable creation also recovers from a create conflict by re-reading the same scoped key and updating the winning record after a small bounded backoff.
 
 ## Phase and announcement derivation
 
@@ -29,4 +33,4 @@ When the delivered-history variable does not exist, any legacy announcement-shap
 
 The active WebSocket mock server has no configurable `gettime` response. The disposable test import will extend only its config schema to permit deterministic `say Day <n> <time>` commands. The production code will still execute through Takaro's real command API, and the real mock server returns a parseable `Sent message: Day ...` response. No helper methods, Takaro clients, or module source will be mocked.
 
-Tests will prove observed-state-first behavior, retry bookkeeping, migration, and interval-one overlap through real Takaro variables and cron executions. A configured forbidden Discord channel remains environment-gated.
+Tests will prove observed-state-first behavior, retry bookkeeping, migration, interval-one overlap, stale-lock recovery, bounded acquisition timeout that preserves another owner, and concurrent serialization without lost pending keys through real Takaro variables and cron executions. A configured forbidden Discord channel remains environment-gated.
