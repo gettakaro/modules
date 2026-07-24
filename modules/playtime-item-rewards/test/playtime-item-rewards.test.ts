@@ -111,9 +111,10 @@ describe('playtime-item-rewards', () => {
     assert.equal(manifest.config?.properties?.messageDelivery?.default, 'broadcast');
     assert.equal(manifest.config?.properties?.playtimeIntervalMaximumMinutes?.type, 'integer');
     assert.equal(manifest.config?.properties?.playtimeIntervalMaximumMinutes?.minimum, 1);
+    assert.equal(manifest.config?.properties?.playtimeIntervalMaximumMinutes?.default, 120);
     assert.match(
       manifest.config?.properties?.playtimeIntervalMaximumMinutes?.description ?? '',
-      /leave.*empty.*fixed/i,
+      /set.*equal.*fixed/i,
     );
     assert.equal(
       manifest.config?.properties?.roleOverrides?.items?.properties?.playtimeIntervalMaximumMinutes?.type,

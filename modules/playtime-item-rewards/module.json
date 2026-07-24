@@ -18,7 +18,8 @@
       "playtimeIntervalMaximumMinutes": {
         "type": "integer",
         "minimum": 1,
-        "description": "Optional maximum reward interval in accumulated playtime minutes. Leave empty or set equal to playtimeIntervalMinutes for a fixed interval; set it higher to choose a random interval per player and reward cycle."
+        "default": 120,
+        "description": "Maximum reward interval in accumulated playtime minutes. Set equal to playtimeIntervalMinutes for a fixed interval; set it higher to choose a random interval per player and reward cycle."
       },
       "selectionMode": {
         "type": "string",
