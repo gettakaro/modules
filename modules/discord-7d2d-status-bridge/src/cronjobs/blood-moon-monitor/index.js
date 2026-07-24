@@ -30,9 +30,9 @@ function stateFor(status, config) {
   const interval = config.hordeIntervalDays ?? 7;
   const start = config.bloodMoonStartHour ?? 22;
   const end = config.bloodMoonEndHour ?? 4;
-  const currentIsHorde = isBloodMoonDay(parsed.day, first, interval);
+  const currentIsHorde = isBloodMoonDay(parsed.day, first, interval, config.bloodMoonRangeDays ?? 0);
   const previousDay = parsed.day - 1;
-  const previousIsHorde = parsed.day > 1 && isBloodMoonDay(previousDay, first, interval);
+  const previousIsHorde = parsed.day > 1 && isBloodMoonDay(previousDay, first, interval, config.bloodMoonRangeDays ?? 0);
 
   if (currentIsHorde && parsed.hour !== null && parsed.hour >= start) {
     const key = `start:${parsed.day}`;

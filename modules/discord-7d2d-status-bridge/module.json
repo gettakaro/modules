@@ -30,6 +30,7 @@
       "timeConsoleCommand": { "type": "string", "enum": ["gettime"], "default": "gettime" },
       "hordeIntervalDays": { "type": "integer", "minimum": 1, "default": 7 },
       "firstHordeDay": { "type": "integer", "minimum": 1, "default": 7 },
+      "bloodMoonRangeDays": { "type": "integer", "minimum": 0, "default": 0, "description": "7D2D BloodMoonRange setting in days. Use 0 for exact fixed hordes; use 1 when a day-7 horde may happen on days 6-8." },
       "bloodMoonStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 22 },
       "bloodMoonEndHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 4 },
       "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-day message override." },

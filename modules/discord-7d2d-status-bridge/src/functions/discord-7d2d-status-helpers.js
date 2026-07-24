@@ -91,14 +91,24 @@ export function nextHordeDay(currentDay, firstHordeDay = 7, interval = 7) {
   return firstHordeDay + Math.ceil((currentDay - firstHordeDay) / interval) * interval;
 }
 
-export function isBloodMoonDay(day, firstHordeDay = 7, interval = 7) {
-  return nextHordeDay(day, firstHordeDay, interval) === day;
+export function normalizeBloodMoonRangeDays(range = 0) {
+  const value = Number(range);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.floor(value);
 }
 
-export function isBloodMoonActive(parsed, firstHordeDay = 7, interval = 7, startHour = 22, endHour = 4) {
+export function isBloodMoonDay(day, firstHordeDay = 7, interval = 7, rangeDays = 0) {
+  const range = normalizeBloodMoonRangeDays(rangeDays);
+  const next = nextHordeDay(day, firstHordeDay, interval);
+  if (Math.abs(next - day) <= range) return true;
+  const previous = next - interval;
+  return previous >= firstHordeDay && Math.abs(day - previous) <= range;
+}
+
+export function isBloodMoonActive(parsed, firstHordeDay = 7, interval = 7, startHour = 22, endHour = 4, rangeDays = 0) {
   if (!parsed || parsed.hour === null) return false;
-  if (isBloodMoonDay(parsed.day, firstHordeDay, interval) && parsed.hour >= startHour) return true;
-  if (parsed.hour < endHour && parsed.day > 1 && isBloodMoonDay(parsed.day - 1, firstHordeDay, interval)) return true;
+  if (isBloodMoonDay(parsed.day, firstHordeDay, interval, rangeDays) && parsed.hour >= startHour) return true;
+  if (parsed.hour < endHour && parsed.day > 1 && isBloodMoonDay(parsed.day - 1, firstHordeDay, interval, rangeDays)) return true;
   return false;
 }
 
@@ -167,7 +177,14 @@ export async function getTimeStatus(gameServerId, config) {
   if (!parsed) console.warn(`discord-7d2d-status: could not parse 7D2D time: ${rawTime}`);
   const day = parsed?.day ?? '?';
   const time = parsed?.time ?? '?';
-  const active = isBloodMoonActive(parsed, config.firstHordeDay ?? 7, config.hordeIntervalDays ?? 7, config.bloodMoonStartHour ?? 22, config.bloodMoonEndHour ?? 4);
+  const active = isBloodMoonActive(
+    parsed,
+    config.firstHordeDay ?? 7,
+    config.hordeIntervalDays ?? 7,
+    config.bloodMoonStartHour ?? 22,
+    config.bloodMoonEndHour ?? 4,
+    config.bloodMoonRangeDays ?? 0,
+  );
   return { rawTime, parsed, day, time, bloodMoonActive: active };
 }
 

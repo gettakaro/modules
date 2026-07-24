@@ -27,10 +27,11 @@ const __dirname = path.dirname(__filename);
 const MODULE_DIR = path.resolve(__dirname, '..');
 const MODULE_TO_JSON_SCRIPT = path.resolve(__dirname, '..', '..', '..', 'dist', 'scripts', 'module-to-json.js');
 const TEST_MODULE_NAME = `qa-discord-7d2d-status-bridge-${process.pid}`;
+const TEST_TIME_DAY_6_START = 'say Day 6 22:00';
 const TEST_TIME_DAY_7_NOON = 'say Day 7 12:00';
 const TEST_TIME_DAY_7_START = 'say Day 7 22:00';
 const TEST_TIME_DAY_8_AFTER_END = 'say Day 8 05:00';
-const TEST_TIME_COMMANDS = [TEST_TIME_DAY_7_NOON, TEST_TIME_DAY_7_START, TEST_TIME_DAY_8_AFTER_END];
+const TEST_TIME_COMMANDS = [TEST_TIME_DAY_6_START, TEST_TIME_DAY_7_NOON, TEST_TIME_DAY_7_START, TEST_TIME_DAY_8_AFTER_END];
 const dormantCronDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
 const TEST_DORMANT_CRON = [
   dormantCronDate.getUTCMinutes(),
@@ -447,6 +448,12 @@ describe('discord-7d2d-status-bridge integration', () => {
       { type: 'string', maxLength: 500, default: '' },
     );
     assert.ok(message?.description, 'Expected the private notice message to have a description');
+    const range = configSchema.properties?.bloodMoonRangeDays;
+    assert.deepEqual(
+      { type: range?.type, default: range?.default },
+      { type: 'integer', default: 0 },
+    );
+    assert.match(range?.description ?? '', /BloodMoonRange/i);
   });
 
   it('privately sends the exact English Blood Moon Today wording to the first online player', async () => {
@@ -611,6 +618,29 @@ describe('discord-7d2d-status-bridge integration', () => {
       await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
       ['today:7'],
     );
+  });
+
+  it('honors BloodMoonRange by treating adjacent configured days as possible horde days', async () => {
+    await installNoticeWithConfig({
+      timeConsoleCommand: TEST_TIME_DAY_6_START,
+      bloodMoonRangeDays: 1,
+    });
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodDelivered');
+    await deleteModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending');
+
+    const execution = await triggerCronjobExecution('bloodMoonMonitor', noticeCtx);
+
+    assert.equal(execution.success, true, `Expected range-aware Blood Moon observation to succeed: ${JSON.stringify(execution.logs)}`);
+    assert.equal(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodState'),
+      'start:6',
+    );
+    assert.deepEqual(
+      await readModuleVariable(client, noticeCtx.gameServer.id, mod.id, 'discord7d2d:bloodPending'),
+      ['start:6'],
+    );
+    assertLogContains(execution.logs, 'skipped message: Blood Moon is starting...');
   });
 
   it('retains failed announcements in chronological order across a phase transition', async () => {
