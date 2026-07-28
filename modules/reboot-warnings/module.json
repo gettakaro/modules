@@ -1,0 +1,110 @@
+{
+  "name": "test-reboot-warnings",
+  "description": "Broadcasts fixed countdown warning messages before scheduled server reboots. Each warning has its own cronjob so admins can schedule exact 60/30/15/5/1 minute notices without needing game console commands.",
+  "version": "latest",
+  "supportedGames": ["all"],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "warning60": {
+        "$ref": "#/definitions/warning",
+        "default": {
+          "enabled": true,
+          "message": "Server reboot in 60 minutes. Please plan accordingly."
+        }
+      },
+      "warning30": {
+        "$ref": "#/definitions/warning",
+        "default": {
+          "enabled": true,
+          "message": "Server reboot in 30 minutes."
+        }
+      },
+      "warning15": {
+        "$ref": "#/definitions/warning",
+        "default": {
+          "enabled": true,
+          "message": "Server reboot in 15 minutes. Please get somewhere safe."
+        }
+      },
+      "warning5": {
+        "$ref": "#/definitions/warning",
+        "default": {
+          "enabled": true,
+          "message": "Server reboot in 5 minutes. Log out soon to avoid losing progress."
+        }
+      },
+      "warning1": {
+        "$ref": "#/definitions/warning",
+        "default": {
+          "enabled": true,
+          "message": "Server reboot in 1 minute. Log out now."
+        }
+      },
+      "skipWhenNoPlayersOnline": {
+        "type": "boolean",
+        "default": true,
+        "description": "When enabled, warning cronjobs skip without sending if no players are online."
+      }
+    },
+    "definitions": {
+      "warning": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this warning cronjob should send a message when triggered."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500,
+            "description": "Message to broadcast. Supports {minutesRemaining}, {serverName}, and {playerCount}. Leave blank to skip this warning."
+          }
+        },
+        "required": ["enabled", "message"],
+        "additionalProperties": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [],
+  "commands": {},
+  "hooks": {},
+  "cronJobs": {
+    "warning60": {
+      "temporalValue": "0 3 * * *",
+      "description": "Broadcasts the 60-minute reboot warning. Edit this cron schedule to match your server reboot time.",
+      "function": "src/cronjobs/warning60/index.js"
+    },
+    "warning30": {
+      "temporalValue": "30 3 * * *",
+      "description": "Broadcasts the 30-minute reboot warning. Edit this cron schedule to match your server reboot time.",
+      "function": "src/cronjobs/warning30/index.js"
+    },
+    "warning15": {
+      "temporalValue": "45 3 * * *",
+      "description": "Broadcasts the 15-minute reboot warning. Edit this cron schedule to match your server reboot time.",
+      "function": "src/cronjobs/warning15/index.js"
+    },
+    "warning5": {
+      "temporalValue": "55 3 * * *",
+      "description": "Broadcasts the 5-minute reboot warning. Edit this cron schedule to match your server reboot time.",
+      "function": "src/cronjobs/warning5/index.js"
+    },
+    "warning1": {
+      "temporalValue": "59 3 * * *",
+      "description": "Broadcasts the 1-minute reboot warning. Edit this cron schedule to match your server reboot time.",
+      "function": "src/cronjobs/warning1/index.js"
+    }
+  },
+  "functions": {
+    "reboot-warnings-helpers": {
+      "function": "src/functions/reboot-warnings-helpers.js"
+    }
+  }
+}
