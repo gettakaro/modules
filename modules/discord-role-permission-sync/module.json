@@ -1,0 +1,105 @@
+{
+  "name": "discord-role-permission-sync",
+  "description": "Sync Takaro role membership, including roles synced from Discord, to game-server permission levels by running configurable console commands when players join.",
+  "version": "latest",
+  "supportedGames": [
+    "7d2d",
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable permission sync on player join."
+      },
+      "rolePermissionMappings": {
+        "type": "array",
+        "default": [
+          {
+            "roleName": "Diamond",
+            "permissionLevel": 200
+          }
+        ],
+        "description": "Takaro role names to game permission levels. If Discord role sync creates/assigns Takaro roles, use those Takaro role names here. Lower permission numbers are more powerful in 7 Days to Die.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "roleName": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Takaro role name to match exactly, case-insensitive."
+            },
+            "permissionLevel": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000,
+              "description": "Game permission level to apply when the player has this role. For 7D2D, lower numbers grant more access; 1000 is default/no access."
+            }
+          },
+          "required": [
+            "roleName",
+            "permissionLevel"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "unmatchedPermissionLevel": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "default": null,
+        "minimum": 0,
+        "maximum": 1000,
+        "description": "Optional permission level to apply to players who do not match any role. Leave null to leave unmatched players unchanged."
+      },
+      "commandTemplate": {
+        "type": "string",
+        "default": "admin add {playerGameId} {permissionLevel}",
+        "description": "Console command template. Available placeholders: {playerGameId}, {playerName}, {permissionLevel}, {matchedRole}. Default is 7D2D's admin add command."
+      },
+      "notifyPlayer": {
+        "type": "boolean",
+        "default": false,
+        "description": "Privately notify the player after their permission level is synced."
+      },
+      "notifyUnmatchedDiscordLink": {
+        "type": "boolean",
+        "default": false,
+        "description": "Privately remind unmatched players to link Discord / ask staff if they expected a reserved-slot role."
+      },
+      "matchedMessage": {
+        "type": "string",
+        "default": "Your reserved-slot permission has been synced from role {matchedRole}.",
+        "description": "Private message sent when notifyPlayer is enabled and a mapping matched. Placeholders: {playerName}, {permissionLevel}, {matchedRole}."
+      },
+      "unmatchedMessage": {
+        "type": "string",
+        "default": "No reserved-slot role was found for you. If you are a supporter, make sure your Discord account is linked.",
+        "description": "Private message sent when notifyUnmatchedDiscordLink is enabled and no mapping matched."
+      },
+      "dryRun": {
+        "type": "boolean",
+        "default": false,
+        "description": "Log the command that would be executed without running it. Useful while setting up mappings."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "hooks": {
+    "sync-permission-on-join": {
+      "eventType": "player-connected",
+      "description": "Apply configured game permission level when a player joins based on their Takaro/Discord-synced role.",
+      "function": "src/hooks/sync-permission-on-join/index.js"
+    }
+  },
+  "functions": {
+    "permission-sync-helpers": {
+      "function": "src/functions/permission-sync-helpers.js"
+    }
+  }
+}
