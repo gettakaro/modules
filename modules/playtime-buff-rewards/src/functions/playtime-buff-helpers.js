@@ -2,6 +2,7 @@ import { takaro } from '@takaro/helpers';
 
 const DEFAULT_BUFF_COMMAND_TEMPLATE = 'buffplayer {playerName} {buffName}';
 const DEFAULT_REWARD_MESSAGE = '{playerName} received a playtime reward: {rewardName}.';
+const PLAYTIME_STATE_KEY = 'playtime_buff_reward_state';
 
 export function trimOrEmpty(value) {
   if (value === undefined || value === null) return '';
@@ -39,6 +40,68 @@ async function getPlayerName(playerId, fallback) {
     console.error(`playtime-buff-rewards: failed to fetch player name for ${playerId}: ${err}`);
     return fallback;
   }
+}
+
+async function findPlayerStateVariable(gameServerId, moduleId, playerId) {
+  const res = await takaro.variable.variableControllerSearch({
+    filters: {
+      key: [PLAYTIME_STATE_KEY],
+      gameServerId: [gameServerId],
+      moduleId: [moduleId],
+      playerId: [playerId],
+    },
+  });
+  return res.data.data.length > 0 ? res.data.data[0] : null;
+}
+
+async function getPlayerRewardState(gameServerId, moduleId, playerId) {
+  const variable = await findPlayerStateVariable(gameServerId, moduleId, playerId);
+  if (!variable) return { lastRewardBucket: 0 };
+  try {
+    const parsed = JSON.parse(variable.value);
+    return {
+      lastRewardBucket: Math.max(0, Math.floor(Number(parsed.lastRewardBucket || 0))),
+    };
+  } catch (err) {
+    console.error(`playtime-buff-rewards: failed to parse reward state for player ${playerId}: ${err}`);
+    return { lastRewardBucket: 0 };
+  }
+}
+
+async function setPlayerRewardState(gameServerId, moduleId, playerId, state) {
+  const value = JSON.stringify(state);
+  const existing = await findPlayerStateVariable(gameServerId, moduleId, playerId);
+  if (existing) {
+    await takaro.variable.variableControllerUpdate(existing.id, { value });
+    return;
+  }
+
+  await takaro.variable.variableControllerCreate({
+    key: PLAYTIME_STATE_KEY,
+    value,
+    gameServerId,
+    moduleId,
+    playerId,
+  });
+}
+
+function getPlaytimeIntervalMinutes(config) {
+  const interval = Math.floor(Number(config?.playtimeIntervalMinutes || 0));
+  if (!Number.isFinite(interval) || interval < 1) return 0;
+  return interval;
+}
+
+async function getEligibleRewardBucket(gameServerId, moduleId, config, target) {
+  const intervalMinutes = getPlaytimeIntervalMinutes(config);
+  if (intervalMinutes === 0) return null;
+
+  const playtimeSeconds = Math.max(0, Number(target.playtimeSeconds || 0));
+  const currentBucket = Math.floor(playtimeSeconds / (intervalMinutes * 60));
+  if (currentBucket < 1) return null;
+
+  const state = await getPlayerRewardState(gameServerId, moduleId, target.playerId);
+  if (currentBucket <= state.lastRewardBucket) return null;
+  return currentBucket;
 }
 
 export function normalizeBuffName(value) {
@@ -221,6 +284,7 @@ export async function findOnlinePlayers(gameServerId) {
       const fallbackName = target.gameId || target.playerId;
       return {
         ...target,
+        playtimeSeconds: Number(record.playtimeSeconds || 0),
         name: await getPlayerName(target.playerId, fallbackName),
       };
     }));
@@ -234,9 +298,16 @@ export async function findOnlinePlayers(gameServerId) {
 
 export async function grantPlaytimeRewards(gameServerId, mod) {
   const config = mod.userConfig || {};
+  const moduleId = mod.moduleId;
+  const intervalMinutes = getPlaytimeIntervalMinutes(config);
   const rewards = getConfiguredRewards(config);
   if (rewards.length === 0) {
     console.log('playtime-buff-rewards: no rewards configured');
+    return { playersChecked: 0, rewardsGranted: 0 };
+  }
+
+  if (intervalMinutes > 0 && !moduleId) {
+    console.error('playtime-buff-rewards: playtimeIntervalMinutes requires moduleId but data.module.moduleId was missing');
     return { playersChecked: 0, rewardsGranted: 0 };
   }
 
@@ -247,17 +318,32 @@ export async function grantPlaytimeRewards(gameServerId, mod) {
   }
 
   let rewardsGranted = 0;
+  let playersEligible = 0;
   for (const target of players) {
+    const eligibleBucket = await getEligibleRewardBucket(gameServerId, moduleId, config, target);
+    if (intervalMinutes > 0 && eligibleBucket === null) continue;
+
+    playersEligible++;
     const reward = pickWeightedReward(rewards);
     if (!reward) continue;
     try {
       await grantRewardToPlayer(gameServerId, config, target, reward);
+      if (intervalMinutes > 0) {
+        await setPlayerRewardState(gameServerId, moduleId, target.playerId, {
+          lastRewardBucket: eligibleBucket,
+          lastRewardedAt: new Date().toISOString(),
+          playtimeSeconds: Math.max(0, Number(target.playtimeSeconds || 0)),
+        });
+      }
       rewardsGranted++;
     } catch (err) {
       console.error(`playtime-buff-rewards: failed to grant reward to ${target.name}: ${err}`);
     }
   }
 
+  if (intervalMinutes > 0 && playersEligible === 0) {
+    console.log(`playtime-buff-rewards: no players reached a new ${intervalMinutes} minute playtime interval`);
+  }
   console.log(`playtime-buff-rewards: granted ${rewardsGranted} reward(s) to ${players.length} online player(s)`);
   return { playersChecked: players.length, rewardsGranted };
 }

@@ -73,11 +73,12 @@ describe('playtime-buff-rewards', () => {
     await stopMockServer(ctx.server, client, ctx.gameServer.id);
   });
 
-  async function installWithBuffConfig(): Promise<void> {
+  async function installWithBuffConfig(userConfig: Record<string, unknown> = {}): Promise<void> {
     await installModule(client, versionId, ctx!.gameServer.id, {
       userConfig: {
         buffCommandTemplate: 'buffplayer {playerName} {buffName}',
         announceRewards: false,
+        playtimeIntervalMinutes: 0,
         buffRewards: [
           {
             buffName: 'CustomerBuff',
@@ -87,6 +88,7 @@ describe('playtime-buff-rewards', () => {
         ],
         commandRewards: [],
         currencyRewards: [],
+        ...userConfig,
       },
     });
   }
@@ -141,6 +143,25 @@ describe('playtime-buff-rewards', () => {
       assert.ok(
         logs.some((msg) => msg.includes('buffplayer') && msg.includes('CustomerBuff')),
         `Expected buff command in logs, got: ${JSON.stringify(logs)}`,
+      );
+    } finally {
+      await uninstallModule(client, moduleId, ctx!.gameServer.id);
+    }
+  });
+
+  it('skips grants and reward messages until a player reaches the configured playtime interval', async () => {
+    await installWithBuffConfig({ playtimeIntervalMinutes: 999999 });
+    try {
+      const { success, logs } = await triggerCronjob();
+
+      assert.equal(success, true, `Expected interval cronjob success, logs: ${JSON.stringify(logs)}`);
+      assert.ok(
+        logs.some((msg) => msg.includes('no players reached a new 999999 minute playtime interval')),
+        `Expected interval skip log, got: ${JSON.stringify(logs)}`,
+      );
+      assert.ok(
+        !logs.some((msg) => msg.includes('buffplayer') || msg.includes('CustomerBuff')),
+        `Expected no reward command while below interval, got: ${JSON.stringify(logs)}`,
       );
     } finally {
       await uninstallModule(client, moduleId, ctx!.gameServer.id);
