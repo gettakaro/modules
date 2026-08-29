@@ -93,44 +93,44 @@ async function main() {
 
             console.log(`   ✅ Applied ${successCount}/${buffNames.length} buffs from this package`);
 
-            if (Number(pkg.duration) > 0) {
-                const expiryKey = `buff_expiry_${pkg.commandName}`;
-                const expiryTime = Date.now() + (Number(pkg.duration) * 60000);
+            const expiryKey = `buff_expiry_${pkg.commandName}`;
+            const durationMinutes = Number(pkg.duration);
+            const expiryTime = durationMinutes > 0 ? Date.now() + (durationMinutes * 60000) : 0;
 
-                try {
-                    const existingVars = await takaro.variable.variableControllerSearch({
-                        filters: {
-                            key: [expiryKey],
-                            playerId: [targetPlayer.id],
-                            gameServerId: [gameServerId],
-                            moduleId: [module.moduleId]
-                        }
+            try {
+                const existingVars = await takaro.variable.variableControllerSearch({
+                    filters: {
+                        key: [expiryKey],
+                        playerId: [targetPlayer.id],
+                        gameServerId: [gameServerId],
+                        moduleId: [module.moduleId]
+                    }
+                });
+
+                if (existingVars.data.data.length > 0) {
+                    await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
+                        value: expiryTime.toString()
                     });
+                } else {
+                    await takaro.variable.variableControllerCreate({
+                        key: expiryKey,
+                        value: expiryTime.toString(),
+                        playerId: targetPlayer.id,
+                        gameServerId: gameServerId,
+                        moduleId: module.moduleId
+                    });
+                }
 
-                    const minutes = Math.floor(Number(pkg.duration));
+                if (durationMinutes > 0) {
+                    const minutes = Math.floor(durationMinutes);
                     const hours = Math.floor(minutes / 60);
                     const timeStr = hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-
-                    if (existingVars.data.data.length > 0) {
-                        await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
-                            value: expiryTime.toString()
-                        });
-                        console.log(`   ⏰ Expiration updated for ${pkg.commandName}: ${timeStr}`);
-                    } else {
-                        await takaro.variable.variableControllerCreate({
-                            key: expiryKey,
-                            value: expiryTime.toString(),
-                            playerId: targetPlayer.id,
-                            gameServerId: gameServerId,
-                            moduleId: module.moduleId
-                        });
-                        console.log(`   ⏰ Expiration set for ${pkg.commandName}: ${timeStr}`);
-                    }
-                } catch (err) {
-                    console.error(`   ⚠️ Failed to set expiration variable for ${pkg.commandName}:`, err.message);
+                    console.log(`   ⏰ Expiration ${existingVars.data.data.length > 0 ? 'updated' : 'set'} for ${pkg.commandName}: ${timeStr}`);
+                } else {
+                    console.log(`   ⏰ Permanent tracking ${existingVars.data.data.length > 0 ? 'updated' : 'set'} for ${pkg.commandName}`);
                 }
-            } else {
-                console.log(`   ⏰ No expiration for ${pkg.commandName} (permanent)`);
+            } catch (err) {
+                console.error(`   ⚠️ Failed to set tracking variable for ${pkg.commandName}:`, err.message);
             }
         }
 
@@ -174,45 +174,46 @@ async function main() {
 
     console.log(`✅ Applied ${successCount}/${buffNames.length} buffs successfully`);
 
-    if (Number(pkg.duration) > 0) {
-        const expiryKey = `buff_expiry_${pkg.commandName}`;
-        const expiryTime = Date.now() + (Number(pkg.duration) * 60000);
+    const expiryKey = `buff_expiry_${pkg.commandName}`;
+    const durationMinutes = Number(pkg.duration);
+    const expiryTime = durationMinutes > 0 ? Date.now() + (durationMinutes * 60000) : 0;
 
-        try {
-            const existingVars = await takaro.variable.variableControllerSearch({
-                filters: {
-                    key: [expiryKey],
-                    playerId: [targetPlayer.id],
-                    gameServerId: [gameServerId],
-                    moduleId: [module.moduleId]
-                }
+    try {
+        const existingVars = await takaro.variable.variableControllerSearch({
+            filters: {
+                key: [expiryKey],
+                playerId: [targetPlayer.id],
+                gameServerId: [gameServerId],
+                moduleId: [module.moduleId]
+            }
+        });
+
+        if (existingVars.data.data.length > 0) {
+            await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
+                value: expiryTime.toString()
             });
+        } else {
+            await takaro.variable.variableControllerCreate({
+                key: expiryKey,
+                value: expiryTime.toString(),
+                playerId: targetPlayer.id,
+                gameServerId: gameServerId,
+                moduleId: module.moduleId
+            });
+        }
 
-            const minutes = Math.floor(Number(pkg.duration));
+        if (durationMinutes > 0) {
+            const minutes = Math.floor(durationMinutes);
             const hours = Math.floor(minutes / 60);
             const timeStr = hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-
-            if (existingVars.data.data.length > 0) {
-                await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
-                    value: expiryTime.toString()
-                });
-                console.log(`⏰ Expiration updated: ${timeStr}`);
-            } else {
-                await takaro.variable.variableControllerCreate({
-                    key: expiryKey,
-                    value: expiryTime.toString(),
-                    playerId: targetPlayer.id,
-                    gameServerId: gameServerId,
-                    moduleId: module.moduleId
-                });
-                console.log(`⏰ Expiration set: ${timeStr}`);
-            }
-        } catch (err) {
-            console.error(`⚠️ Failed to set expiration variable:`, err.message);
+            console.log(`⏰ Expiration ${existingVars.data.data.length > 0 ? 'updated' : 'set'}: ${timeStr}`);
+        } else {
+            console.log(`⏰ Permanent tracking ${existingVars.data.data.length > 0 ? 'updated' : 'set'}`);
         }
-    } else {
-        console.log(`⏰ No expiration (permanent buff)`);
+    } catch (err) {
+        console.error(`⚠️ Failed to set tracking variable:`, err.message);
     }
+
 
     // Format expiry message
     let expiryMsg = '';

@@ -30,52 +30,35 @@ async function main() {
     };
 
     try {
-        // Get all online players
-        const playersRes = await takaro.gameserver.gameServerControllerGetPlayers(gameServerId);
-        const onlinePlayers = playersRes.data.data || playersRes.data || [];
+        // Get online PlayerOnGameServer records directly. This is more reliable for 7D2D
+        // than mapping game-server player output through steamId, because 7D2D players may
+        // only have gameId/platformId in the online-player payload.
+        const pogsRes = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({
+            filters: {
+                gameServerId: [gameServerId],
+                online: [true]
+            },
+            extend: ['player'],
+            limit: 100
+        });
+        const onlinePogs = pogsRes.data.data || [];
 
-        console.log(`\n👥 Found ${onlinePlayers.length} online player(s)`);
+        console.log(`
+👥 Found ${onlinePogs.length} online player(s)`);
 
-        if (onlinePlayers.length === 0) {
+        if (onlinePogs.length === 0) {
             console.log('   No players online - nothing to do');
             return;
         }
 
-        // Get POG (PlayerOnGameServer) data for each online player
-        const playerPogsPromises = onlinePlayers.map(async (onlinePlayer) => {
-            try {
-                const playerRes = await takaro.player.playerControllerSearch({
-                    filters: {
-                        steamId: [onlinePlayer.steamId]
-                    },
-                    limit: 1
-                });
-
-                if (!playerRes.data.data || playerRes.data.data.length === 0) {
-                    console.log(`⚠️  Player ${onlinePlayer.name} not found in Takaro database`);
-                    return null;
-                }
-
-                const takaroPlayer = playerRes.data.data[0];
-                const pogRes = await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(
-                    gameServerId,
-                    takaroPlayer.id
-                );
-
-                return {
-                    onlinePlayer,
-                    takaroPlayer,
-                    pog: pogRes.data.data
-                };
-            } catch (err) {
-                console.error(`❌ Error fetching POG for ${onlinePlayer.name}:`, err.message);
-                stats.errors++;
-                return null;
-            }
-        });
-
-        const playerPogsResults = await Promise.all(playerPogsPromises);
-        const validPlayers = playerPogsResults.filter(result => result !== null);
+        const validPlayers = onlinePogs.map(pog => {
+            const takaroPlayer = pog.player || { id: pog.playerId, name: pog.name || pog.gameId };
+            const onlinePlayer = {
+                name: takaroPlayer.name || pog.name || pog.gameId,
+                gameId: pog.gameId
+            };
+            return { onlinePlayer, takaroPlayer, pog };
+        }).filter(result => result.takaroPlayer && result.takaroPlayer.id);
 
         console.log(`\n🔍 Processing ${validPlayers.length} player(s)...\n`);
 
@@ -140,10 +123,10 @@ async function main() {
                         // STEP 1: Check if expired
                         const expiryTime = parseInt(variable.value);
                         const now = Date.now();
-                        const isExpired = Number(pkg.duration) > 0 && expiryTime > 0 && now > expiryTime;  // ✅ Fixed: pkg.duration
+                        const isExpired = Number(pkg.duration) > 0 && expiryTime > 0 && now > expiryTime;
 
                         // Debug logging
-                        console.log(`      📅 Debug: Expiry=${new Date(expiryTime).toISOString()}, Now=${new Date(now).toISOString()}, Duration=${pkg.duration}m`);
+                        console.log(`      📅 Debug: Expiry=${expiryTime === 0 ? 'permanent' : new Date(expiryTime).toISOString()}, Now=${new Date(now).toISOString()}, Duration=${pkg.duration}m`);
                         console.log(`      🔍 Expired check: ${isExpired} (now ${now} > expiry ${expiryTime})`)
 
                         if (isExpired) {
@@ -221,7 +204,7 @@ async function main() {
                         }
 
                         // STEP 3: Calculate time remaining (for active buffs)
-                        if (Number(pkg.duration) > 0) {  // ✅ Fixed: pkg.duration
+                        if (Number(pkg.duration) > 0) {
                             const msRemaining = expiryTime - now;
                             const minutesRemaining = Math.floor(msRemaining / 60000);
                             const hoursRemaining = Math.floor(msRemaining / 3600000);
@@ -232,7 +215,7 @@ async function main() {
 
                             console.log(`      ⏰ Active - Expires in ${remainingTimeStr}`);
                         } else {
-                            console.log(`      ⏰ Active - Permanent (no expiration)`);
+                            console.log(`      ⏰ Active - Permanent tracking`);
                         }
 
                         // STEP 4: Re-apply active buffs to maintain them

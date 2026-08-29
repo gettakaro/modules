@@ -138,57 +138,48 @@ async function main() {
         }
     }
 
-    // Set or update expiration variable if duration is set
-    if (Number(pkg.duration) > 0) {
-        const expiryKey = `buff_expiry_${pkg.commandName}`;
-        const expiryTime = Date.now() + (Number(pkg.duration) * 60000);
+    // Set or update tracking variable. A duration of 0 means permanent Takaro tracking,
+    // stored as value "0", so the maintenance cron can keep re-applying it.
+    const expiryKey = `buff_expiry_${pkg.commandName}`;
+    const durationMinutes = Number(pkg.duration);
+    const expiryTime = durationMinutes > 0 ? Date.now() + (durationMinutes * 60000) : 0;
 
-        try {
-            // Check if variable already exists
-            const existingVars = await takaro.variable.variableControllerSearch({
-                filters: {
-                    key: [expiryKey],
-                    playerId: [player.id],
-                    gameServerId: [gameServerId],
-                    moduleId: [module.moduleId]
-                }
-            });
-
-            if (existingVars.data.data.length > 0) {
-                // Update existing variable
-                await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
-                    value: expiryTime.toString()
-                });
-                const minutes = Math.floor(Number(pkg.duration));
-                const hours = Math.floor(minutes / 60);
-                if (hours > 0) {
-                    console.log(`⏰ Expiration updated: ${hours}h ${minutes % 60}m`);
-                } else {
-                    console.log(`⏰ Expiration updated: ${minutes}m`);
-                }
-            } else {
-                // Create new variable
-                await takaro.variable.variableControllerCreate({
-                    key: expiryKey,
-                    value: expiryTime.toString(),
-                    playerId: player.id,
-                    gameServerId: gameServerId,
-                    moduleId: module.moduleId
-                });
-                const minutes = Math.floor(Number(pkg.duration));
-                const hours = Math.floor(minutes / 60);
-                if (hours > 0) {
-                    console.log(`⏰ Expiration set: ${hours}h ${minutes % 60}m`);
-                } else {
-                    console.log(`⏰ Expiration set: ${minutes}m`);
-                }
+    try {
+        // Check if variable already exists
+        const existingVars = await takaro.variable.variableControllerSearch({
+            filters: {
+                key: [expiryKey],
+                playerId: [player.id],
+                gameServerId: [gameServerId],
+                moduleId: [module.moduleId]
             }
-        } catch (err) {
-            console.error(`⚠️ Failed to set expiration variable:`, err.message);
-            // Don't throw - buff was applied successfully
+        });
+
+        if (existingVars.data.data.length > 0) {
+            await takaro.variable.variableControllerUpdate(existingVars.data.data[0].id, {
+                value: expiryTime.toString()
+            });
+        } else {
+            await takaro.variable.variableControllerCreate({
+                key: expiryKey,
+                value: expiryTime.toString(),
+                playerId: player.id,
+                gameServerId: gameServerId,
+                moduleId: module.moduleId
+            });
         }
-    } else {
-        console.log(`⏰ No expiration (permanent buff)`);
+
+        if (durationMinutes > 0) {
+            const minutes = Math.floor(durationMinutes);
+            const hours = Math.floor(minutes / 60);
+            const timeStr = hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+            console.log(`⏰ Expiration ${existingVars.data.data.length > 0 ? 'updated' : 'set'}: ${timeStr}`);
+        } else {
+            console.log(`⏰ Permanent tracking ${existingVars.data.data.length > 0 ? 'updated' : 'set'}`);
+        }
+    } catch (err) {
+        console.error(`⚠️ Failed to set buff tracking variable:`, err.message);
+        // Don't throw - buff was applied successfully
     }
 
     // Send confirmation with properly formatted duration

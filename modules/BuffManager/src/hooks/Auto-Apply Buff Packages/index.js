@@ -93,21 +93,24 @@ async function main() {
             const expiryKey = `buff_expiry_${pkg.commandName}`;
             const existingVar = existingBuffVars.find(v => v.key === expiryKey);
 
-            if (existingVar && Number(pkg.duration) > 0) {  // ✅ Fixed: pkg.duration
+            if (existingVar) {
                 const expiryTime = parseInt(existingVar.value);
                 const now = Date.now();
-                const isStillActive = expiryTime > now;
+                const isPermanent = Number(pkg.duration) === 0 && expiryTime === 0;
+                const isStillActive = isPermanent || expiryTime > now;
 
                 if (isStillActive) {
-                    const msRemaining = expiryTime - now;
-                    const minutesRemaining = Math.floor(msRemaining / 60000);
-                    const hoursRemaining = Math.floor(msRemaining / 3600000);
-
-                    const timeStr = hoursRemaining > 0
-                        ? `${hoursRemaining}h ${minutesRemaining % 60}m`
-                        : `${minutesRemaining}m`;
-
-                    console.log(`   ⏭️  Already active (${timeStr} remaining) - skipping`);
+                    if (isPermanent) {
+                        console.log(`   ⏭️  Already active (permanent) - skipping`);
+                    } else {
+                        const msRemaining = expiryTime - now;
+                        const minutesRemaining = Math.floor(msRemaining / 60000);
+                        const hoursRemaining = Math.floor(msRemaining / 3600000);
+                        const timeStr = hoursRemaining > 0
+                            ? `${hoursRemaining}h ${minutesRemaining % 60}m`
+                            : `${minutesRemaining}m`;
+                        console.log(`   ⏭️  Already active (${timeStr} remaining) - skipping`);
+                    }
                     stats.packagesSkipped++;
                     continue;
                 }
@@ -149,38 +152,36 @@ async function main() {
                 stats.buffsTotalApplied += successCount;
             }
 
-            // Set or update expiration variable if duration is set
-            if (Number(pkg.duration) > 0) {  // ✅ Fixed: pkg.duration
-                try {
-                    const expiryTime = Date.now() + (Number(pkg.duration) * 60000);
+            // Set or update tracking. Duration 0 is permanent tracking for maintenance.
+            try {
+                const durationMinutes = Number(pkg.duration);
+                const expiryTime = durationMinutes > 0 ? Date.now() + (durationMinutes * 60000) : 0;
 
-                    const minutes = Math.floor(Number(pkg.duration));
+                if (existingVar) {
+                    await takaro.variable.variableControllerUpdate(existingVar.id, {
+                        value: expiryTime.toString()
+                    });
+                } else {
+                    await takaro.variable.variableControllerCreate({
+                        key: expiryKey,
+                        value: expiryTime.toString(),
+                        playerId: player.id,
+                        gameServerId: gameServerId,
+                        moduleId: module.moduleId
+                    });
+                }
+
+                if (durationMinutes > 0) {
+                    const minutes = Math.floor(durationMinutes);
                     const hours = Math.floor(minutes / 60);
                     const timeStr = hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-
-                    if (existingVar) {
-                        // Update existing variable
-                        await takaro.variable.variableControllerUpdate(existingVar.id, {
-                            value: expiryTime.toString()
-                        });
-                        console.log(`   ⏰ Expiration updated: ${timeStr}`);
-                    } else {
-                        // Create new variable
-                        await takaro.variable.variableControllerCreate({
-                            key: expiryKey,
-                            value: expiryTime.toString(),
-                            playerId: player.id,
-                            gameServerId: gameServerId,
-                            moduleId: module.moduleId
-                        });
-                        console.log(`   ⏰ Expiration set: ${timeStr}`);
-                    }
-                } catch (err) {
-                    console.log(`   ⚠️ Failed to set/update expiration: ${err.message}`);
-                    stats.errors++;
+                    console.log(`   ⏰ Expiration ${existingVar ? 'updated' : 'set'}: ${timeStr}`);
+                } else {
+                    console.log(`   ⏰ Permanent tracking ${existingVar ? 'updated' : 'set'}`);
                 }
-            } else {
-                console.log(`   ⏰ No expiration (permanent buff)`);
+            } catch (err) {
+                console.log(`   ⚠️ Failed to set/update tracking: ${err.message}`);
+                stats.errors++;
             }
         } catch (err) {
             console.log(`   ❌ Error processing package ${pkg.displayName}: ${err.message}`);
@@ -195,7 +196,7 @@ async function main() {
                 .filter(pkg => {
                     // Only include packages that weren't skipped
                     const expiryKey = `buff_expiry_${pkg.commandName}`;
-                    const wasSkipped = existingBuffVars.find(v => v.key === expiryKey && parseInt(v.value) > Date.now());
+                    const wasSkipped = existingBuffVars.find(v => v.key === expiryKey && (parseInt(v.value) === 0 || parseInt(v.value) > Date.now()));
                     return !wasSkipped;
                 })
                 .map(p => p.displayName)

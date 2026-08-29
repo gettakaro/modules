@@ -53,7 +53,7 @@
             "duration": {
               "type": "number",
               "title": "Duration (Minutes)",
-              "description": "How long Takaro tracks this package as active, in minutes. This is the purchased/owned window and the point where maintenance stops re-applying the buff. It does not change the native 7D2D XML buff duration. Set to 0 for no Takaro expiry tracking; duration-0 packages are applied by commands/auto-apply but are not maintained by the expiry cronjob.",
+              "description": "How long Takaro tracks this package as active, in minutes. This is the purchased/owned window and the point where maintenance stops re-applying the buff. It does not change the native 7D2D XML buff duration. Set to 0 for permanent Takaro tracking; maintenance keeps re-applying it while the player is online.",
               "minimum": 0,
               "default": 60
             },
