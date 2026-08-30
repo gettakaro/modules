@@ -1,4 +1,11 @@
 import { data, takaro } from '@takaro/helpers';
+import {
+    clearWorldEvent,
+    findBuffPackage,
+    isWorldEventExpired,
+    readWorldEvent,
+    removePackageFromPog,
+} from './buff-manager-helpers.js';
 
 function get7dtdCommandTarget(pog, onlinePlayer) {
     if (pog?.gameId) return String(pog.gameId).startsWith('EOS_') ? pog.gameId : `EOS_${pog.gameId}`;
@@ -31,6 +38,8 @@ async function main() {
         buffPackagesMaintained: 0,
         buffPackagesExpiredAndRemoved: 0,
         totalBuffsReapplied: 0,
+        worldEventBuffsMaintained: 0,
+        worldEventBuffsRemoved: 0,
         errors: 0
     };
 
@@ -66,6 +75,53 @@ async function main() {
         }).filter(result => result.takaroPlayer && result.takaroPlayer.id);
 
         console.log(`\n🔍 Processing ${validPlayers.length} player(s)...\n`);
+
+        // Process active world event before per-player package maintenance.
+        try {
+            const { state: worldEvent } = await readWorldEvent(gameServerId, module.moduleId);
+            if (worldEvent) {
+                const worldEventPackage = findBuffPackage(buffPackages, worldEvent.packageName);
+                if (!worldEventPackage) {
+                    console.log(`🌍 World event package "${worldEvent.packageName}" is no longer configured; clearing state`);
+                    await clearWorldEvent(gameServerId, module.moduleId);
+                } else if (isWorldEventExpired(worldEvent)) {
+                    console.log(`🌍 World event expired: ${worldEventPackage.displayName}. Removing from online players.`);
+                    for (const { pog } of validPlayers) {
+                        stats.worldEventBuffsRemoved += await removePackageFromPog(gameServerId, worldEventPackage, pog);
+                    }
+                    await clearWorldEvent(gameServerId, module.moduleId);
+                    try {
+                        await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {
+                            message: `World event ended: ${worldEventPackage.displayName}.`
+                        });
+                    } catch (err) {
+                        console.log(`   ⚠️ Failed to announce expired world event: ${err.message}`);
+                    }
+                } else {
+                    console.log(`🌍 Maintaining active world event: ${worldEventPackage.displayName}`);
+                    for (const { pog } of validPlayers) {
+                        const commandTarget = get7dtdCommandTarget(pog, pog.player || { name: pog.name || pog.gameId });
+                        const buffNames = worldEventPackage.buffNames || [];
+                        const buffCommands = buffNames.map(buffName =>
+                            takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
+                                command: `buffplayer ${commandTarget} ${buffName}`
+                            })
+                                .then(() => ({ success: true }))
+                                .catch(err => {
+                                    console.log(`      ✗ Failed world event buff ${buffName}: ${err.message}`);
+                                    stats.errors++;
+                                    return { success: false };
+                                })
+                        );
+                        const results = await Promise.all(buffCommands);
+                        stats.worldEventBuffsMaintained += results.filter(r => r.success).length;
+                    }
+                }
+            }
+        } catch (err) {
+            console.log(`⚠️ Failed to process world event maintenance: ${err.message}`);
+            stats.errors++;
+        }
 
         // Process each player
         for (const { onlinePlayer, takaroPlayer, pog } of validPlayers) {
@@ -273,6 +329,8 @@ async function main() {
     console.log(`   - Active buff packages maintained: ${stats.buffPackagesMaintained}`);
     console.log(`   - Expired buffs removed: ${stats.buffPackagesExpiredAndRemoved}`);
     console.log(`   - Total buffs re-applied: ${stats.totalBuffsReapplied}`);
+    console.log(`   - World event buffs maintained: ${stats.worldEventBuffsMaintained}`);
+    console.log(`   - World event buffs removed: ${stats.worldEventBuffsRemoved}`);
     if (stats.errors > 0) {
         console.log(`   - Errors encountered: ${stats.errors} ⚠️`);
     }
