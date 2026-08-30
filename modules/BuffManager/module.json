@@ -1,7 +1,7 @@
 {
   "name": "BuffManager",
   "author": "limon",
-  "description": "Sell, grant, and maintain configurable 7 Days to Die buff packages through Takaro. BuffManager helps admins turn buffs into permissioned, timed, and currency-backed player perks.\n\nUse this module to:\n- Configure multiple buff packages with display names and command triggers.\n- Require roles or permissions for specific buff packages.\n- Charge Takaro currency for player-selected buffs.\n- Track expirations and reapply active buffs when players reconnect.\n- Give staff admin commands for manual buff and debuff workflows.\n\nGood fit for 7 Days to Die servers that want VIP buffs, paid perks, timed role benefits, or economy-connected buff rewards.\n\n## Module details\n\n# Dynamic Buff Manager\n\nFlexible buff management system that supports unlimited buff packages with role requirements, expiration tracking, and currency costs.\n\n## Features\n- ✅ Unlimited buff packages (add as many as you need)\n- ✅ Role-based access control per package\n- ✅ Time-based expiration system\n- ✅ Auto-apply buffs on player connect\n- ✅ Currency costs per package\n- ✅ Automatic maintenance to keep buffs active\n\n## Quick Start\n\n1. **Add a Buff Package**\n   - Click \"Add Item\" under Buff Packages\n   - Set Command Name (e.g., \"vipbuff\")\n   - Set Display Name (e.g., \"VIP Speed Package\")\n   - Add buff names from your XML (e.g., \"SpeedbuffVip\")\n\n2. **Get Role ID**\n   - Go to Settings → Roles in Takaro\n   - Click on the role you want (e.g., \"VIP\")\n   - Look at the browser address bar: `https://your-takaro.com/settings/roles/743b9623-ad09-4cf2-86c0-3d7faed57a88`\n   - Copy the UUID from the URL (the part after `/roles/`)\n   - Example: `743b9623-ad09-4cf2-86c0-3d7faed57a88`\n   - Paste into \"Required Role ID\" field\n   - Leave empty to allow everyone\n\n3. **Configure Duration**\n   - Set how long buffs should last in minutes\n   - 0 = no Takaro expiry tracking. The buff is applied by `/getbuff` or auto-apply, but maintenance only maintains packages that have an expiry variable.\n   - 60 = expires after 1 hour\n\n4. **Save and Install**\n\n## Configuration Fields\n\n### Buff Package Settings\n\n- **Command Name**: What players type (creates /getbuff commandName)\n- **Display Name**: Friendly name in messages\n- **Description**: Explanation of what the package does\n- **Buff Names**: Array of buff codes from your buffs.xml\n- **Required Role ID**: UUID of the role (copy from browser URL). Empty = everyone\n- **Duration (Minutes)**: Takaro tracking/maintenance window. 0 = no expiry tracking\n- **Auto-Apply on Connect**: Give buff automatically when player joins\n- **Currency Cost**: Price to use the command\n\n### Examples\n\n**VIP Package:**\n- Command: \"vipbuff\"\n- Buffs: [\"SpeedbuffVip\", \"ExpBuffVip\"]\n- Role: 743b9623-ad09-4cf2-86c0-3d7faed57a88\n- Duration: 0 (permanent)\n- Auto-apply: Yes\n- Cost: 0\n\n**Temporary Donor Buff:**\n- Command: \"donorbuff\"\n- Buffs: [\"SuperSpeed\", \"SuperJump\"]\n- Role: abc-123-donor-role-id\n- Duration: 120 (2 hours)\n- Auto-apply: No\n- Cost: 1000\n\n## How It Works\n\n1. **On Player Connect**: Module checks all packages with auto-apply enabled and matching roles\n2. **Manual Command**: Player uses /getbuff <packageName> to activate a specific package\n3. **Expiration Tracking**: Module stores expiration timestamp per player per package\n4. **Maintenance**: Cronjob re-applies non-expired timed buffs on its schedule. The included cronjob is scheduled every minute; adjust the cronjob schedule in Takaro if you want a different cadence.\n\n\n## Important: BuffManager duration vs 7D2D XML duration\n\nBuffManager has two different duration concepts:\n\n- **BuffManager package duration** controls how long Takaro tracks the player as owning the package. When a player runs `/getbuff <package>`, BuffManager stores a Takaro variable such as `buff_expiry_<package>` with the expiry timestamp.\n- **7D2D XML buff duration** controls how long each actual in-game buff application lasts. BuffManager applies buffs by sending a normal console command such as `buffplayer \"playername\" buffName`. That command does not include a duration, so 7D2D reads the duration and stack/refresh behavior from your server/mod XML, usually `buffs.xml`.\n\nThe maintenance cronjob is a keep-alive loop for timed packages. It does not inspect the live 7D2D buff timer. It checks Takaro's saved expiry variable for online players:\n\n- If the package has not expired, maintenance sends `buffplayer \"playername\" buffName` again to refresh/reapply the buff.\n- If the package has expired, maintenance sends `debuffplayer \"playername\" buffName` and deletes the Takaro tracking variable.\n- If package duration is `0`, BuffManager does not create an expiry variable for maintenance to check. The buff can still be applied by `/getbuff`, `/buffplayer`, or auto-apply on connect, but it is not part of the timed maintenance loop.\n\nFor clean behavior, set the XML duration and stacking behavior intentionally. If maintenance runs every minute, a short XML duration such as 60-90 seconds usually works well: Takaro refreshes while the package is active, then removes the buff when the Takaro package expires. Avoid very long XML durations unless you are comfortable with possible tail time if a buff was refreshed shortly before expiry and removal does not run cleanly.\n\n## Troubleshooting\n\n**Buffs not applying:**\n- Check buff names match your buffs.xml exactly (case-sensitive)\n- Verify role ID is correct UUID from browser URL\n- Check player actually has the role assigned\n- Look at module execution events for detailed logs\n\n**Buffs disappearing:**\n- Check duration - timed packages may be expiring, or duration 0 may not be tracked by maintenance\n- Verify maintenance is enabled and the maintenance cronjob schedule is what you expect\n- Check game server console for buff command errors\n\n**Currency not deducting:**\n- Verify economy is enabled in Takaro settings\n- Check currency cost is set correctly per package",
+  "description": "Sell, grant, and maintain configurable 7 Days to Die buff packages through Takaro. BuffManager helps admins turn buffs into permissioned, timed, and currency-backed player perks.\n\nUse this module to:\n- Configure multiple buff packages with display names and command triggers.\n- Require roles or permissions for specific buff packages.\n- Charge Takaro currency for player-selected buffs.\n- Track expirations and reapply active buffs when players reconnect.\n- Give staff admin commands for manual buff and debuff workflows.\n\nGood fit for 7 Days to Die servers that want VIP buffs, paid perks, timed role benefits, or economy-connected buff rewards.\n\n## Module details\n\n# Dynamic Buff Manager\n\nFlexible buff management system that supports unlimited buff packages with role requirements, expiration tracking, and currency costs.\n\n## Features\n- ✅ Unlimited buff packages (add as many as you need)\n- ✅ Role-based access control per package\n- ✅ Time-based expiration system\n- ✅ Auto-apply buffs on player connect\n- ✅ Currency costs per package\n- ✅ Automatic maintenance to keep buffs active\n- ✅ World event mode for temporary server-wide buff packages with late-join support\n\n## Quick Start\n\n1. **Add a Buff Package**\n   - Click \"Add Item\" under Buff Packages\n   - Set Command Name (e.g., \"vipbuff\")\n   - Set Display Name (e.g., \"VIP Speed Package\")\n   - Add buff names from your XML (e.g., \"SpeedbuffVip\")\n\n2. **Get Role ID**\n   - Go to Settings → Roles in Takaro\n   - Click on the role you want (e.g., \"VIP\")\n   - Look at the browser address bar: `https://your-takaro.com/settings/roles/743b9623-ad09-4cf2-86c0-3d7faed57a88`\n   - Copy the UUID from the URL (the part after `/roles/`)\n   - Example: `743b9623-ad09-4cf2-86c0-3d7faed57a88`\n   - Paste into \"Required Role ID\" field\n   - Leave empty to allow everyone\n\n3. **Configure Duration**\n   - Set how long buffs should last in minutes\n   - 0 = no Takaro expiry tracking. The buff is applied by `/getbuff` or auto-apply, but maintenance only maintains packages that have an expiry variable.\n   - 60 = expires after 1 hour\n\n4. **Save and Install**\n\n## Configuration Fields\n\n### Buff Package Settings\n\n- **Command Name**: What players type (creates /getbuff commandName)\n- **Display Name**: Friendly name in messages\n- **Description**: Explanation of what the package does\n- **Buff Names**: Array of buff codes from your buffs.xml\n- **Required Role ID**: UUID of the role (copy from browser URL). Empty = everyone\n- **Duration (Minutes)**: Takaro tracking/maintenance window. 0 = no expiry tracking\n- **Auto-Apply on Connect**: Give buff automatically when player joins\n- **Currency Cost**: Price to use the command\n\n### Examples\n\n**VIP Package:**\n- Command: \"vipbuff\"\n- Buffs: [\"SpeedbuffVip\", \"ExpBuffVip\"]\n- Role: 743b9623-ad09-4cf2-86c0-3d7faed57a88\n- Duration: 0 (permanent)\n- Auto-apply: Yes\n- Cost: 0\n\n**Temporary Donor Buff:**\n- Command: \"donorbuff\"\n- Buffs: [\"SuperSpeed\", \"SuperJump\"]\n- Role: abc-123-donor-role-id\n- Duration: 120 (2 hours)\n- Auto-apply: No\n- Cost: 1000\n\n## How It Works\n\n1. **On Player Connect**: Module checks all packages with auto-apply enabled and matching roles\n2. **Manual Command**: Player uses /getbuff <packageName> to activate a specific package\n3. **Expiration Tracking**: Module stores expiration timestamp per player per package\n4. **Maintenance**: Cronjob re-applies non-expired timed buffs on its schedule. The included cronjob is scheduled every minute; adjust the cronjob schedule in Takaro if you want a different cadence.\n\n\n## Important: BuffManager duration vs 7D2D XML duration\n\nBuffManager has two different duration concepts:\n\n- **BuffManager package duration** controls how long Takaro tracks the player as owning the package. When a player runs `/getbuff <package>`, BuffManager stores a Takaro variable such as `buff_expiry_<package>` with the expiry timestamp.\n- **7D2D XML buff duration** controls how long each actual in-game buff application lasts. BuffManager applies buffs by sending a normal console command such as `buffplayer \"playername\" buffName`. That command does not include a duration, so 7D2D reads the duration and stack/refresh behavior from your server/mod XML, usually `buffs.xml`.\n\nThe maintenance cronjob is a keep-alive loop for timed packages. It does not inspect the live 7D2D buff timer. It checks Takaro's saved expiry variable for online players:\n\n- If the package has not expired, maintenance sends `buffplayer \"playername\" buffName` again to refresh/reapply the buff.\n- If the package has expired, maintenance sends `debuffplayer \"playername\" buffName` and deletes the Takaro tracking variable.\n- If package duration is `0`, BuffManager does not create an expiry variable for maintenance to check. The buff can still be applied by `/getbuff`, `/buffplayer`, or auto-apply on connect, but it is not part of the timed maintenance loop.\n\nFor clean behavior, set the XML duration and stacking behavior intentionally. If maintenance runs every minute, a short XML duration such as 60-90 seconds usually works well: Takaro refreshes while the package is active, then removes the buff when the Takaro package expires. Avoid very long XML durations unless you are comfortable with possible tail time if a buff was refreshed shortly before expiry and removal does not run cleanly.\n\n## Troubleshooting\n\n**Buffs not applying:**\n- Check buff names match your buffs.xml exactly (case-sensitive)\n- Verify role ID is correct UUID from browser URL\n- Check player actually has the role assigned\n- Look at module execution events for detailed logs\n\n**Buffs disappearing:**\n- Check duration - timed packages may be expiring, or duration 0 may not be tracked by maintenance\n- Verify maintenance is enabled and the maintenance cronjob schedule is what you expect\n- Check game server console for buff command errors\n\n**Currency not deducting:**\n- Verify economy is enabled in Takaro settings\n- Check currency cost is set correctly per package",
   "version": "latest",
   "supportedGames": [
     "7 Days to Die"
@@ -89,6 +89,19 @@
         "title": "Maintenance Schedule",
         "description": "Cron expression text for documenting the intended maintenance cadence. The bundled cronjob schedule is configured separately in the cronjob settings; maintenance is a keep-alive/check loop that re-applies active timed packages and removes expired ones.",
         "default": "*/15 * * * *"
+      },
+      "worldEventDefaultDuration": {
+        "type": "number",
+        "title": "World Event Default Duration (Minutes)",
+        "description": "Default duration for /buffevent start when no duration is provided. Set to 0 for an event that runs until /buffevent stop.",
+        "minimum": 0,
+        "default": 60
+      },
+      "announceWorldEvents": {
+        "type": "boolean",
+        "title": "Announce World Events",
+        "description": "Broadcast start and stop messages for /buffevent world buff events.",
+        "default": true
       }
     },
     "required": [
@@ -160,6 +173,34 @@
           "position": 0
         }
       ]
+    },
+    "buffevent": {
+      "trigger": "buffevent",
+      "description": "Start, stop, or inspect a server-wide buff event using configured buff packages.",
+      "helpText": "Manage world buff events. Usage: /buffevent start <packageName|random> [durationMinutes], /buffevent stop, /buffevent status",
+      "function": "src/commands/buffevent/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "defaultValue": "status",
+          "helpText": "start, stop, or status",
+          "position": 0
+        },
+        {
+          "name": "packageName",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "Buff package commandName, or random when starting",
+          "position": 1
+        },
+        {
+          "name": "durationMinutes",
+          "type": "number",
+          "helpText": "Optional event duration in minutes. Omit to use module default. 0 means until stopped.",
+          "position": 2
+        }
+      ]
     }
   },
   "hooks": {
@@ -175,6 +216,11 @@
       "temporalValue": "* * * * *",
       "description": "Checks Takaro buff expiry variables for online players, re-applies non-expired buffs with buffplayer, and removes expired buffs with debuffplayer.",
       "function": "src/cronjobs/check Buff Packages/index.js"
+    }
+  },
+  "functions": {
+    "buff-manager-helpers": {
+      "function": "src/functions/buff-manager-helpers.js"
     }
   }
 }

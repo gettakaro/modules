@@ -1,4 +1,12 @@
 import { data, takaro } from '@takaro/helpers';
+import {
+    applyPackageToPog,
+    clearWorldEvent,
+    findBuffPackage,
+    get7dtdCommandTarget,
+    isWorldEventExpired,
+    readWorldEvent,
+} from './buff-manager-helpers.js';
 
 async function main() {
     const { gameServerId, eventData, player, pog, module } = data;
@@ -21,6 +29,29 @@ async function main() {
     if (buffPackages.length === 0) {
         console.log('⚠️ No buff packages configured');
         return;
+    }
+
+    // Apply active world event packages to late joiners before normal per-player auto-apply.
+    try {
+        const { state: worldEvent } = await readWorldEvent(gameServerId, module.moduleId);
+        if (worldEvent) {
+            if (isWorldEventExpired(worldEvent)) {
+                console.log('🌍 World event is expired; clearing stale state');
+                await clearWorldEvent(gameServerId, module.moduleId);
+            } else {
+                const worldEventPackage = findBuffPackage(buffPackages, worldEvent.packageName);
+                if (!worldEventPackage) {
+                    console.log(`🌍 World event package "${worldEvent.packageName}" is no longer configured; clearing state`);
+                    await clearWorldEvent(gameServerId, module.moduleId);
+                } else {
+                    console.log(`🌍 Applying active world event package to late joiner: ${worldEventPackage.displayName}`);
+                    const applied = await applyPackageToPog(gameServerId, worldEventPackage, pog);
+                    console.log(`   ✅ World event applied ${applied}/${(worldEventPackage.buffNames || []).length} buff(s)`);
+                }
+            }
+        }
+    } catch (err) {
+        console.log(`⚠️ Failed to process active world event for late joiner: ${err.message}`);
     }
 
     // Filter packages that should auto-apply
@@ -124,11 +155,12 @@ async function main() {
             }
 
             console.log(`   Buffs to apply: ${buffNames.join(', ')}`);
+            const commandTarget = get7dtdCommandTarget(pog, player);
 
             // Apply all buffs in this package in parallel
             const buffCommands = buffNames.map(buffName =>
                 takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-                    command: `buffplayer "${player.name}" ${buffName}`
+                    command: `buffplayer ${commandTarget} ${buffName}`
                 })
                     .then((response) => {
                         const serverResponse = response.data.data?.rawResult || 'No response';
