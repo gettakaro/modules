@@ -770,6 +770,23 @@ export async function recoverRunningRace(gameServerId, moduleId, config, systemC
   return completeRace(gameServerId, moduleId, config, systemConfig);
 }
 
+async function acquireRaceLockWithRetry(gameServerId, moduleId, reason, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      return await acquireRaceLock(gameServerId, moduleId, reason);
+    } catch (err) {
+      lastError = err;
+      if (!(err instanceof TakaroUserError) || !String(err.message || '').includes('Race state is busy')) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw lastError;
+}
+
 export async function broadcastRaceCommentary(gameServerId, moduleId, config, expectedSource, stage) {
   const currentRaceData = await getRaceData(gameServerId, moduleId);
   if (currentRaceData.status !== 'running') {
@@ -794,7 +811,7 @@ export async function broadcastRaceCommentary(gameServerId, moduleId, config, ex
     return { skipped: true, raceData: currentRaceData };
   }
 
-  const lockOwner = await acquireRaceLock(gameServerId, moduleId, `race-commentary-${stage}`);
+  const lockOwner = await acquireRaceLockWithRetry(gameServerId, moduleId, `race-commentary-${stage}`);
   try {
     const raceData = await getRaceData(gameServerId, moduleId);
     if (raceData.status !== 'running') {
