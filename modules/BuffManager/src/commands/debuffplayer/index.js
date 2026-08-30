@@ -2,7 +2,7 @@ import { data, takaro, TakaroUserError } from '@takaro/helpers';
 
 function get7dtdCommandTarget(onlinePlayer) {
     if (onlinePlayer?.gameId) return String(onlinePlayer.gameId).startsWith('EOS_') ? onlinePlayer.gameId : `EOS_${onlinePlayer.gameId}`;
-    return `\"${onlinePlayer.name}\"`;
+    return JSON.stringify(onlinePlayer.name);
 }
 
 async function main() {

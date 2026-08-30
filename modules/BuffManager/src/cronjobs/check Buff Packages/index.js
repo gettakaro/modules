@@ -2,7 +2,7 @@ import { data, takaro } from '@takaro/helpers';
 
 function get7dtdCommandTarget(pog, onlinePlayer) {
     if (pog?.gameId) return String(pog.gameId).startsWith('EOS_') ? pog.gameId : `EOS_${pog.gameId}`;
-    return `\"${onlinePlayer.name}\"`;
+    return JSON.stringify(onlinePlayer.name);
 }
 
 async function main() {

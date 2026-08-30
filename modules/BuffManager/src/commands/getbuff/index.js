@@ -2,7 +2,7 @@ import { data, takaro, checkPermission, TakaroUserError } from '@takaro/helpers'
 
 function get7dtdCommandTarget(pog, player) {
     if (pog?.gameId) return String(pog.gameId).startsWith('EOS_') ? pog.gameId : `EOS_${pog.gameId}`;
-    return `\"${player.name}\"`;
+    return JSON.stringify(player.name);
 }
 
 async function main() {
