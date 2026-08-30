@@ -1,5 +1,10 @@
 import { data, takaro, TakaroUserError } from '@takaro/helpers';
 
+function get7dtdCommandTarget(onlinePlayer) {
+    if (onlinePlayer?.gameId) return String(onlinePlayer.gameId).startsWith('EOS_') ? onlinePlayer.gameId : `EOS_${onlinePlayer.gameId}`;
+    return `\"${onlinePlayer.name}\"`;
+}
+
 async function main() {
     const { gameServerId, pog, arguments: args, module, player } = data;
 
@@ -41,6 +46,7 @@ async function main() {
     }
 
     console.log(`👤 Target player: ${targetOnlinePlayer.name}`);
+    const commandTarget = get7dtdCommandTarget(targetOnlinePlayer);
 
     const targetPlayerRes = await takaro.player.playerControllerSearch({
         filters: {
@@ -72,7 +78,7 @@ async function main() {
 
             const buffCommands = buffNames.map(buffName =>
                 takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-                    command: `buffplayer "${targetOnlinePlayer.name}" ${buffName}`
+                    command: `buffplayer ${commandTarget} ${buffName}`
                 })
                     .then((response) => {
                         const serverResponse = response.data.data?.rawResult || 'No response';
@@ -155,7 +161,7 @@ async function main() {
 
     const buffCommands = buffNames.map(buffName =>
         takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-            command: `buffplayer "${targetOnlinePlayer.name}" ${buffName}`
+            command: `buffplayer ${commandTarget} ${buffName}`
         })
             .then((response) => {
                 const serverResponse = response.data.data?.rawResult || 'No response';

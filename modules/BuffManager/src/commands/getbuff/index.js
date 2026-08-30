@@ -1,5 +1,10 @@
 import { data, takaro, checkPermission, TakaroUserError } from '@takaro/helpers';
 
+function get7dtdCommandTarget(pog, player) {
+    if (pog?.gameId) return String(pog.gameId).startsWith('EOS_') ? pog.gameId : `EOS_${pog.gameId}`;
+    return `\"${player.name}\"`;
+}
+
 async function main() {
     const { gameServerId, pog, arguments: args, module, player } = data;
 
@@ -95,11 +100,12 @@ async function main() {
 
     const buffNames = pkg.buffNames || [];
     console.log(`💉 Applying ${buffNames.length} buff(s): ${buffNames.join(', ')}`);
+    const commandTarget = get7dtdCommandTarget(pog, player);
 
     // Apply all buffs in parallel
     const buffCommands = buffNames.map(buffName =>
         takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-            command: `buffplayer "${player.name}" ${buffName}`
+            command: `buffplayer ${commandTarget} ${buffName}`
         })
             .then((response) => {
                 const serverResponse = response.data.data?.rawResult || 'No response';

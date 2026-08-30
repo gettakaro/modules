@@ -1,5 +1,10 @@
 import { data, takaro } from '@takaro/helpers';
 
+function get7dtdCommandTarget(pog, onlinePlayer) {
+    if (pog?.gameId) return String(pog.gameId).startsWith('EOS_') ? pog.gameId : `EOS_${pog.gameId}`;
+    return `\"${onlinePlayer.name}\"`;
+}
+
 async function main() {
     const { gameServerId, module } = data;
 
@@ -144,10 +149,11 @@ async function main() {
                             // Remove the actual buffs from the player
                             const buffNames = pkg.buffNames || [];
                             console.log(`      💊 Removing ${buffNames.length} buff(s): ${buffNames.join(', ')}`);
+                            const commandTarget = get7dtdCommandTarget(pog, onlinePlayer);
 
                             const debuffCommands = buffNames.map(buffName =>
                                 takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-                                    command: `debuffplayer "${onlinePlayer.name}" ${buffName}`
+                                    command: `debuffplayer ${commandTarget} ${buffName}`
                                 })
                                     .then(() => {
                                         console.log(`         ✓ Removed ${buffName}`);
@@ -221,10 +227,11 @@ async function main() {
                         // STEP 4: Re-apply active buffs to maintain them
                         const buffNames = pkg.buffNames || [];
                         console.log(`      💉 Re-applying ${buffNames.length} buff(s): ${buffNames.join(', ')}`);
+                        const commandTarget = get7dtdCommandTarget(pog, onlinePlayer);
 
                         const buffCommands = buffNames.map(buffName =>
                             takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, {
-                                command: `buffplayer "${onlinePlayer.name}" ${buffName}`
+                                command: `buffplayer ${commandTarget} ${buffName}`
                             })
                                 .then(() => {
                                     console.log(`         ✓ Applied ${buffName}`);
