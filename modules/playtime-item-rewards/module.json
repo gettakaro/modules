@@ -1,0 +1,194 @@
+{
+  "name": "playtime-item-rewards",
+  "description": "Grant configurable item-only rewards after accumulated playtime intervals, with independent drop chances, success-only announcements, and role-specific reward profiles.",
+  "version": "latest",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "playtimeIntervalMinutes": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 120,
+        "description": "Minimum reward interval in accumulated playtime minutes. This is also the fixed interval when playtimeIntervalMaximumMinutes is empty."
+      },
+      "playtimeIntervalMaximumMinutes": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 120,
+        "description": "Maximum reward interval in accumulated playtime minutes. Set equal to playtimeIntervalMinutes for a fixed interval; set it higher to choose a random interval per player and reward cycle."
+      },
+      "selectionMode": {
+        "type": "string",
+        "enum": [
+          "single",
+          "multiple"
+        ],
+        "default": "single",
+        "description": "Grant at most one passing item or every item whose chance passes."
+      },
+      "rewardMessage": {
+        "type": "string",
+        "default": "{playerName} received {items} after {intervalMinutes} minutes of playtime.",
+        "description": "Message after a successful reward. Supports {playerName}, {playerId}, {gameId}, {items}, {itemCount}, {profileName}, and {intervalMinutes}."
+      },
+      "messageDelivery": {
+        "type": "string",
+        "enum": [
+          "broadcast",
+          "private",
+          "both",
+          "off"
+        ],
+        "default": "broadcast",
+        "description": "Where successful reward messages are sent: broadcast to the server, private message only to the rewarded player, both, or off."
+      },
+      "items": {
+        "type": "array",
+        "default": [],
+        "description": "Default item pool.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "Game item identifier accepted by the connector."
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "default": ""
+            },
+            "dropChance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 100,
+              "description": "Independent percentage chance that this item enters the reward selection."
+            },
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "roleOverrides": {
+        "type": "array",
+        "default": [],
+        "description": "Reward profile overrides for Takaro roles, including Discord-synced roles.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "roleName": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "priority": {
+              "type": "integer",
+              "default": 0
+            },
+            "playtimeIntervalMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional role-specific minimum interval. Without a role-specific maximum, this is a fixed interval."
+            },
+            "playtimeIntervalMaximumMinutes": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional role-specific maximum interval. Leave empty for a fixed role interval, or set it higher than the effective minimum for a random interval."
+            },
+            "selectionMode": {
+              "type": "string",
+              "enum": [
+                "single",
+                "multiple"
+              ]
+            },
+            "rewardMessage": {
+              "type": "string"
+            },
+            "messageDelivery": {
+              "type": "string",
+              "enum": [
+                "broadcast",
+                "private",
+                "both",
+                "off"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "quality": {
+                    "type": "string",
+                    "default": ""
+                  },
+                  "dropChance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 100
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "roleName"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [],
+  "commands": {},
+  "hooks": {},
+  "cronJobs": {
+    "grant-playtime-item-rewards": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Grant item rewards to online players who reached a new playtime interval.",
+      "function": "src/cronjobs/grant-playtime-item-rewards/index.js"
+    }
+  },
+  "functions": {
+    "playtime-item-reward-helpers": {
+      "function": "src/functions/playtime-item-reward-helpers.js"
+    }
+  }
+}
