@@ -15,6 +15,7 @@
       "monitorJoins": { "type": "boolean", "default": true },
       "monitorLeaves": { "type": "boolean", "default": true },
       "monitorDeaths": { "type": "boolean", "default": true },
+      "privateBloodMoonNoticeOnFirstJoin": { "type": "boolean", "default": false, "description": "Privately notify the first player online when the persisted Blood Moon phase is today or starting." },
       "joinMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional join-message override. Placeholder: {player}." },
       "leaveMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional leave-message override. Placeholder: {player}." },
       "deathMessageTemplate": { "type": "string", "maxLength": 500, "default": "", "description": "Optional death-message override. Placeholder: {player}." },
@@ -29,9 +30,11 @@
       "timeConsoleCommand": { "type": "string", "enum": ["gettime"], "default": "gettime" },
       "hordeIntervalDays": { "type": "integer", "minimum": 1, "default": 7 },
       "firstHordeDay": { "type": "integer", "minimum": 1, "default": 7 },
+      "bloodMoonRangeDays": { "type": "integer", "minimum": 0, "default": 0, "description": "7D2D BloodMoonRange setting in days. Use 0 for exact fixed hordes; use 1 when a day-7 horde may happen on days 6-8." },
       "bloodMoonStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 22 },
       "bloodMoonEndHour": { "type": "integer", "minimum": 0, "maximum": 23, "default": 4 },
       "bloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-day message override." },
+      "privateBloodMoonTodayMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional private first-player Blood Moon notice override. The selected language preset is used when empty." },
       "bloodMoonStartingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-starting message override." },
       "bloodMoonEndingMessage": { "type": "string", "maxLength": 500, "default": "", "description": "Optional blood-moon-ending message override." }
     },
@@ -58,7 +61,7 @@
   },
   "cronJobs": {
     "updateStatus": { "temporalValue": "*/5 * * * *", "description": "Updates the persistent Discord server status message.", "function": "src/cronjobs/update-status/index.js" },
-    "bloodMoonMonitor": { "temporalValue": "*/5 * * * *", "description": "Checks 7D2D time and sends blood moon day/start/end notices.", "function": "src/cronjobs/blood-moon-monitor/index.js" }
+    "bloodMoonMonitor": { "temporalValue": "* * * * *", "description": "Checks 7D2D phase transitions every minute and sends blood moon day/start/end notices.", "function": "src/cronjobs/blood-moon-monitor/index.js" }
   },
   "functions": {
     "discord-7d2d-status-helpers": { "function": "src/functions/discord-7d2d-status-helpers.js" }

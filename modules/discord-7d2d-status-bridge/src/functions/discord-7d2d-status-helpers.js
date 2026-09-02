@@ -2,6 +2,20 @@ import { takaro } from '@takaro/helpers';
 
 export const STATUS_MESSAGE_KEY_PREFIX = 'discord7d2d:statusMessage:';
 export const BLOOD_STATE_KEY = 'discord7d2d:bloodState';
+export const BLOOD_DELIVERED_KEY = 'discord7d2d:bloodDelivered';
+export const BLOOD_PENDING_KEY = 'discord7d2d:bloodPending';
+export const BLOOD_MONITOR_LOCK_KEY = 'discord7d2d:bloodMonitorLock';
+
+const BLOOD_MONITOR_LOCK_EXPIRY_MS = 120000;
+const BLOOD_MONITOR_LOCK_MAX_ATTEMPTS = 60;
+const BLOOD_MONITOR_LOCK_WAIT_MS = 5000;
+
+async function waitWithoutTimers(milliseconds) {
+  // Takaro's function VM does not expose setTimeout. Atomics.wait provides a
+  // bounded backoff without issuing extra API requests or busy-spinning.
+  const signal = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
+  Atomics.wait(signal, 0, 0, milliseconds);
+}
 
 export const MESSAGE_PRESETS = {
   en: {
@@ -10,6 +24,7 @@ export const MESSAGE_PRESETS = {
     deathMessageTemplate: '{player} died.',
     deathWithReasonMessageTemplate: '{player} died: {reason}',
     bloodMoonTodayMessage: 'Today is the Blood Moon day...',
+    privateBloodMoonTodayMessage: 'Today is the Blood Moon day...',
     bloodMoonStartingMessage: 'Blood Moon is starting...',
     bloodMoonEndingMessage: 'Blood Moon is ending...',
     serverStartingMessageTemplate: 'Server starting...',
@@ -24,6 +39,7 @@ export const MESSAGE_PRESETS = {
     deathMessageTemplate: '{player} nie żyje.',
     deathWithReasonMessageTemplate: '{player} nie żyje: {reason}',
     bloodMoonTodayMessage: 'Dzisiaj zapowiadają Krwawy Księżyc...',
+    privateBloodMoonTodayMessage: 'Dzisiaj zapowiadają Krwawy Księżyc...',
     bloodMoonStartingMessage: 'Krwawy Księżyc wschodzi...',
     bloodMoonEndingMessage: 'Krwawy Księżyc zachodzi...',
     serverStartingMessageTemplate: 'Serwer startuje...',
@@ -75,14 +91,24 @@ export function nextHordeDay(currentDay, firstHordeDay = 7, interval = 7) {
   return firstHordeDay + Math.ceil((currentDay - firstHordeDay) / interval) * interval;
 }
 
-export function isBloodMoonDay(day, firstHordeDay = 7, interval = 7) {
-  return nextHordeDay(day, firstHordeDay, interval) === day;
+export function normalizeBloodMoonRangeDays(range = 0) {
+  const value = Number(range);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.floor(value);
 }
 
-export function isBloodMoonActive(parsed, firstHordeDay = 7, interval = 7, startHour = 22, endHour = 4) {
+export function isBloodMoonDay(day, firstHordeDay = 7, interval = 7, rangeDays = 0) {
+  const range = normalizeBloodMoonRangeDays(rangeDays);
+  const next = nextHordeDay(day, firstHordeDay, interval);
+  if (Math.abs(next - day) <= range) return true;
+  const previous = next - interval;
+  return previous >= firstHordeDay && Math.abs(day - previous) <= range;
+}
+
+export function isBloodMoonActive(parsed, firstHordeDay = 7, interval = 7, startHour = 22, endHour = 4, rangeDays = 0) {
   if (!parsed || parsed.hour === null) return false;
-  if (isBloodMoonDay(parsed.day, firstHordeDay, interval) && parsed.hour >= startHour) return true;
-  if (parsed.hour < endHour && parsed.day > 1 && isBloodMoonDay(parsed.day - 1, firstHordeDay, interval)) return true;
+  if (isBloodMoonDay(parsed.day, firstHordeDay, interval, rangeDays) && parsed.hour >= startHour) return true;
+  if (parsed.hour < endHour && parsed.day > 1 && isBloodMoonDay(parsed.day - 1, firstHordeDay, interval, rangeDays)) return true;
   return false;
 }
 
@@ -124,6 +150,17 @@ export async function getServerName(gameServerId) {
   }
 }
 
+export async function getCurrentModuleInstallation(gameServerId, moduleId) {
+  try {
+    const res = await takaro.module.moduleInstallationsControllerGetModuleInstallation(moduleId, gameServerId);
+    return res.data.data ?? null;
+  } catch (err) {
+    const status = err?.response?.status ?? err?.status;
+    if (status === 404) return null;
+    throw err;
+  }
+}
+
 export async function executeTimeCommand(gameServerId, command = 'gettime') {
   const res = await takaro.gameserver.gameServerControllerExecuteCommand(gameServerId, { command });
   const data = res?.data?.data ?? res?.data ?? res;
@@ -134,18 +171,30 @@ export async function executeTimeCommand(gameServerId, command = 'gettime') {
   return JSON.stringify(data);
 }
 
-export async function getStatus(gameServerId, config) {
-  const [players, serverName, rawTime] = await Promise.all([
-    getOnlinePlayers(gameServerId),
-    getServerName(gameServerId),
-    executeTimeCommand(gameServerId, config.timeConsoleCommand ?? 'gettime'),
-  ]);
+export async function getTimeStatus(gameServerId, config) {
+  const rawTime = await executeTimeCommand(gameServerId, config.timeConsoleCommand ?? 'gettime');
   const parsed = parse7d2dTime(rawTime);
   if (!parsed) console.warn(`discord-7d2d-status: could not parse 7D2D time: ${rawTime}`);
   const day = parsed?.day ?? '?';
   const time = parsed?.time ?? '?';
-  const active = isBloodMoonActive(parsed, config.firstHordeDay ?? 7, config.hordeIntervalDays ?? 7, config.bloodMoonStartHour ?? 22, config.bloodMoonEndHour ?? 4);
-  return { ...players, serverName, rawTime, parsed, day, time, bloodMoonActive: active };
+  const active = isBloodMoonActive(
+    parsed,
+    config.firstHordeDay ?? 7,
+    config.hordeIntervalDays ?? 7,
+    config.bloodMoonStartHour ?? 22,
+    config.bloodMoonEndHour ?? 4,
+    config.bloodMoonRangeDays ?? 0,
+  );
+  return { rawTime, parsed, day, time, bloodMoonActive: active };
+}
+
+export async function getStatus(gameServerId, config) {
+  const [players, serverName, timeStatus] = await Promise.all([
+    getOnlinePlayers(gameServerId),
+    getServerName(gameServerId),
+    getTimeStatus(gameServerId, config),
+  ]);
+  return { ...players, serverName, ...timeStatus };
 }
 
 export function renderTemplate(template, status, config) {
@@ -171,6 +220,21 @@ async function findVariable(gameServerId, moduleId, key) {
   return res.data.data[0] ?? null;
 }
 
+function parseVariableRecord(record) {
+  if (!record) return null;
+  try { return JSON.parse(record.value); } catch (_err) { return null; }
+}
+
+async function deleteVariableRecord(record) {
+  if (!record) return;
+  try {
+    await takaro.variable.variableControllerDelete(record.id);
+  } catch (err) {
+    const status = err?.response?.status ?? err?.status;
+    if (status !== 404) throw err;
+  }
+}
+
 export async function readVariable(gameServerId, moduleId, key, fallback = null) {
   const record = await findVariable(gameServerId, moduleId, key);
   if (!record) return fallback;
@@ -181,12 +245,180 @@ export async function writeVariable(gameServerId, moduleId, key, value) {
   const existing = await findVariable(gameServerId, moduleId, key);
   const serialized = JSON.stringify(value);
   if (existing) await takaro.variable.variableControllerUpdate(existing.id, { value: serialized });
-  else await takaro.variable.variableControllerCreate({ key, value: serialized, gameServerId, moduleId });
+  else {
+    try {
+      await takaro.variable.variableControllerCreate({ key, value: serialized, gameServerId, moduleId });
+    } catch (err) {
+      const status = err?.response?.status ?? err?.status;
+      if (status !== 409) throw err;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const winner = await findVariable(gameServerId, moduleId, key);
+        if (winner) {
+          await takaro.variable.variableControllerUpdate(winner.id, { value: serialized });
+          return;
+        }
+        if (attempt < 2) await waitWithoutTimers(50 * (attempt + 1));
+      }
+      throw new Error(`Variable '${key}' was created concurrently but could not be found`);
+    }
+  }
+}
+
+export async function acquireBloodMonitorLock(gameServerId, moduleId) {
+  const owner = `blood-monitor:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const waitDeadline = Date.now() + BLOOD_MONITOR_LOCK_WAIT_MS;
+  let loggedWait = false;
+
+  for (let attempt = 0; attempt < BLOOD_MONITOR_LOCK_MAX_ATTEMPTS; attempt += 1) {
+    const now = Date.now();
+    try {
+      await takaro.variable.variableControllerCreate({
+        key: BLOOD_MONITOR_LOCK_KEY,
+        value: JSON.stringify({
+          owner,
+          acquiredAt: now,
+          expiresAt: now + BLOOD_MONITOR_LOCK_EXPIRY_MS,
+        }),
+        gameServerId,
+        moduleId,
+      });
+      return owner;
+    } catch (err) {
+      const status = err?.response?.status ?? err?.status;
+      if (status !== 409) throw err;
+    }
+
+    const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+    const lock = parseVariableRecord(existing);
+    const expiresAt = Number(lock?.expiresAt);
+    if (existing && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) {
+      console.warn(`discord-7d2d-status: reclaiming stale Blood Moon monitor lock owned by ${lock?.owner ?? 'unknown'}`);
+      await deleteVariableRecord(existing);
+      continue;
+    }
+
+    if (!loggedWait) {
+      console.log('discord-7d2d-status: Blood Moon monitor lock busy; waiting');
+      loggedWait = true;
+    }
+    if (attempt < BLOOD_MONITOR_LOCK_MAX_ATTEMPTS - 1 && Date.now() < waitDeadline) {
+      const backoffMs = Math.min(50 * (attempt + 1), 250);
+      await waitWithoutTimers(Math.min(backoffMs, waitDeadline - Date.now()));
+    }
+    if (Date.now() >= waitDeadline) break;
+  }
+
+  throw new Error(
+    `Timed out waiting for Blood Moon monitor lock after ${BLOOD_MONITOR_LOCK_WAIT_MS}ms`,
+  );
+}
+
+export async function renewBloodMonitorLock(gameServerId, moduleId, owner) {
+  const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+  const lock = parseVariableRecord(existing);
+  if (!existing || lock?.owner !== owner) {
+    throw new Error('Lost Blood Moon monitor lock ownership before completing state mutation');
+  }
+
+  const now = Date.now();
+  if (Number(lock.expiresAt) <= now) {
+    throw new Error('Blood Moon monitor lock lease expired before renewal');
+  }
+  await takaro.variable.variableControllerUpdate(existing.id, {
+    value: JSON.stringify({
+      ...lock,
+      owner,
+      renewedAt: now,
+      expiresAt: now + BLOOD_MONITOR_LOCK_EXPIRY_MS,
+    }),
+  });
+}
+
+export async function releaseBloodMonitorLock(gameServerId, moduleId, owner) {
+  const existing = await findVariable(gameServerId, moduleId, BLOOD_MONITOR_LOCK_KEY);
+  const lock = parseVariableRecord(existing);
+  if (existing && lock?.owner === owner) {
+    await deleteVariableRecord(existing);
+  }
 }
 
 export function getDiscordChannelFromHook(data, configuredChannelId, hookName) {
   if (configuredChannelId) return configuredChannelId;
   return data?.module?.systemConfig?.hooks?.[hookName]?.discordChannelId || data?.discordChannelId || data?.eventData?.discordChannelId || data?.eventData?.channelId || '';
+}
+
+function discordErrorStatus(err) {
+  const status = err?.response?.status ?? err?.status;
+  return Number.isInteger(status) ? status : null;
+}
+
+function safeIdentifier(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
+}
+
+function discordApiError(err) {
+  const value = err?.response?.data?.meta?.error;
+  return value && typeof value === 'object' ? value : null;
+}
+
+function discordErrorCode(err) {
+  const apiError = discordApiError(err);
+  if (!apiError) return null;
+  for (const value of [apiError.code, apiError.message, apiError.details]) {
+    if (Number.isInteger(value) && value >= 1000) return value;
+    if (typeof value !== 'string') continue;
+    if (/^\d{4,6}$/.test(value)) return Number(value);
+    const match = value.match(/(?:DiscordAPIError|discord(?:\s+error)?\s+code|["']?code["']?)[^0-9]{0,16}(\d{4,6})/i);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+function safeDiscordCause(err) {
+  const details = [];
+  const status = discordErrorStatus(err);
+  const discordCode = discordErrorCode(err);
+  const takaroCode = safeIdentifier(discordApiError(err)?.code);
+  const requestCode = safeIdentifier(err?.code);
+  if (status !== null) details.push(`HTTP ${status}`);
+  if (discordCode !== null) details.push(`Discord code ${discordCode}`);
+  if (takaroCode && !/^\d+$/.test(takaroCode)) details.push(`Takaro code ${takaroCode}`);
+  if (requestCode) details.push(`request code ${requestCode}`);
+  return new Error(details.length > 0 ? `Discord request failed (${details.join(', ')})` : 'Discord request failed');
+}
+
+function errorWithSafeCause(message, err) {
+  try {
+    return new Error(message, { cause: safeDiscordCause(err) });
+  } catch (_err) {
+    return new Error(message);
+  }
+}
+
+export function normalizeDiscordError(channelId, err) {
+  const status = discordErrorStatus(err);
+  const discordCode = discordErrorCode(err);
+  const codeText = discordCode === null ? '' : `, Discord code ${discordCode}`;
+  const guidance = 'verify the Discord guild is enabled and authorized in Takaro; use a normal text channel and grant the Takaro bot View Channel, Send Messages, and Read Message History; private or archived threads may still reject the bot.';
+  if (discordCode === 10008) {
+    const errorDetails = status === null ? 'Discord code 10008' : `HTTP ${status}, Discord code 10008`;
+    return errorWithSafeCause(`Discord reported Unknown Message for the prior status message in channel ${channelId} (${errorDetails}): the previous status message no longer exists.`, err);
+  }
+  if (status === 403) {
+    return errorWithSafeCause(`Takaro or Discord refused delivery to channel ${channelId} (HTTP 403${codeText}): ${guidance}`, err);
+  }
+  if (status === 404) {
+    return errorWithSafeCause(`Discord channel ${channelId} or its guild was not found or is unavailable to the Takaro bot (HTTP 404${codeText}): ${guidance}`, err);
+  }
+
+  const statusText = status === null ? '' : ` (HTTP ${status})`;
+  const requestCode = safeIdentifier(err?.code);
+  const reason = requestCode ? `: request code ${requestCode}` : '';
+  return errorWithSafeCause(`Discord delivery to channel ${channelId} failed${statusText}${reason}`, err);
+}
+
+function shouldReplaceMissingMessage(err) {
+  return discordErrorCode(err) === 10008;
 }
 
 export async function sendDiscord(channelId, message) {
@@ -195,7 +427,11 @@ export async function sendDiscord(channelId, message) {
     console.log(`discord-7d2d-status: no Discord channel configured, skipped message: ${safeMessage}`);
     return null;
   }
-  return takaro.discord.discordControllerSendMessage(channelId, { message: safeMessage });
+  try {
+    return await takaro.discord.discordControllerSendMessage(channelId, { message: safeMessage });
+  } catch (err) {
+    throw normalizeDiscordError(channelId, err);
+  }
 }
 
 export function sanitizeDiscordMessage(message) {
@@ -231,7 +467,9 @@ export async function updatePersistentDiscordMessage(gameServerId, moduleId, cha
       await takaro.discord.discordControllerUpdateMessage(channelId, existingId, { message: safeMessage });
       return existingId;
     } catch (err) {
-      console.error(`discord-7d2d-status: failed to update Discord status message ${existingId}, sending replacement: ${err}`);
+      const reason = normalizeDiscordError(channelId, err);
+      if (!shouldReplaceMissingMessage(err)) throw reason;
+      console.error(`discord-7d2d-status: prior Discord status message ${existingId} is missing, sending replacement: ${reason.message}`);
     }
   }
   const sent = await sendDiscord(channelId, safeMessage);
