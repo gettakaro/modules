@@ -24,6 +24,12 @@
         "default": "{playerName} received a playtime reward: {rewardName}.",
         "description": "Fallback message for rewards that do not define their own message."
       },
+      "playtimeIntervalMinutes": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "description": "Only reward a player after each full playtime interval. Set to 120 for one reward every 2 hours of accumulated playtime. Set to 0 to grant on every cron run."
+      },
       "buffRewards": {
         "type": "array",
         "default": [
