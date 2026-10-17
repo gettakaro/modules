@@ -1,0 +1,67 @@
+name: Publish registry
+
+# Publish notifications (repository_dispatch) are added separately.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - name: Validate registry (append-only against what main published before)
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # A push compares against the previous tip of main. A manual dispatch (or a push whose previous tip is
+          # unknown, such as a first push) compares against the parent of HEAD, so published versions stay immutable.
+          BASE="$BEFORE"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}"; then
+            BASE=$(git rev-parse --verify --quiet HEAD^ || true)
+          fi
+          if [ -z "$BASE" ]; then
+            npm run registry:check
+          else
+            npm run registry:check -- --base "$BASE"
+          fi
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp -R registry/. _site/
+          cp -R schema _site/schema
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

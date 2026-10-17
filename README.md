@@ -9,7 +9,9 @@ docs at https://docs.takaro.io.
 | Path | Contents |
 |------|----------|
 | `modules/` | One directory per module: `module.json` plus `src/` |
-| `src/` | TypeScript tooling to convert modules to and from Takaro's import format |
+| `src/` | TypeScript tooling: module conversion, and the registry build and validator |
+| `registry/` | Generated and committed: `registry.json` and the append-only version files that GitHub Pages serves |
+| `schema/` | JSON Schemas of the source and published formats, see [docs/registry-format.md](docs/registry-format.md) |
 | `scripts/` | Shell helpers to authenticate against and push/pull modules to a Takaro domain |
 | `test/` | Offline checks (run in CI) and the dormant live test suite, see [test/README.md](test/README.md) |
 | `dev/minecraft/` | Optional Minecraft dev environment for in-game testing |
@@ -55,9 +57,35 @@ claude
 > Write me a module that says 'hello' to every player when they join
 ```
 
-## Status
+## Subscribing
 
-Publishing to the registry is being set up. Until then, modules are imported into a Takaro domain manually.
+In Takaro, subscribe a domain to `https://gettakaro.github.io/modules` and install modules from there. A custom
+domain, `registry.takaro.io`, will follow. The published modules are:
+
+- `afk-kick`
+- `community-fund`
+- `discord-status-bridge-7d2d`
+- `kill-tracker`
+- `mini-games`
+- `playtime-buff-rewards`
+- `referral-program`
+- `server-toolkit`
+- `vote-restart`
+- `zombie-racing`
+
+Every version is immutable and has a SHA-256 in `registry.json`. The file formats are documented in
+[docs/registry-format.md](docs/registry-format.md).
+
+## Run your own registry
+
+1. Copy this repo.
+2. Edit `registry.config.json`: set `name` and `description`, empty `legacyModuleNames`, and adjust `unlisted`.
+3. Replace `modules/` with your modules and delete `registry/`.
+4. Run `npm run registry:build` and commit the result.
+5. Enable GitHub Pages for your repo: `gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow`.
+6. Subscribe to `https://<owner>.github.io/<repo>`.
+
+The validator can check another checkout too: `node dist/scripts/registry.js check --root <dir>`.
 
 ## Contributing
 

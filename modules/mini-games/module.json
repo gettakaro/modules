@@ -1,7 +1,8 @@
 {
-  "name": "test-mini-games",
-  "description": "Unified mini-games module with daily puzzles (Wordle, Hangman, Hot/Cold) and live chat rounds (Trivia, Scramble, Math race, Reaction race). Skill-based, point-scoring, optional currency rewards, boost tiers, cross-game leaderboards.",
-  "version": "latest",
+  "name": "mini-games",
+  "author": "Takaro",
+  "description": "Unified mini-games module with daily puzzles (Wordle, Hangman, Hot/Cold) and live chat rounds (Trivia, Scramble, Math race, Reaction race). Skill-based, point-scoring, optional currency rewards, boost tiers, cross-game leaderboards. Trivia rounds fetch questions from the public Open Trivia Database (https://opentdb.com) when `triviaQuestionSource` is `api` (the default), so the module makes outbound HTTPS requests to opentdb.com from Takaro; on failure it falls back to the custom bank.",
+  "version": "1.0.0",
   "supportedGames": ["all"],
 
   "config": {

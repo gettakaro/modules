@@ -1,7 +1,8 @@
 {
-  "name": "test-hello-world",
+  "name": "hello-world",
+  "author": "Takaro",
   "description": "A simple hello world module for testing",
-  "version": "latest",
+  "version": "1.0.0",
   "supportedGames": [
     "all"
   ],

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "name": "Fixture Registry",
+  "description": "A registry used by the tests.",
+  "modules": [
+    {
+      "name": "alpha-tools",
+      "description": "Alpha tools greets players and gives them a starter item.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "d8b353af6b75e660821d4936ca18348f01b4bae191acbabcbc9c0bc8e6b1f240",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ],
+          "minTakaroVersion": "1.2.3"
+        }
+      ]
+    },
+    {
+      "name": "legacyThing",
+      "description": "A module with a legacy camelCase name.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "00324cb078ba323800f5e7ebb3251f990b4098a2d574d0db7463947a5ba36edf",
+          "requiredCapabilities": []
+        }
+      ]
+    }
+  ]
+}

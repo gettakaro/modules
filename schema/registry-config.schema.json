@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gettakaro.github.io/modules/schema/registry-config.schema.json",
+  "title": "Registry configuration (registry.config.json)",
+  "description": "Root configuration of a registry repository: how the registry is named and which module directories are not published.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200, "description": "Registry name, copied into registry.json." },
+    "description": { "type": "string", "maxLength": 1000, "description": "Registry description, copied into registry.json." },
+    "legacyModuleNames": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$", "maxLength": 50 },
+      "uniqueItems": true,
+      "description": "Module names that are exempt from the kebab-case rule. A fixed exception for names that already exist elsewhere; leave empty in a new registry."
+    },
+    "unlisted": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Module directories that are not published, keyed by directory name. The value says why. Unlisted modules are only checked against module.schema.json."
+    }
+  }
+}

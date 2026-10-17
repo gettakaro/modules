@@ -1,0 +1,30 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "legacyThing",
+  "author": "Unknown",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "A module with a legacy camelCase name.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "ping",
+          "trigger": "ping",
+          "description": null,
+          "helpText": "No help text available",
+          "function": "console.log('pong');\n",
+          "arguments": []
+        }
+      ],
+      "hooks": [],
+      "cronJobs": [],
+      "functions": [],
+      "permissions": []
+    }
+  ]
+}

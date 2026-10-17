@@ -1,7 +1,8 @@
 {
-  "name": "test-afk-kick",
+  "name": "afk-kick",
+  "author": "Takaro",
   "description": "AFK Kick — periodically checks player positions and warns/kicks idle players. A permission exempts specific players from AFK detection.",
-  "version": "latest",
+  "version": "1.0.0",
   "supportedGames": [
     "all"
   ],

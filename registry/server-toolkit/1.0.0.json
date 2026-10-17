@@ -1,0 +1,158 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "server-toolkit",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Cross-game utility commands for server info, rules, moderation, and simple economy administration.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"discordLink\":{\"type\":\"string\",\"default\":\"\",\"maxLength\":500,\"description\":\"Discord invite or community link shown by /discord\"},\"rules\":{\"type\":\"array\",\"default\":[],\"maxItems\":20,\"description\":\"Server rules shown by /rules\",\"items\":{\"type\":\"string\",\"maxLength\":200}},\"serverInfoMessage\":{\"type\":\"string\",\"default\":\"\",\"maxLength\":300,\"description\":\"Optional extra server info line shown by /serverinfo\"},\"broadcastCurrencyGrants\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Whether /givecurrency should broadcast to the whole server\"},\"currencyGrantBroadcastMessage\":{\"type\":\"string\",\"default\":\"{player} received {amount} currency from {admin}.\",\"maxLength\":300,\"description\":\"Broadcast template for /givecurrency. Supports {player}, {amount}, and {admin}.\"},\"broadcastKicks\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Whether /kick should broadcast to the whole server\"},\"kickBroadcastMessage\":{\"type\":\"string\",\"default\":\"{player} was kicked by {admin}. Reason: {reason}\",\"maxLength\":300,\"description\":\"Broadcast template for /kick. Supports {player}, {reason}, and {admin}.\"},\"broadcastBans\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Whether /ban should broadcast to the whole server\"},\"banBroadcastMessage\":{\"type\":\"string\",\"default\":\"{player} was banned by {admin} for {duration}. Reason: {reason}\",\"maxLength\":300,\"description\":\"Broadcast template for temporary /ban. Supports {player}, {reason}, {admin}, and {duration}.\"},\"banPermBroadcastMessage\":{\"type\":\"string\",\"default\":\"{player} was permanently banned by {admin}. Reason: {reason}\",\"maxLength\":300,\"description\":\"Broadcast template for permanent /ban. Supports {player}, {reason}, and {admin}.\"}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "serverinfo",
+          "trigger": "serverinfo",
+          "description": "Show basic server information",
+          "helpText": "Shows the server name, online player count, and optional server info message.",
+          "function": "import { data } from '@takaro/helpers';\nimport { trimOrEmpty } from './server-toolkit-pure.js';\nimport { fetchOnlinePlayers, getGameServerName } from './server-toolkit-helpers.js';\n\nasync function main() {\n  const { gameServerId, pog, module: mod } = data;\n  const [serverName, onlinePlayers] = await Promise.all([\n    getGameServerName(gameServerId),\n    fetchOnlinePlayers(gameServerId),\n  ]);\n\n  const lines = [\n    `Server: ${serverName}`,\n    `Players online: ${onlinePlayers.length}`,\n  ];\n\n  const infoMessage = trimOrEmpty(mod.userConfig.serverInfoMessage);\n  if (infoMessage !== '') {\n    lines.push(`Info: ${infoMessage}`);\n  }\n\n  const message = lines.join('\\n');\n  console.log(`toolkit:serverinfo ${message}`);\n  await pog.pm(message);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "online",
+          "trigger": "online",
+          "description": "Show online players",
+          "helpText": "Shows how many players are online and lists up to 10 names.",
+          "function": "import { data } from '@takaro/helpers';\nimport { formatOnlinePlayersLine } from './server-toolkit-pure.js';\nimport { fetchOnlinePlayers } from './server-toolkit-helpers.js';\n\nasync function main() {\n  const { gameServerId, pog } = data;\n  const onlinePlayers = await fetchOnlinePlayers(gameServerId);\n  const message = formatOnlinePlayersLine(onlinePlayers);\n  console.log(`toolkit:online ${message}`);\n  await pog.pm(message);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "discord",
+          "trigger": "discord",
+          "description": "Show the server Discord link",
+          "helpText": "Shows the configured Discord link for this server.",
+          "function": "import { data } from '@takaro/helpers';\nimport { trimOrEmpty } from './server-toolkit-pure.js';\n\nasync function main() {\n  const { pog, module: mod } = data;\n  const discordLink = trimOrEmpty(mod.userConfig.discordLink);\n\n  if (discordLink === '') {\n    const message = 'This server has not configured a Discord link.';\n    console.log(`toolkit:discord unconfigured`);\n    console.log(message);\n    await pog.pm(message);\n    return;\n  }\n\n  const message = `Join our Discord: ${discordLink}`;\n  console.log(`toolkit:discord ${discordLink}`);\n  console.log(message);\n  await pog.pm(message);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "rules",
+          "trigger": "rules",
+          "description": "Show server rules",
+          "helpText": "Shows the configured server rules as a numbered list.",
+          "function": "import { data } from '@takaro/helpers';\nimport { compactRules } from './server-toolkit-pure.js';\n\nasync function main() {\n  const { pog, module: mod } = data;\n  const rules = compactRules(mod.userConfig.rules);\n\n  if (rules.length === 0) {\n    const message = 'This server has not configured any rules yet.';\n    console.log(`toolkit:rules unconfigured`);\n    console.log(message);\n    await pog.pm(message);\n    return;\n  }\n\n  const lines = ['Server rules:'];\n  for (let i = 0; i < rules.length; i++) {\n    lines.push(`${i + 1}. ${rules[i]}`);\n  }\n\n  const message = lines.join('\\n');\n  console.log(`toolkit:rules ${rules.length} rules`);\n  console.log(message);\n  await pog.pm(message);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "kick",
+          "trigger": "kick",
+          "description": "Kick an online player",
+          "helpText": "Usage: kick <player> [reason] — kicks a player from the server.",
+          "function": "import { data, takaro, TakaroUserError, checkPermission } from '@takaro/helpers';\nimport {\n  getCommandTargetPlayer,\n  normalizeReason,\n  renderTemplate,\n} from './server-toolkit-pure.js';\nimport {\n  getPlayerName,\n  safeBroadcast,\n} from './server-toolkit-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod } = data;\n\n  if (!checkPermission(pog, 'TOOLKIT_KICK')) {\n    throw new TakaroUserError('You do not have permission to use this command.');\n  }\n\n  const target = getCommandTargetPlayer(args.player);\n  if (!target) {\n    throw new TakaroUserError('Please specify a valid player to kick.');\n  }\n\n  if (!target.online) {\n    throw new TakaroUserError('That player is not currently online.');\n  }\n\n  if (target.playerId === player.id) {\n    throw new TakaroUserError('You cannot use this command on yourself.');\n  }\n\n  const [adminName, targetName] = await Promise.all([\n    getPlayerName(player.id, player.name),\n    getPlayerName(target.playerId, target.name),\n  ]);\n  const reason = normalizeReason(args.reason, 'Kicked by an admin.');\n\n  try {\n    await takaro.gameserver.gameServerControllerKickPlayer(gameServerId, target.playerId, {\n      reason,\n    });\n  } catch (err) {\n    console.error(`toolkit:kick failed for target=${target.playerId}: ${err}`);\n    throw new TakaroUserError('That player could not be kicked right now. They may have just disconnected, or the game server rejected the kick.');\n  }\n\n  console.log(`toolkit:kick admin=${adminName} target=${targetName} reason=${reason}`);\n\n  const kickPm = `Kicked ${targetName}. Reason: ${reason}`;\n  console.log(`toolkit:kick pm=${kickPm}`);\n  try {\n    await pog.pm(kickPm);\n  } catch (err) {\n    console.error(`toolkit:kick pm failed: ${err}`);\n  }\n\n  if (mod.userConfig.broadcastKicks) {\n    const message = renderTemplate(mod.userConfig.kickBroadcastMessage, {\n      player: targetName,\n      reason,\n      admin: adminName,\n    });\n    await safeBroadcast(gameServerId, message);\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to kick",
+              "position": 0
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "defaultValue": "?",
+              "helpText": "Optional reason shown to the target and in broadcasts",
+              "position": 1
+            }
+          ]
+        },
+        {
+          "name": "ban",
+          "trigger": "ban",
+          "description": "Ban a player temporarily or permanently",
+          "helpText": "Usage: ban <player> <duration> [reason] — duration: perm/permanent or 10m, 12h, 7d, 2w.",
+          "function": "import { data, takaro, TakaroUserError, checkPermission } from '@takaro/helpers';\nimport {\n  getCommandTargetPlayer,\n  normalizeReason,\n  parseBanDurationToken,\n  renderTemplate,\n} from './server-toolkit-pure.js';\nimport {\n  getPlayerName,\n  safeBroadcast,\n} from './server-toolkit-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod } = data;\n\n  if (!checkPermission(pog, 'TOOLKIT_BAN')) {\n    throw new TakaroUserError('You do not have permission to use this command.');\n  }\n\n  const target = getCommandTargetPlayer(args.player);\n  if (!target) {\n    throw new TakaroUserError('Please specify a valid player to ban.');\n  }\n\n  if (target.playerId === player.id) {\n    throw new TakaroUserError('You cannot use this command on yourself.');\n  }\n\n  const parsedDuration = parseBanDurationToken(args.duration);\n  if (!parsedDuration) {\n    throw new TakaroUserError('Invalid duration. Use perm/permanent or a value like 10m, 12h, 7d, or 2w.');\n  }\n\n  const [adminName, targetName] = await Promise.all([\n    getPlayerName(player.id, player.name),\n    getPlayerName(target.playerId, target.name),\n  ]);\n  const reason = normalizeReason(args.reason, 'Banned by an admin.');\n\n  const payload = {\n    reason,\n  };\n  if (!parsedDuration.isPermanent) {\n    payload.expiresAt = parsedDuration.expiresAt;\n  }\n\n  console.log(`toolkit:ban payload=${JSON.stringify(payload)}`);\n\n  try {\n    await takaro.gameserver.gameServerControllerBanPlayer(gameServerId, target.playerId, payload);\n  } catch (err) {\n    console.error(`toolkit:ban failed for target=${target.playerId}: ${err}`);\n    throw new TakaroUserError('The ban could not be created right now. Please try again in a moment.');\n  }\n\n  console.log(`toolkit:ban admin=${adminName} target=${targetName} duration=${parsedDuration.humanDuration} reason=${reason}`);\n\n  const confirmationMessage = parsedDuration.isPermanent\n    ? `Banned ${targetName} permanently. Reason: ${reason}`\n    : `Banned ${targetName} for ${parsedDuration.humanDuration}. Reason: ${reason}`;\n\n  console.log(`toolkit:ban pm=${confirmationMessage}`);\n  try {\n    await pog.pm(confirmationMessage);\n  } catch (err) {\n    console.error(`toolkit:ban pm failed: ${err}`);\n  }\n\n  if (mod.userConfig.broadcastBans) {\n    // Use separate templates for perm vs temp to avoid \"for permanently\" grammar issue\n    let message;\n    if (parsedDuration.isPermanent) {\n      const permTemplate = mod.userConfig.banPermBroadcastMessage || '{player} was permanently banned by {admin}. Reason: {reason}';\n      message = renderTemplate(permTemplate, {\n        player: targetName,\n        reason,\n        admin: adminName,\n      });\n    } else {\n      message = renderTemplate(mod.userConfig.banBroadcastMessage, {\n        player: targetName,\n        reason,\n        admin: adminName,\n        duration: parsedDuration.humanDuration,\n      });\n    }\n    await safeBroadcast(gameServerId, message);\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to ban",
+              "position": 0
+            },
+            {
+              "name": "duration",
+              "type": "string",
+              "defaultValue": null,
+              "helpText": "perm/permanent or a value like 10m, 12h, 7d, or 2w",
+              "position": 1
+            },
+            {
+              "name": "reason",
+              "type": "string",
+              "defaultValue": "?",
+              "helpText": "Optional reason shown in the ban confirmation and broadcasts",
+              "position": 2
+            }
+          ]
+        },
+        {
+          "name": "givecurrency",
+          "trigger": "givecurrency",
+          "description": "Grant currency to a player",
+          "helpText": "Usage: givecurrency <player> <amount> — amount must be a positive whole number.",
+          "function": "import { data, takaro, TakaroUserError, checkPermission } from '@takaro/helpers';\nimport {\n  getCommandTargetPlayer,\n  renderTemplate,\n} from './server-toolkit-pure.js';\nimport {\n  getPlayerName,\n  safeBroadcast,\n} from './server-toolkit-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod } = data;\n\n  if (!checkPermission(pog, 'TOOLKIT_GIVE_CURRENCY')) {\n    throw new TakaroUserError('You do not have permission to use this command.');\n  }\n\n  const amount = args.amount;\n\n  const target = getCommandTargetPlayer(args.player);\n  if (!target) {\n    throw new TakaroUserError('Please specify a valid player to receive currency.');\n  }\n\n  if (!Number.isInteger(amount) || amount <= 0) {\n    throw new TakaroUserError('Usage: givecurrency <player> <amount> — Amount must be a positive whole number.');\n  }\n\n  const [adminName, targetName] = await Promise.all([\n    getPlayerName(player.id, player.name),\n    getPlayerName(target.playerId, target.name),\n  ]);\n\n  try {\n    await takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(gameServerId, target.playerId, {\n      currency: amount,\n    });\n  } catch (err) {\n    console.error(`toolkit:givecurrency failed for target=${target.playerId} amount=${amount}: ${err}`);\n    throw new TakaroUserError('The currency grant could not be completed. Please try again in a moment. If it keeps failing, contact a server owner.');\n  }\n\n  console.log(`toolkit:givecurrency admin=${adminName} target=${targetName} amount=${amount}`);\n\n  try {\n    await pog.pm(`Gave ${amount} currency to ${targetName}.`);\n  } catch (err) {\n    console.error(`toolkit:givecurrency pm failed: ${err}`);\n  }\n\n  if (mod.userConfig.broadcastCurrencyGrants) {\n    const message = renderTemplate(mod.userConfig.currencyGrantBroadcastMessage, {\n      player: targetName,\n      amount,\n      admin: adminName,\n    });\n    await safeBroadcast(gameServerId, message);\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to receive currency",
+              "position": 0
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "defaultValue": null,
+              "helpText": "Amount of currency to give (positive whole number)",
+              "position": 1
+            }
+          ]
+        }
+      ],
+      "hooks": [],
+      "cronJobs": [],
+      "functions": [
+        {
+          "name": "server-toolkit-helpers",
+          "function": "import { takaro } from '@takaro/helpers';\n\nfunction trimOrEmptyInternal(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return '';\n  return String(value).trim();\n}\n\nfunction collapsePlayersById(players) {\n  const seen = new Set();\n  const uniquePlayers = [];\n\n  for (const player of players) {\n    const playerId = String(player?.playerId || player?.id || '').trim();\n    if (playerId === '' || seen.has(playerId)) continue;\n    seen.add(playerId);\n    uniquePlayers.push(player);\n  }\n\n  return uniquePlayers;\n}\n\nasync function collectPaginatedResults(fetchPage, { limit = 100, maxIterations = 100 } = {}) {\n  const items = [];\n\n  for (let page = 0; page < maxIterations; page += 1) {\n    const result = await fetchPage({ page, limit });\n    const batch = Array.isArray(result?.data) ? result.data : [];\n    const total = typeof result?.total === 'number' ? result.total : undefined;\n\n    items.push(...batch);\n\n    if (batch.length === 0) return items;\n    if (total !== undefined && items.length >= total) return items;\n    if (batch.length < limit && total === undefined) return items;\n  }\n\n  throw new Error(\n    `collectPaginatedResults reached the ${maxIterations}-page safety limit before pagination completed.`,\n  );\n}\n\nexport async function fetchOnlinePlayers(gameServerId) {\n  const players = await collectPaginatedResults(async ({ page, limit }) => {\n    const result = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({\n      filters: {\n        gameServerId: [gameServerId],\n        online: [true],\n      },\n      page,\n      limit,\n    });\n\n    return {\n      data: result.data.data,\n      total: result.data.meta?.total,\n    };\n  }, { limit: 100, maxIterations: 1000 });\n\n  const uniquePlayers = collapsePlayersById(players);\n  const namedPlayers = await Promise.all(uniquePlayers.map(async (player) => ({\n    ...player,\n    name: await getPlayerName(player.playerId, ''),\n  })));\n\n  return namedPlayers;\n}\n\nexport async function getGameServerName(gameServerId) {\n  try {\n    const result = await takaro.gameserver.gameServerControllerGetOne(gameServerId);\n    const trimmed = trimOrEmptyInternal(result?.data?.data?.name);\n    return trimmed || 'Unknown Server';\n  } catch (err) {\n    console.error(`server-toolkit-helpers: failed to load gameserver ${gameServerId}: ${err}`);\n    return 'Unknown Server';\n  }\n}\n\nexport async function getPlayerName(playerId, fallback) {\n  try {\n    const result = await takaro.player.playerControllerGetOne(playerId);\n    const trimmed = trimOrEmptyInternal(result?.data?.data?.name);\n    return trimmed || fallback || 'Unknown Player';\n  } catch (err) {\n    console.error(`server-toolkit-helpers: failed to load player ${playerId}: ${err}`);\n    return fallback || 'Unknown Player';\n  }\n}\n\nexport async function safeBroadcast(gameServerId, message) {\n  const trimmed = trimOrEmptyInternal(message);\n  if (trimmed === '') return false;\n  try {\n    await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n      message: trimmed,\n      opts: {},\n    });\n    console.log(`[broadcast] ${trimmed}`);\n    return true;\n  } catch (err) {\n    console.error(`server-toolkit-helpers: broadcast failed: ${err}`);\n    return false;\n  }\n}\n"
+        },
+        {
+          "name": "server-toolkit-pure",
+          "function": "/**\n * Pure utility functions with no @takaro/helpers dependency.\n * These can be imported in tests without the Takaro sandbox.\n */\n\nexport function isBlank(value) {\n  return value === undefined || value === null || String(value).trim() === '';\n}\n\nexport function trimOrEmpty(value) {\n  return isBlank(value) ? '' : String(value).trim();\n}\n\nexport function normalizeReason(value, fallback) {\n  const trimmed = trimOrEmpty(value);\n  return trimmed === '' || trimmed === '?' ? fallback : trimmed;\n}\n\nexport function compactRules(rules) {\n  if (!Array.isArray(rules)) return [];\n  return rules\n    .map((rule) => trimOrEmpty(rule))\n    .filter((rule) => rule !== '');\n}\n\nexport function formatOnlinePlayersLine(players) {\n  const names = players\n    .map((player) => trimOrEmpty(player.name || player.playerName))\n    .filter((name) => name !== '')\n    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));\n\n  if (names.length === 0) {\n    return 'No players are currently online.';\n  }\n\n  const visible = names.slice(0, 10);\n  const hiddenCount = Math.max(0, names.length - visible.length);\n  const suffix = hiddenCount > 0 ? ', ...' : '';\n  const noun = names.length === 1 ? 'player' : 'players';\n  return `${names.length} ${noun} online: ${visible.join(', ')}${suffix}`;\n}\n\nexport function getCommandTargetPlayer(target) {\n  if (!target || typeof target !== 'object') return null;\n\n  const playerId = trimOrEmpty(target.playerId || target.id);\n  if (playerId === '') return null;\n\n  return {\n    playerId,\n    name: trimOrEmpty(target.name || target.playerName) || 'Unknown Player',\n    gameId: trimOrEmpty(target.gameId),\n    gameServerId: trimOrEmpty(target.gameServerId),\n    online: target.online,\n  };\n}\n\nexport function renderTemplate(template, placeholders) {\n  const source = trimOrEmpty(template);\n  return source.replace(/\\{([a-zA-Z0-9_]+)\\}/g, (_, key) => {\n    if (Object.prototype.hasOwnProperty.call(placeholders, key)) {\n      return String(placeholders[key]);\n    }\n    return `{${key}}`;\n  });\n}\n\n/**\n * Parse a ban duration token such as \"perm\", \"permanent\", \"10m\", \"12h\", \"7d\", \"2w\".\n * Returns a parsed duration object or null if invalid.\n */\nexport function parseBanDurationToken(token) {\n  const normalized = trimOrEmpty(token).toLowerCase();\n\n  if (normalized === 'perm' || normalized === 'permanent') {\n    return {\n      isPermanent: true,\n      expiresAt: undefined,\n      humanDuration: 'permanent',\n      normalizedToken: normalized,\n    };\n  }\n\n  const match = normalized.match(/^(\\d+)([mhdw])$/);\n  if (!match) return null;\n\n  const amount = Number(match[1]);\n  const unit = match[2];\n  if (!Number.isInteger(amount) || amount <= 0) return null;\n\n  const unitConfig = {\n    m: { ms: 60 * 1000, singular: 'minute', plural: 'minutes' },\n    h: { ms: 60 * 60 * 1000, singular: 'hour', plural: 'hours' },\n    d: { ms: 24 * 60 * 60 * 1000, singular: 'day', plural: 'days' },\n    w: { ms: 7 * 24 * 60 * 60 * 1000, singular: 'week', plural: 'weeks' },\n  }[unit];\n\n  if (!unitConfig) return null;\n\n  const durationMs = amount * unitConfig.ms;\n  const expiresAtMs = Date.now() + durationMs;\n  if (!Number.isSafeInteger(durationMs) || !Number.isFinite(expiresAtMs) || expiresAtMs > 8.64e15) {\n    return null;\n  }\n\n  return {\n    isPermanent: false,\n    expiresAt: new Date(expiresAtMs).toISOString(),\n    humanDuration: `${amount} ${amount === 1 ? unitConfig.singular : unitConfig.plural}`,\n    normalizedToken: normalized,\n  };\n}\n"
+        }
+      ],
+      "permissions": [
+        {
+          "canHaveCount": false,
+          "description": "Allows a player to kick other players",
+          "permission": "TOOLKIT_KICK",
+          "friendlyName": "Kick Players"
+        },
+        {
+          "canHaveCount": false,
+          "description": "Allows a player to ban other players",
+          "permission": "TOOLKIT_BAN",
+          "friendlyName": "Ban Players"
+        },
+        {
+          "canHaveCount": false,
+          "description": "Allows a player to grant currency to players",
+          "permission": "TOOLKIT_GIVE_CURRENCY",
+          "friendlyName": "Give Currency"
+        }
+      ]
+    }
+  ]
+}

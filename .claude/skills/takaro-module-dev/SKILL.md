@@ -197,7 +197,7 @@ All metadata — config schema, permissions, command definitions, hook definitio
 {
   "name": "my-module",
   "description": "Does something useful",
-  "version": "latest",
+  "version": "1.0.0",
   "supportedGames": ["all"],
 
   "config": {
@@ -275,7 +275,7 @@ bash scripts/module-pull.sh <module-uuid>        # By ID
 
 ### Versioning
 
-Takaro modules support semantic versioning. During development, work on the "latest" version (set `"version": "latest"` in module.json). Tag a version when the module is stable and tested.
+Every module in this registry has a strict semantic `"version"` (`x.y.z`, for example `1.0.0`) in `module.json`. The module `name` is kebab-case and equals its directory name, with no `test-` prefix. Once a version is published it can never change: to release a change, bump `version`, run `npm run registry:build` and commit `modules/` and `registry/` together. CI runs `npm run registry:check`, and merging to `main` publishes. See `docs/registry-format.md`. A module without a `version` exports as `latest`, which is fine for local drafts but is rejected for modules that would be published.
 
 ## Phase 4: Testing
 

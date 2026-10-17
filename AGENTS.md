@@ -21,7 +21,19 @@ npm run build       # compile src/ to dist/
 npm run typecheck
 npm test            # offline checks, what CI runs
 npm run test:live   # live suite against a Takaro domain; dormant, see test/README.md
+npm run registry:build   # validate, then write new files below registry/
+npm run registry:check   # validate without writing; CI runs this
 ```
+
+## Registry conventions
+
+Full spec: `docs/registry-format.md`.
+
+- Listed modules have a kebab-case `name` equal to their directory name (no `test-` prefix) and a strict `x.y.z` `version`. Only the names in `legacyModuleNames` (`registry.config.json`) may be camelCase.
+- `registry/` is generated and committed, and is append-only: a published version never changes. After changing a module, bump `version`, run `npm run registry:build` and commit `modules/` and `registry/` together. Never edit `registry/` by hand.
+- Descriptions in `registry.json` are at most 500 characters: add a `summary` to `module.json` when the description is longer. `minTakaroVersion` is optional.
+- Published modules are never removed. Add a module to `unlisted` in `registry.config.json` to stop publishing it.
+- Merging to `main` deploys `registry/` and `schema/` to GitHub Pages.
 
 ## Module Development
 

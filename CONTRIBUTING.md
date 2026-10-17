@@ -27,7 +27,14 @@ npm test
 ## Module layout
 
 Each module is one directory under `modules/`, containing a `module.json` and its code under
-`src/**`. See [modules/README.md](modules/README.md). New module directories and names use kebab-case.
+`src/**`. See [modules/README.md](modules/README.md) and [docs/registry-format.md](docs/registry-format.md).
+
+- Module names are kebab-case and equal the directory name (`my-module`). The camelCase names listed in
+  `legacyModuleNames` in `registry.config.json` are a fixed exception for Takaro's formerly bundled modules.
+- `version` is a semantic version `x.y.z`.
+- A `summary` (at most 500 characters) is used as the registry description when the full `description` is longer than
+  500 characters.
+- `minTakaroVersion` (`x.y.z`) is optional and declares the lowest Takaro version the module needs.
 
 ## Testing a module against your own Takaro domain
 
@@ -41,4 +48,13 @@ Docs: https://docs.takaro.io
 
 ## Publishing
 
-Publishing to the registry is being set up.
+Merging to `main` publishes the registry. To release a module change:
+
+1. Change the module.
+2. Bump `version` in `module.json`. A published version can never change.
+3. Run `npm run registry:build`.
+4. Commit `modules/` and `registry/` together.
+
+CI runs `npm run registry:check` against the target branch. It fails if you changed a published version without
+bumping it, if `registry/` is out of date, or if anything already published was altered. Published modules are never
+removed; to retire one, add it to `unlisted` in `registry.config.json`.

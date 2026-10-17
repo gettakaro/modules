@@ -1,0 +1,6 @@
+registry/** -text linguist-generated=true
+modules/** text eol=lf
+modules/**/*.png binary
+modules/**/*.jpg binary
+modules/**/*.gif binary
+test/fixtures/** text eol=lf

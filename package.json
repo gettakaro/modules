@@ -13,7 +13,9 @@
     "test:live": "npm run build && T_WS_CONTINUOUS_RECONNECT=false T_WS_HEARTBEAT_INTERVAL_MS=120000 LOGGING_LEVEL=warn node --test-force-exit --test-concurrency 1 --import=ts-node-maintained/register/esm --test 'modules/*/test/*.test.ts'",
     "module:to-json": "node dist/scripts/module-to-json.js",
     "module:from-json": "node dist/scripts/json-to-module.js",
-    "module:migrate": "node dist/scripts/migrate-module.js"
+    "module:migrate": "node dist/scripts/migrate-module.js",
+    "registry:build": "npm run build && node dist/scripts/registry.js build",
+    "registry:check": "npm run build && node dist/scripts/registry.js check"
   },
   "devDependencies": {
     "@takaro/apiclient": "^0.7.5",
@@ -21,5 +23,8 @@
     "dotenv": "^16.4.0",
     "ts-node-maintained": "^10.9.6",
     "typescript": "~5.5.4"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
   }
 }
