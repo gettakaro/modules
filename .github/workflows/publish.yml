@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,11 +29,17 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
-      - name: Validate registry
+      - name: Validate registry (append-only against what main published before)
         env:
-          BASE: ${{ github.event.before }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+          # A push compares against the previous tip of main. A manual dispatch (or a push whose previous tip is
+          # unknown, such as a first push) compares against the parent of HEAD, so published versions stay immutable.
+          BASE="$BEFORE"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}"; then
+            BASE=$(git rev-parse --verify --quiet HEAD^ || true)
+          fi
+          if [ -z "$BASE" ]; then
             npm run registry:check
           else
             npm run registry:check -- --base "$BASE"
@@ -49,6 +56,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
