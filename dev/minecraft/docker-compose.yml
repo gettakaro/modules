@@ -12,7 +12,7 @@ services:
       - ENABLE_RCON=true
       - RCON_PASSWORD=${RCON_PASSWORD:-takaro123}
       - TAKARO_REGISTRATION_TOKEN=${TAKARO_REGISTRATION_TOKEN}
-      - TAKARO_IDENTITY_TOKEN=${TAKARO_MC_IDENTITY_TOKEN:-nca-ai-paper}
+      - TAKARO_IDENTITY_TOKEN=${TAKARO_MC_IDENTITY_TOKEN:-takaro-dev-paper}
       - TAKARO_WS_URL=${TAKARO_WS_URL:-wss://connect.takaro.io}
       - PLUGINS=https://github.com/gettakaro/takaro-minecraft/releases/download/${TAKARO_PLUGIN_VERSION:-0.0.5}/takaro-paper-${TAKARO_PLUGIN_VERSION:-0.0.5}.jar
       - REMOVE_OLD_PLUGINS=TRUE
@@ -31,10 +31,4 @@ services:
       - BOT_API_PORT=3001
     depends_on:
       - paper
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     restart: unless-stopped

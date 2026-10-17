@@ -1,6 +1,6 @@
 .env
 _data/
-bot/node_modules/
+dev/minecraft/bot/node_modules/
 node_modules/
 dist/
 *.tsbuildinfo

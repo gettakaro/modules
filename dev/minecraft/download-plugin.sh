@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve paths relative to repo root so script works from any directory
+# Resolve paths relative to this script so it works from any directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Pre-flight check for gh CLI
 if ! command -v gh &> /dev/null; then
@@ -12,7 +11,7 @@ if ! command -v gh &> /dev/null; then
   exit 1
 fi
 
-PLUGIN_DIR="${REPO_ROOT}/_data/paper/plugins"
+PLUGIN_DIR="${SCRIPT_DIR}/_data/paper/plugins"
 PLUGIN_FILE="${PLUGIN_DIR}/TakaroMinecraft.jar"
 
 if [ -f "$PLUGIN_FILE" ]; then

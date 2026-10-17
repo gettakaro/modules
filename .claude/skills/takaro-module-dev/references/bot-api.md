@@ -1,6 +1,6 @@
 # Bot API Reference
 
-The bot service provides an HTTP API for creating and controlling Minecraft player bots for testing. The port is configured by `BOT_PORT` in `.env` (default 3101).
+The bot service provides an HTTP API for creating and controlling Minecraft player bots for testing. The port is configured by `BOT_PORT` in `dev/minecraft/.env` (default 3101).
 
 **Base URL**: `http://localhost:${BOT_PORT:-3101}`
 
@@ -129,5 +129,5 @@ curl -X DELETE http://localhost:${BOT_PORT:-3101}/bots/tester
 
 - If a bot returns 503, the Minecraft server is likely still starting — wait and retry
 - Bots auto-reconnect after server restarts with exponential backoff (5s to 60s)
-- If the bot can't connect, check `docker compose logs bot` and `docker compose logs paper`
+- If the bot can't connect, check `docker compose -f dev/minecraft/docker-compose.yml logs bot` and `docker compose -f dev/minecraft/docker-compose.yml logs paper`
 - For automated tests, prefer the mock game server approach (see `test/helpers/mock-server.ts`) which doesn't require a real Minecraft server
