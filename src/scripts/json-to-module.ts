@@ -16,7 +16,16 @@ import {
   LocalCronJobDef,
   LocalFunctionDef,
 } from '../types/module.js';
-import { validateEntityName } from '../utils/validate.js';
+import { validateEntityName as assertEntityName } from '../utils/validate.js';
+
+function validateEntityName(entityName: string, entityType: string): void {
+  try {
+    assertEntityName(entityName, entityType);
+  } catch (err) {
+    console.error(`ERROR: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

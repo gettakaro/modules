@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "name": "Takaro Official Registry",
+  "description": "Modules made and reviewed by the Takaro team.",
+  "modules": [
+    {
+      "name": "afk-kick",
+      "description": "AFK Kick — periodically checks player positions and warns/kicks idle players. A permission exempts specific players from AFK detection.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "32af41e4e3135ab5541d2bde22d9fd8dc6cea80e277790c89aca2dd266509c6b",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "community-fund",
+      "description": "Community Fund — players contribute currency toward a shared goal. When the threshold is reached the fund resets and completion commands fire.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "300a95921b4018bf183892bd5184bb012ea840d42d15e2ee8d25f243a3458231",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "discord-status-bridge-7d2d",
+      "description": "7 Days to Die Discord bridge with chat relay, localized monitoring events, blood moon notices, and a persistent customizable server status message.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "2093ff2ec9266208f032116afb96e2b9d967644dd2896d0f10a4a2d534f555ad",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kill-tracker",
+      "description": "Kill/Death Tracker — tracks player kills, deaths, and points with streaks, leaderboards, and seasonal resets.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "85e17ae55ecbc846eccf2c30f331ccb208949fb9cb19f5ac50bfdb6bf937ce3a",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mini-games",
+      "description": "Unified mini-games module with daily puzzles (Wordle, Hangman, Hot/Cold) and live chat rounds (Trivia, Scramble, Math race, Reaction race). Skill-based, point-scoring, optional currency rewards, boost tiers, cross-game leaderboards. Trivia rounds fetch questions from the public Open Trivia Database (https://opentdb.com) when `triviaQuestionSource` is `api` (the default), so the module makes outbound HTTPS requests to opentdb.com from Takaro; on failure it falls back to the custom bank.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "4e67028edeaf15ee6c4a06ee36a3776794fb9081d67e6f84ef800f20ba4e8b19",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "playtime-buff-rewards",
+      "description": "Hourly playtime rewards with configurable currency, command, and buff rewards.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "aaeb68a49c0aff64108c28a90197d00093664d8e446662cb4219ad892cb9a432",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "referral-program",
+      "description": "Players invite others via a referral code; referrers earn currency or items when their referees hit a playtime threshold, with daily/lifetime caps and VIP tiering.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "ae9f6f8678cbd87da65bc0aeb1f1d2643865e1f3da85723c6bda1972f3ded572",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "server-toolkit",
+      "description": "Cross-game utility commands for server info, rules, moderation, and simple economy administration.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "db43e32cbda53f1ec0f6ef8384a22e76a800bcbe5bc89eea59c8c4a26d098f0c",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.ban",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vote-restart",
+      "description": "Vote Restart — players vote democratically to restart the server. Dynamic threshold based on online non-immune players.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "75c579e1c8a24b3f383e024fb1bee03ab110d1042fa91736bb8ed0d074fd25e8",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zombie-racing",
+      "description": "Zombie Racing lets players bet on a configurable virtual race, locks betting when a race starts, broadcasts live race commentary while the race is running, then finishes the race through delayed hooks after the configured duration.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "794242e90e2a3d37291787a1b4d63bdbcd4939d0ed87ec9728eabaff762913fc",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    }
+  ]
+}

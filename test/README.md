@@ -2,8 +2,9 @@
 
 ## Offline checks: `npm test`
 
-Runs the `test/*.test.ts` files. Currently this checks that every module directory converts to
-Takaro's import format. It needs no Takaro account and no secrets, and it is what CI runs.
+Runs the `test/*.test.ts` files. It checks that every module directory converts to
+Takaro's import format, tests the registry build and validator against the fixtures in `test/fixtures/registry/`, and
+validates this repository's own `registry/`. It needs no Takaro account and no secrets, and it is what CI runs.
 
 ## Live suite: `npm run test:live`
 

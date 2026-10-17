@@ -1,0 +1,8 @@
+{
+  "name": "Fixture Registry",
+  "description": "A registry used by the tests.",
+  "legacyModuleNames": ["legacyThing"],
+  "unlisted": {
+    "example": "Example module"
+  }
+}

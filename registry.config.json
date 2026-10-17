@@ -1,0 +1,28 @@
+{
+  "name": "Takaro Official Registry",
+  "description": "Modules made and reviewed by the Takaro team.",
+  "legacyModuleNames": [
+    "utils",
+    "teleports",
+    "playerOnboarding",
+    "serverMessages",
+    "chatBridge",
+    "gimme",
+    "highPingKicker",
+    "economyUtils",
+    "lottery",
+    "geoBlock",
+    "timedShutdown",
+    "dailyRewards",
+    "shopActions"
+  ],
+  "unlisted": {
+    "hello-world": "Example module for module authors",
+    "teleports": "Superseded by Takaro's teleports module",
+    "lottery": "Superseded by Takaro's lottery module",
+    "daily-rewards": "Superseded by Takaro's dailyRewards module",
+    "server-messages": "Superseded by Takaro's serverMessages module",
+    "casino": "Held until it has tests",
+    "buff-manager": "Held until it has tests"
+  }
+}

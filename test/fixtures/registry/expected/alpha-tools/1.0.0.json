@@ -1,0 +1,72 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "alpha-tools",
+  "author": "Test Author",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Alpha tools greets players and gives them a starter item.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"greeting\":{\"type\":\"string\",\"default\":\"Hello\"}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{\"greeting\":{\"ui:widget\":\"text\"}}",
+      "commands": [
+        {
+          "name": "greet",
+          "trigger": "greet",
+          "description": "Greet a player",
+          "helpText": "Greets a player",
+          "function": "import { data, takaro } from '@takaro/helpers';\n\nasync function main() {\n  const { gameServerId, arguments: args } = data;\n  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, { message: `Hello ${args.player.name}` });\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "helpText": "Who to greet",
+              "position": 0
+            },
+            {
+              "name": "times",
+              "type": "number",
+              "helpText": "How often",
+              "position": 1,
+              "defaultValue": "1"
+            }
+          ]
+        }
+      ],
+      "hooks": [
+        {
+          "name": "welcome",
+          "eventType": "player-connected",
+          "description": "Welcome players",
+          "regex": null,
+          "function": "import { data, takaro } from '@takaro/helpers';\n\nasync function main() {\n  const { gameServerId, player } = data;\n  await takaro.gameserver.gameServerControllerGiveItem(gameServerId, player.id, { name: 'bread', amount: 1 });\n}\n\nawait main();\n"
+        }
+      ],
+      "cronJobs": [
+        {
+          "name": "tick",
+          "temporalValue": "0 * * * *",
+          "description": "Hourly tick",
+          "function": "import { takaro } from '@takaro/helpers';\n\nasync function main() {\n  console.log('tick', typeof takaro);\n}\n\nawait main();\n"
+        }
+      ],
+      "functions": [
+        {
+          "name": "alpha-helpers",
+          "function": "export function double(value) {\n  return value * 2;\n}\n"
+        }
+      ],
+      "permissions": [
+        {
+          "permission": "ALPHA_GREET",
+          "friendlyName": "Greet",
+          "description": "Allows greeting",
+          "canHaveCount": false
+        }
+      ],
+      "defaultSystemConfig": "{\"commands\":{\"greet\":{\"cost\":0}}}"
+    }
+  ]
+}

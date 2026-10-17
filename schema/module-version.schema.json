@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gettakaro.github.io/modules/schema/module-version.schema.json",
+  "title": "Module version file (<module>/<version>.json)",
+  "description": "One published version of a module in Takaro's module export format. The file is append-only: once published its bytes never change. versions holds exactly one entry whose tag is the semver version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["takaroVersion", "name", "author", "supportedGames", "versions"],
+  "definitions": {
+    "argument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "description": "Argument name." },
+        "type": { "type": "string", "description": "Argument type." },
+        "helpText": { "type": "string", "description": "Help text of the argument." },
+        "position": { "type": "integer", "description": "Position in the command line." },
+        "defaultValue": { "type": ["string", "null"], "description": "Value used when the argument is left out." }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "trigger", "description", "helpText", "function", "arguments"],
+      "properties": {
+        "name": { "type": "string", "description": "Command name." },
+        "trigger": { "type": "string", "description": "The word players type." },
+        "description": { "type": ["string", "null"], "description": "What the command does." },
+        "helpText": { "type": "string", "description": "Usage text." },
+        "function": { "type": "string", "description": "The command's JavaScript code." },
+        "arguments": { "type": "array", "items": { "$ref": "#/definitions/argument" }, "description": "Command arguments." }
+      }
+    },
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "eventType", "description", "regex", "function"],
+      "properties": {
+        "name": { "type": "string", "description": "Hook name." },
+        "eventType": { "type": "string", "description": "Triggering event type." },
+        "description": { "type": ["string", "null"], "description": "What the hook does." },
+        "regex": { "type": ["string", "null"], "description": "Chat message filter." },
+        "function": { "type": "string", "description": "The hook's JavaScript code." }
+      }
+    },
+    "cronJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "temporalValue", "description", "function"],
+      "properties": {
+        "name": { "type": "string", "description": "Job name." },
+        "temporalValue": { "type": "string", "description": "Cron expression." },
+        "description": { "type": ["string", "null"], "description": "What the job does." },
+        "function": { "type": "string", "description": "The job's JavaScript code." }
+      }
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "function"],
+      "properties": {
+        "name": { "type": "string", "description": "Function name." },
+        "function": { "type": "string", "description": "The function's JavaScript code." }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permission", "friendlyName", "description"],
+      "properties": {
+        "permission": { "type": "string", "description": "Permission key." },
+        "friendlyName": { "type": "string", "description": "Name shown in the role editor." },
+        "description": { "type": "string", "description": "What the permission allows." },
+        "canHaveCount": { "type": "boolean", "description": "Whether the permission can carry a count." }
+      }
+    },
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "description", "configSchema", "uiSchema", "commands", "hooks", "cronJobs", "functions", "permissions"],
+      "properties": {
+        "tag": { "type": "string", "description": "The semver version of this file." },
+        "description": { "type": "string", "description": "Full module description." },
+        "configSchema": { "type": "string", "description": "The module config JSON schema, serialized as a JSON string." },
+        "uiSchema": { "type": "string", "description": "The UI schema, serialized as a JSON string." },
+        "defaultSystemConfig": { "type": "string", "description": "Default system config, serialized as a JSON string. Present only when the module declares one." },
+        "commands": { "type": "array", "items": { "$ref": "#/definitions/command" }, "description": "Chat commands." },
+        "hooks": { "type": "array", "items": { "$ref": "#/definitions/hook" }, "description": "Event hooks." },
+        "cronJobs": { "type": "array", "items": { "$ref": "#/definitions/cronJob" }, "description": "Scheduled jobs." },
+        "functions": { "type": "array", "items": { "$ref": "#/definitions/function" }, "description": "Shared functions." },
+        "permissions": { "type": "array", "items": { "$ref": "#/definitions/permission" }, "description": "Permissions." }
+      }
+    }
+  },
+  "properties": {
+    "takaroVersion": { "type": "string", "description": "Takaro version that produced the export. Always 0.0.0 for registry files; minTakaroVersion in registry.json carries compatibility." },
+    "name": { "type": "string", "description": "Module name. Equals the module's directory in the registry." },
+    "author": { "type": "string", "description": "Module author." },
+    "supportedGames": { "type": "array", "items": { "type": "string" }, "description": "Supported games." },
+    "versions": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/definitions/version" }, "description": "Exactly one entry: the version this file represents." }
+  }
+}

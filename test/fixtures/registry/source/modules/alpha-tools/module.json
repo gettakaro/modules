@@ -1,0 +1,49 @@
+{
+  "name": "alpha-tools",
+  "author": "Test Author",
+  "description": "Alpha tools greets players and gives them a starter item.",
+  "version": "1.0.0",
+  "minTakaroVersion": "1.2.3",
+  "supportedGames": ["all"],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": { "greeting": { "type": "string", "default": "Hello" } },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": { "greeting": { "ui:widget": "text" } },
+  "defaultSystemConfig": { "commands": { "greet": { "cost": 0 } } },
+  "permissions": [
+    { "permission": "ALPHA_GREET", "friendlyName": "Greet", "description": "Allows greeting", "canHaveCount": false }
+  ],
+  "commands": {
+    "greet": {
+      "trigger": "greet",
+      "description": "Greet a player",
+      "helpText": "Greets a player",
+      "function": "src/commands/greet/index.js",
+      "arguments": [
+        { "name": "player", "type": "player", "helpText": "Who to greet", "position": 0 },
+        { "name": "times", "type": "number", "helpText": "How often", "position": 1, "defaultValue": "1" }
+      ]
+    }
+  },
+  "hooks": {
+    "welcome": {
+      "eventType": "player-connected",
+      "description": "Welcome players",
+      "function": "src/hooks/welcome/index.js"
+    }
+  },
+  "cronJobs": {
+    "tick": {
+      "temporalValue": "0 * * * *",
+      "description": "Hourly tick",
+      "function": "src/cronjobs/tick/index.js"
+    }
+  },
+  "functions": {
+    "alpha-helpers": { "function": "src/functions/alpha-helpers.js" }
+  }
+}

@@ -57,6 +57,8 @@ export interface ModuleVersion {
   cronJobs: ModuleCronJob[];
   functions: ModuleFunction[];
   permissions: ModulePermission[];
+  /** JSON string of the default system config */
+  defaultSystemConfig?: string;
 }
 
 /** The format for importing/exporting a module to/from Takaro */
@@ -107,4 +109,42 @@ export interface LocalModuleJson {
   hooks?: Record<string, LocalHookDef>;
   cronJobs?: Record<string, LocalCronJobDef>;
   functions?: Record<string, LocalFunctionDef>;
+  defaultSystemConfig?: Record<string, unknown>;
+  /** Short manifest description, at most 500 characters. Used instead of `description` when present. */
+  summary?: string;
+  /** Lowest Takaro version (x.y.z) this module works with. */
+  minTakaroVersion?: string;
+}
+
+export interface RegistryConfig {
+  name: string;
+  description?: string;
+  /** Pre-existing camelCase names that are exempt from the kebab-case rule. */
+  legacyModuleNames: string[];
+  /** Module directory name -> reason it is not published. */
+  unlisted: Record<string, string>;
+}
+
+export interface RegistryVersionDetails {
+  version: string;
+  /** Lowercase hex SHA-256 of the exact bytes of `<module>/<version>.json` as served. */
+  sha256: string;
+  minTakaroVersion?: string;
+  /** Informational; Takaro derives its own. */
+  requiredCapabilities: string[];
+}
+
+export interface RegistryModuleEntry {
+  name: string;
+  description: string;
+  latestVersion: string;
+  versions: string[];
+  versionDetails: RegistryVersionDetails[];
+}
+
+export interface RegistryManifest {
+  schemaVersion: 1;
+  name: string;
+  description?: string;
+  modules: RegistryModuleEntry[];
 }

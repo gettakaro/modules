@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gettakaro.github.io/modules/schema/module.schema.json",
+  "title": "Takaro module source (module.json)",
+  "description": "The source definition of one module, stored at modules/<dir>/module.json next to its src/ directory. Every function path is relative to the module directory and must stay inside it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description"],
+  "definitions": {
+    "stringOrNull": { "type": ["string", "null"] },
+    "commandArgument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "Argument name. Unique within the command." },
+        "type": { "type": "string", "description": "Argument type, for example string, number, boolean or player." },
+        "helpText": { "type": "string", "description": "Shown to players in the command help." },
+        "position": { "type": "integer", "minimum": 0, "description": "Position of the argument in the command line. Unique within the command." },
+        "defaultValue": { "type": ["string", "null"], "description": "Value used when the player leaves the argument out." }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function"],
+      "properties": {
+        "trigger": { "type": "string", "minLength": 1, "description": "The word players type to run the command. Defaults to the command's key." },
+        "description": { "type": ["string", "null"], "description": "What the command does." },
+        "helpText": { "type": "string", "description": "Usage text shown in the command help." },
+        "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the command code, relative to the module directory." },
+        "arguments": { "type": "array", "items": { "$ref": "#/definitions/commandArgument" }, "description": "Arguments of the command." }
+      }
+    },
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventType", "function"],
+      "properties": {
+        "eventType": { "type": "string", "minLength": 1, "description": "The Takaro event that triggers the hook, for example chat-message or player-connected." },
+        "description": { "type": ["string", "null"], "description": "What the hook does." },
+        "regex": { "type": ["string", "null"], "description": "Only run for chat messages that match this regular expression." },
+        "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the hook code, relative to the module directory." }
+      }
+    },
+    "cronJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temporalValue", "function"],
+      "properties": {
+        "temporalValue": { "type": "string", "minLength": 1, "description": "Cron expression for when the job runs." },
+        "description": { "type": ["string", "null"], "description": "What the job does." },
+        "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the job code, relative to the module directory." }
+      }
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function"],
+      "properties": {
+        "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the shared function code, relative to the module directory." }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permission", "friendlyName", "description"],
+      "properties": {
+        "permission": { "type": "string", "minLength": 1, "description": "Permission key, checked in module code." },
+        "friendlyName": { "type": "string", "description": "Name shown in the role editor." },
+        "description": { "type": "string", "description": "What the permission allows." },
+        "canHaveCount": { "type": "boolean", "description": "Whether a role can hold the permission with a count (a numeric limit)." }
+      }
+    }
+  },
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "description": "Module name. For modules listed in the registry it equals the directory name and is kebab-case (see docs/registry-format.md)." },
+    "author": { "type": "string", "description": "Author shown in Takaro. Defaults to Unknown." },
+    "description": { "type": "string", "description": "What the module does. Shown in Takaro and kept in the version file." },
+    "summary": { "type": "string", "maxLength": 500, "description": "Optional short description of at most 500 characters. Used as the registry.json description when the full description is longer than 500 characters." },
+    "version": { "type": "string", "description": "Semantic version x.y.z. Required for listed modules (validated by the registry validator); a published version can never change." },
+    "minTakaroVersion": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$", "description": "Optional lowest Takaro version (x.y.z) that can run this module. Copied into versionDetails when the version is first published." },
+    "supportedGames": { "type": "array", "items": { "type": "string" }, "description": "Games the module supports. Defaults to all." },
+    "config": { "type": "object", "description": "JSON schema (draft-07) of the module configuration." },
+    "uiSchema": { "type": "object", "description": "JSON Forms UI schema for the module configuration." },
+    "defaultSystemConfig": { "type": "object", "description": "Default values for the system config (cron job and command settings) of an installation." },
+    "permissions": { "type": "array", "items": { "$ref": "#/definitions/permission" }, "description": "Permissions the module defines." },
+    "commands": { "type": "object", "additionalProperties": { "$ref": "#/definitions/command" }, "description": "Chat commands, keyed by command name." },
+    "hooks": { "type": "object", "additionalProperties": { "$ref": "#/definitions/hook" }, "description": "Event hooks, keyed by hook name." },
+    "cronJobs": { "type": "object", "additionalProperties": { "$ref": "#/definitions/cronJob" }, "description": "Scheduled jobs, keyed by job name." },
+    "functions": { "type": "object", "additionalProperties": { "$ref": "#/definitions/function" }, "description": "Shared functions other code in the module can import, keyed by function name." }
+  }
+}

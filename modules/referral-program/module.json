@@ -1,7 +1,8 @@
 {
-  "name": "test-referral-program",
+  "name": "referral-program",
+  "author": "Takaro",
   "description": "Players invite others via a referral code; referrers earn currency or items when their referees hit a playtime threshold, with daily/lifetime caps and VIP tiering.",
-  "version": "latest",
+  "version": "1.0.0",
   "supportedGames": [
     "all"
   ],

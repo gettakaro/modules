@@ -126,7 +126,7 @@ When tests crash before `after()` runs, mock game servers and test modules are l
 - `cleanupTestModules(client)` — deletes modules with names starting with `test-`
 - `cleanupTestGameServers(client)` — deletes game servers with names starting with `test-`
 
-Module names should start with `test-` (e.g., `test-hello-world` in `module.json`) so `cleanupTestModules` can find and remove them.
+Registry modules are named in kebab-case without a `test-` prefix (for example `hello-world`), because the name is published. `cleanupTestModules` only removes modules whose names start with `test-`, so a test that pushes a module to a Takaro domain must give the copy it installs a `test-` name (the `TEST_MODULE_NAME` pattern in `modules/discord-status-bridge-7d2d/test/bridge.test.ts`) and must not edit `module.json`.
 
 ### Writing Tests for a New Module
 

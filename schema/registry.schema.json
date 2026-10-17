@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gettakaro.github.io/modules/schema/registry.schema.json",
+  "title": "Registry manifest (registry.json)",
+  "description": "The manifest served at the root of a registry. Takaro reads name, description and modules. versions stays a list of strings so that existing Takaro releases keep working; per-version data lives in the sibling versionDetails array.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "modules"],
+  "definitions": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$", "maxLength": 20 },
+    "versionDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sha256", "requiredCapabilities"],
+      "properties": {
+        "version": { "$ref": "#/definitions/semver", "description": "The version these details belong to." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Lowercase hex SHA-256 of the exact bytes of <module>/<version>.json as served (UTF-8, no BOM). Hash the raw response body, never re-serialized JSON." },
+        "minTakaroVersion": { "$ref": "#/definitions/semver", "description": "Lowest Takaro version that can run this version. Omitted when the module does not declare one." },
+        "requiredCapabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Game server capabilities the module code uses, sorted. Informational: Takaro derives its own from the code." }
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "latestVersion", "versions", "versionDetails"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$", "maxLength": 50, "description": "Module name. Also the directory that holds its version files." },
+        "description": { "type": "string", "maxLength": 500, "description": "Module description (the module's summary when it has one)." },
+        "latestVersion": { "$ref": "#/definitions/semver", "description": "The highest entry of versions." },
+        "versions": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/semver" }, "uniqueItems": true, "description": "Every published version in ascending semver order." },
+        "versionDetails": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/versionDetails" }, "description": "One entry per version, in the same order as versions. Frozen once published." }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1, "description": "Version of this manifest format." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200, "description": "Registry name." },
+    "description": { "type": "string", "maxLength": 1000, "description": "Registry description." },
+    "modules": { "type": "array", "items": { "$ref": "#/definitions/module" }, "description": "Published modules, sorted by name." }
+  }
+}

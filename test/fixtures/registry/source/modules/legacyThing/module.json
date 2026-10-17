@@ -1,0 +1,11 @@
+{
+  "name": "legacyThing",
+  "description": "A module with a legacy camelCase name.",
+  "version": "1.0.0",
+  "commands": {
+    "ping": {
+      "trigger": "ping",
+      "function": "src/ping.js"
+    }
+  }
+}

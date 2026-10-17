@@ -1,0 +1,40 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "afk-kick",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "AFK Kick — periodically checks player positions and warns/kicks idle players. A permission exempts specific players from AFK detection.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"checksBeforeWarning\":{\"type\":\"number\",\"default\":3,\"minimum\":1,\"description\":\"Number of idle checks before sending a warning PM to the player\"},\"checksBeforeKick\":{\"type\":\"number\",\"default\":5,\"minimum\":2,\"description\":\"Number of idle checks before kicking the player\"},\"warningMessage\":{\"type\":\"string\",\"default\":\"You will be kicked for being AFK!\",\"description\":\"Private message sent to the player when they reach the warning threshold\"},\"kickMessage\":{\"type\":\"string\",\"default\":\"Kicked for being AFK\",\"description\":\"Kick reason shown to the player when they are kicked for being AFK\"},\"positionThreshold\":{\"type\":\"number\",\"default\":5,\"minimum\":1,\"description\":\"Distance in blocks a player must move to be considered active (resets idle count)\"}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [],
+      "hooks": [],
+      "cronJobs": [
+        {
+          "name": "check-afk",
+          "temporalValue": "*/1 * * * *",
+          "description": "Check online players for AFK and warn/kick based on configured thresholds",
+          "function": "import { data, takaro, checkPermission } from '@takaro/helpers';\nimport { getAfkTracking, setAfkTracking } from './afk-helpers.js';\n\nasync function main() {\n  const { gameServerId, module: mod } = data;\n  let {\n    checksBeforeWarning,\n    checksBeforeKick,\n    warningMessage,\n    kickMessage,\n    positionThreshold,\n  } = mod.userConfig;\n\n  if (checksBeforeKick <= checksBeforeWarning) {\n    console.error(\n      `AFK check: checksBeforeKick (${checksBeforeKick}) must be greater than checksBeforeWarning (${checksBeforeWarning}). Clamping checksBeforeKick to ${checksBeforeWarning + 1}.`,\n    );\n    checksBeforeKick = checksBeforeWarning + 1;\n  }\n\n  // Fetch ALL online players with positions and roles via pagination\n  let allPlayers = [];\n  let page = 0;\n  const limit = 100;\n  while (true) {\n    if (page > 100) break;\n    const res = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({\n      filters: {\n        gameServerId: [gameServerId],\n        online: [true],\n      },\n      page,\n      limit,\n    });\n    const batch = res.data.data;\n    allPlayers = allPlayers.concat(batch);\n    if (allPlayers.length >= res.data.meta.total) break;\n    page++;\n  }\n\n  console.log(`AFK check: found ${allPlayers.length} online players`);\n\n  const tracking = await getAfkTracking(gameServerId, mod.moduleId);\n\n  const onlineIds = new Set(allPlayers.map((pog) => pog.playerId));\n\n  // Prune tracking map: remove entries for players who are no longer online\n  for (const playerId of Object.keys(tracking)) {\n    if (!onlineIds.has(playerId)) {\n      delete tracking[playerId];\n    }\n  }\n\n  for (const pog of allPlayers) {\n    try {\n      const playerId = pog.playerId;\n      const x = pog.positionX;\n      const y = pog.positionY;\n      const z = pog.positionZ;\n\n      if (\n        x === undefined || x === null ||\n        y === undefined || y === null ||\n        z === undefined || z === null ||\n        !isFinite(x) || !isFinite(y) || !isFinite(z)\n      ) {\n        console.log(`AFK check: skipping player ${playerId} — no valid position data`);\n        continue;\n      }\n\n      const stored = tracking[playerId];\n\n      if (!stored) {\n        tracking[playerId] = { x, y, z, idleCount: 0, warned: false };\n        console.log(`AFK check: player ${playerId} first seen, stored position`);\n        continue;\n      }\n\n      const dx = x - stored.x;\n      const dy = y - stored.y;\n      const dz = z - stored.z;\n      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);\n\n      if (distance >= positionThreshold) {\n        tracking[playerId] = { x, y, z, idleCount: 0, warned: false };\n        continue;\n      }\n\n      stored.idleCount += 1;\n\n      if (stored.idleCount >= checksBeforeKick) {\n        if (checkPermission(pog, 'IMMUNE_TO_AFK_KICK')) {\n          console.log(`AFK check: player ${playerId} is immune to AFK kick, skipping`);\n          stored.idleCount = 0;\n          continue;\n        }\n        await takaro.gameserver.gameServerControllerKickPlayer(gameServerId, playerId, {\n          reason: kickMessage,\n        });\n        delete tracking[playerId];\n        console.log(`AFK check: kicked player ${playerId} for being AFK`);\n      } else if (stored.idleCount >= checksBeforeWarning && !stored.warned) {\n        if (checkPermission(pog, 'IMMUNE_TO_AFK_KICK')) {\n          console.log(`AFK check: player ${playerId} is immune to AFK kick, skipping warning`);\n          stored.idleCount = 0;\n          continue;\n        }\n        if (!pog.gameId) {\n          console.warn(`AFK check: player ${playerId} has no gameId, skipping PM but marking as warned`);\n          stored.warned = true;\n          continue;\n        }\n        try {\n          await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n            message: warningMessage,\n            opts: {\n              recipient: {\n                gameId: pog.gameId,\n              },\n            },\n          });\n        } catch (warnErr) {\n          // Mark as warned even if the PM fails to prevent infinite re-warning\n          stored.warned = true;\n          console.error(`AFK check: failed to send warning PM to player ${playerId}`, warnErr);\n          continue;\n        }\n        stored.warned = true;\n        console.log(`AFK check: warned player ${playerId} for being AFK`);\n      }\n    } catch (err) {\n      console.error('AFK check: error processing player', pog.playerId, err);\n    }\n  }\n\n  await setAfkTracking(gameServerId, mod.moduleId, tracking);\n  console.log(`AFK check: tracking state saved`);\n}\n\nawait main();\n"
+        }
+      ],
+      "functions": [
+        {
+          "name": "afk-helpers",
+          "function": "import { takaro } from '@takaro/helpers';\n\nconst AFK_TRACKING_KEY = 'afk_tracking';\n\n/**\n * Read AFK tracking state from Takaro variables.\n * Returns parsed JSON object or {} if not set.\n */\nexport async function getAfkTracking(gameServerId, moduleId) {\n  const res = await takaro.variable.variableControllerSearch({\n    filters: {\n      key: [AFK_TRACKING_KEY],\n      gameServerId: [gameServerId],\n      moduleId: [moduleId],\n    },\n  });\n  if (res.data.data.length === 0) return {};\n  try {\n    return JSON.parse(res.data.data[0].value);\n  } catch (err) {\n    console.error(`afk-helpers: getAfkTracking failed to parse stored value, resetting to {}. Error: ${err}`);\n    return {};\n  }\n}\n\n/**\n * Write AFK tracking state to Takaro variables.\n * Creates the variable if not existing, updates if existing.\n */\nexport async function setAfkTracking(gameServerId, moduleId, data) {\n  const existing = await takaro.variable.variableControllerSearch({\n    filters: {\n      key: [AFK_TRACKING_KEY],\n      gameServerId: [gameServerId],\n      moduleId: [moduleId],\n    },\n  });\n  const serialized = JSON.stringify(data);\n  if (existing.data.data.length > 0) {\n    await takaro.variable.variableControllerUpdate(existing.data.data[0].id, { value: serialized });\n  } else {\n    await takaro.variable.variableControllerCreate({\n      key: AFK_TRACKING_KEY,\n      value: serialized,\n      gameServerId,\n      moduleId,\n    });\n  }\n}\n"
+        }
+      ],
+      "permissions": [
+        {
+          "permission": "IMMUNE_TO_AFK_KICK",
+          "friendlyName": "Immune to AFK Kick",
+          "description": "Exempts a player from AFK detection and kick entirely",
+          "canHaveCount": false
+        }
+      ]
+    }
+  ]
+}
