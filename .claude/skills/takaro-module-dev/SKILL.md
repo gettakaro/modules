@@ -12,8 +12,8 @@ Takaro is a game server management platform. Modules are how features get added 
 ## Environment
 
 This repo provides:
-- **Minecraft Paper server** — A real game server for testing (`docker compose up -d paper`)
-- **Bot service** — HTTP API to create and control Minecraft players (`docker compose up -d bot`). See `references/bot-api.md` for the full API.
+- **Minecraft Paper server** — A real game server for testing (`docker compose -f dev/minecraft/docker-compose.yml up -d paper`)
+- **Bot service** — HTTP API to create and control Minecraft players (`docker compose -f dev/minecraft/docker-compose.yml up -d bot`). See `references/bot-api.md` for the full API.
 - **Auth scripts** — `scripts/takaro-auth.sh` and `scripts/takaro-api.sh` for Takaro API access via curl
 - **Module scripts** — `scripts/module-push.sh` and `scripts/module-pull.sh` for syncing modules between local files and Takaro
 - **Local modules** — `modules/` directory where module code lives as editable files
@@ -21,10 +21,10 @@ This repo provides:
 ### Starting Services
 
 ```bash
-docker compose up -d paper bot
+docker compose -f dev/minecraft/docker-compose.yml up -d paper bot
 ```
 
-Wait for Paper to finish starting before testing (check `docker compose logs paper`).
+Wait for Paper to finish starting before testing (check `docker compose -f dev/minecraft/docker-compose.yml logs paper`).
 
 ### Takaro API Access
 
@@ -283,17 +283,17 @@ Testing is the most important phase. A module is not done until every acceptance
 
 ### Automated tests (preferred)
 
-The repo has a TypeScript test infrastructure that exercises modules against a real Takaro environment using the mock game server. This is the preferred testing approach for reliability and repeatability.
+The repo has a TypeScript live test suite that exercises modules against a real Takaro environment using the mock game server. It is currently dormant: it needs Takaro's mock game server package, which is not on public npm, so it cannot run from a public checkout and is not part of CI (see `test/README.md`). When you do have it available, it is the preferred testing approach for reliability and repeatability.
 
 ```bash
 # Ensure Redis is running (required by mock game server)
-docker compose up -d redis
+docker compose -f test/docker-compose.yml up -d redis
 
 # Build TypeScript (required before running tests)
 npm run build
 
-# Run all module tests
-npm test
+# Run all module tests (the live suite is dormant, see test/README.md)
+npm run test:live
 ```
 
 Each module has a `test/` directory with `.test.ts` files. Tests:
@@ -312,7 +312,7 @@ Test helpers live in `test/helpers/`:
 
 ### Manual test loop (for debugging or ad-hoc verification)
 
-1. **Ensure services are running**: `docker compose up -d paper bot`
+1. **Ensure services are running**: `docker compose -f dev/minecraft/docker-compose.yml up -d paper bot`
 2. **Create a test bot**: `curl -X POST http://localhost:${BOT_PORT:-3101}/bots -H 'Content-Type: application/json' -d '{"name":"tester"}'`
 3. **Wait for connection**: `sleep 5 && curl http://localhost:${BOT_PORT:-3101}/status`
 4. **Trigger the module** (varies by component type):
@@ -370,9 +370,10 @@ This phase applies during `/verify`, manual review, or any final check. Never sk
 
 1. **Start services** (if not already running):
    ```bash
-   docker compose up -d paper bot redis
+   docker compose -f dev/minecraft/docker-compose.yml up -d paper bot
+   docker compose -f test/docker-compose.yml up -d redis
    # Wait for Paper to be ready
-   docker compose logs --tail=5 paper  # look for "Done" message
+   docker compose -f dev/minecraft/docker-compose.yml logs --tail=5 paper  # look for "Done" message
    ```
 
 2. **Push and install the module on the real game server**:
@@ -416,7 +417,7 @@ This phase applies during `/verify`, manual review, or any final check. Never sk
 
 ### When exerciser/verify agents encounter this repo
 
-If you are a verification agent (cata-exerciser or similar): this repo's "app" is the Minecraft Paper server + Takaro platform. To exercise a module, use the bot service at `http://localhost:${BOT_PORT:-3101}` (check `.env` for `BOT_PORT`) to create bots and trigger commands. Check `references/bot-api.md` for the full bot HTTP API. Do NOT skip with "no app to exercise."
+If you are a verification agent: this repo's "app" is the Minecraft Paper server + Takaro platform. To exercise a module, use the bot service at `http://localhost:${BOT_PORT:-3101}` (check `dev/minecraft/.env` for `BOT_PORT`) to create bots and trigger commands. Check `references/bot-api.md` for the full bot HTTP API. Do NOT skip with "no app to exercise."
 
 ## Phase 6: Debugging
 

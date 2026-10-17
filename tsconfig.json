@@ -17,8 +17,8 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "test/**/*", "modules/*/test/**/*"],
-  "exclude": ["node_modules", "bot", "_data", "dist"],
+  "include": ["src/**/*", "test/*.test.ts"],
+  "exclude": ["test/helpers", "modules", "dev", "_data", "dist", "node_modules"],
   "ts-node": {
     "esm": true
   }

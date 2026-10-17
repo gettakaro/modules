@@ -1,30 +1,24 @@
 {
-  "name": "takaro-module-writer",
+  "name": "takaro-modules",
+  "description": "Takaro's Official Registry of game server modules",
+  "repository": "github:gettakaro/modules",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "pretest": "npm run build",
-    "test": "T_WS_CONTINUOUS_RECONNECT=false T_WS_HEARTBEAT_INTERVAL_MS=120000 LOGGING_LEVEL=warn node --test-force-exit --test-concurrency 1 --import=ts-node-maintained/register/esm --test 'modules/*/test/*.test.ts'",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "node --test --import=ts-node-maintained/register/esm 'test/*.test.ts'",
+    "test:live": "npm run build && T_WS_CONTINUOUS_RECONNECT=false T_WS_HEARTBEAT_INTERVAL_MS=120000 LOGGING_LEVEL=warn node --test-force-exit --test-concurrency 1 --import=ts-node-maintained/register/esm --test 'modules/*/test/*.test.ts'",
     "module:to-json": "node dist/scripts/module-to-json.js",
     "module:from-json": "node dist/scripts/json-to-module.js",
     "module:migrate": "node dist/scripts/migrate-module.js"
   },
-  "dependencies": {
-    "@takaro/apiclient": "0.4.17",
-    "@takaro/config": "^0.4.17",
-    "@takaro/db": "^0.4.17",
-    "@takaro/gameserver": "^0.4.17",
-    "@takaro/http": "^0.4.17",
-    "@takaro/mock-gameserver": "0.4.17",
-    "@takaro/modules": "^0.4.17",
-    "@takaro/util": "^0.4.17",
-    "dotenv": "^16.4.0",
-    "pg": "^8.20.0"
-  },
   "devDependencies": {
+    "@takaro/apiclient": "^0.7.5",
     "@types/node": "^22",
+    "dotenv": "^16.4.0",
     "ts-node-maintained": "^10.9.6",
     "typescript": "~5.5.4"
   }

@@ -4,6 +4,8 @@ This document describes both automated and manual testing approaches for Takaro 
 
 ## Automated Tests (Preferred)
 
+> The live suite is dormant: it depends on Takaro's mock game server package, which is not yet on public npm, and it is not run by CI. See `test/README.md`. `npm test` runs only the offline checks.
+
 Tests run TypeScript test files directly via `ts-node-maintained` (no compilation step needed for tests). The test runner is Node's built-in test runner (`node --test`).
 
 All tests interact with a real Takaro environment using the API credentials in `.env`. Each test suite:
@@ -19,20 +21,20 @@ All tests interact with a real Takaro environment using the API credentials in `
 
 - `.env` file with valid Takaro credentials (see `.env.example`)
 - Required env vars: `TAKARO_HOST`, `TAKARO_USERNAME`, `TAKARO_PASSWORD`, `TAKARO_DOMAIN_ID`, `TAKARO_REGISTRATION_TOKEN`, `TAKARO_WS_URL`
-- Redis running: `docker compose up -d redis`
+- Redis running: `docker compose -f test/docker-compose.yml up -d redis`
 - Compiled scripts: `npm run build`
 
 ### Running Tests
 
 ```bash
-# Run all module tests (builds automatically via pretest hook)
-npm test
+# Run all live module tests (builds first; dormant, see test/README.md)
+npm run test:live
 
 # Run tests for a specific module
 node --test-concurrency 1 --import=ts-node-maintained/register/esm --test 'modules/hello-world/test/*.test.ts'
 
 # Run with verbose mock server logging (suppressed by default)
-LOGGING_LEVEL=info npm test
+LOGGING_LEVEL=info npm run test:live
 ```
 
 Tests run with `--test-concurrency 1` to avoid race conditions in the shared Takaro domain. Mock server logs are suppressed via `LOGGING_LEVEL=warn` in the test script — override with `LOGGING_LEVEL=info` or `LOGGING_LEVEL=debug` when debugging.
@@ -195,8 +197,8 @@ Each test suite gets its own mock game server with a unique `identityToken`. Thi
 
 ### Pre-Test Checklist
 
-1. **Services running**: `docker compose up -d paper bot`
-2. **Paper server ready**: Check `docker compose logs --tail=5 paper` — look for "Done" message
+1. **Services running**: `docker compose -f dev/minecraft/docker-compose.yml up -d paper bot`
+2. **Paper server ready**: Check `docker compose -f dev/minecraft/docker-compose.yml logs --tail=5 paper` — look for "Done" message
 3. **Bot service healthy**: `curl http://localhost:${BOT_PORT:-3101}/status`
 4. **Module installed**: Verify via Takaro API
 5. **Command prefix known**: Fetch from settings API — never assume
@@ -240,7 +242,7 @@ curl -X DELETE http://localhost:${BOT_PORT:-3101}/bots/tester
 | player-connected | Create a new bot |
 | player-disconnected | Destroy a bot |
 | chat-message | Send chat via bot |
-| entity-killed (player death) | `docker compose exec paper rcon-cli kill Bot_tester` |
+| entity-killed (player death) | `docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli kill Bot_tester` |
 
 ### Testing Cronjobs
 
@@ -255,11 +257,11 @@ bash scripts/takaro-api.sh POST /cronjob/{cronjobId}/trigger '{
 ### RCON Recipes
 
 ```bash
-docker compose exec paper rcon-cli list                       # List online players
-docker compose exec paper rcon-cli kill Bot_tester            # Kill a bot (triggers death event)
-docker compose exec paper rcon-cli op Bot_tester              # Give operator permissions
-docker compose exec paper rcon-cli gamemode creative Bot_tester  # Change gamemode
-docker compose exec paper rcon-cli give Bot_tester diamond 5  # Give items
+docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli list                       # List online players
+docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli kill Bot_tester            # Kill a bot (triggers death event)
+docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli op Bot_tester              # Give operator permissions
+docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli gamemode creative Bot_tester  # Change gamemode
+docker compose -f dev/minecraft/docker-compose.yml exec paper rcon-cli give Bot_tester diamond 5  # Give items
 ```
 
 ## Thoroughness Requirements
