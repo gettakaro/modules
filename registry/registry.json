@@ -22,6 +22,23 @@
       ]
     },
     {
+      "name": "chatBridge",
+      "description": "Connect chat to other services like Discord.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "8e156af0dae617efb47ce2a18ee7477f76772e78b82a81b490a55e56992cf94e",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "community-fund",
       "description": "Community Fund — players contribute currency toward a shared goal. When the threshold is reached the fund resets and completion commands fire.",
       "latestVersion": "1.0.0",
@@ -36,6 +53,21 @@
             "chat.send",
             "console.execute"
           ]
+        }
+      ]
+    },
+    {
+      "name": "dailyRewards",
+      "description": "Provides daily login rewards with streak tracking",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "267ec2be6b913486650b94aa4345cc1a85345726719ad9b52f04fe18f9efd057",
+          "requiredCapabilities": []
         }
       ]
     },
@@ -58,6 +90,77 @@
       ]
     },
     {
+      "name": "economyUtils",
+      "description": "A set of commands to allow players to manage their currency.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "7519e6c3499644e41a820c4cf63554101d5be3b777995bb60f46934ece49cc78",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "geoBlock",
+      "description": "Block players from certain countries from joining the server.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "3686f653bd4480907c1c7d944228c491e06fa2079da44b54440cb4e2adbdfbbf",
+          "requiredCapabilities": [
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gimme",
+      "description": "Randomly selects item from a list of items and entities. Fixed issue with item identifiers.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "8171db13d3e3c73ed7b2c5de7ba90c23852b76871871215695ac31a6c18efd89",
+          "requiredCapabilities": [
+            "console.execute",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "highPingKicker",
+      "description": "Automatically kick players with high ping, with warnings and configurable thresholds.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "4d7e9a53c181b682247bbb02fa802097c8ff8645fa9a793124b62dcba09cdd80",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.kick",
+            "players.list"
+          ]
+        }
+      ]
+    },
+    {
       "name": "kill-tracker",
       "description": "Kill/Death Tracker — tracks player kills, deaths, and points with streaks, leaderboards, and seasonal resets.",
       "latestVersion": "1.0.0",
@@ -68,6 +171,23 @@
         {
           "version": "1.0.0",
           "sha256": "85e17ae55ecbc846eccf2c30f331ccb208949fb9cb19f5ac50bfdb6bf937ce3a",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lottery",
+      "description": "Players can buy tickets for a lottery, and the winner is chosen at random.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "422b1dea96d8698346e9f68dfc45cdf078ad23638727556287b9351a2e685104",
           "requiredCapabilities": [
             "chat.send"
           ]
@@ -87,6 +207,24 @@
           "sha256": "4e67028edeaf15ee6c4a06ee36a3776794fb9081d67e6f84ef800f20ba4e8b19",
           "requiredCapabilities": [
             "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "playerOnboarding",
+      "description": "Collection of functions that are executed when a player joins the server. Helps with onboarding new players, like sending a welcome message. The starter kit is an Item Set, managed on the server's Item Sets page.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "d98b410b3f8800c08f826dc7de4765e8dc3e01e45c9e488680cb93f6b29da644",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
           ]
         }
       ]
@@ -143,6 +281,92 @@
             "moderation.ban",
             "moderation.kick"
           ]
+        }
+      ]
+    },
+    {
+      "name": "serverMessages",
+      "description": "Send automated, rotated, configurable messages to players on the server.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "3d42e93a15bc5b4a955d7c6e48d298a647ac342002d56bc91ba4b42d0fccd181",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "shopActions",
+      "description": "Built-in shop actions for common use cases like granting roles, sending messages, giving an Item Set, and executing commands. The give-item action gives an Item Set, managed on the server's Item Sets page. Upgrading from 0.0.1 unlinks every shop listing that uses one of these actions; re-link each listing to this version's action afterwards.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "541b4fb840004e9b440273e9b401454815a6feb9bbb8e20cd55647e090be074b",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "teleports",
+      "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "9f37e09015019f2305c6aaf5d2defa6b5bc28c133c2cf6db9fc44b666bb314f1",
+          "requiredCapabilities": [
+            "players.teleport"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "timedShutdown",
+      "description": "Automatically shut down the server at a specific time.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "02d878c0e721039f09f1e4c0868668162a0419902ccd99e15e41064e9eed0b58",
+          "requiredCapabilities": [
+            "chat.send",
+            "server.shutdown"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "utils",
+      "description": "A collection of useful commands",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "11845c41d1db0ac7acd4676514e667ef393693daa340e72b78bb48f46884ce89",
+          "requiredCapabilities": []
         }
       ]
     },

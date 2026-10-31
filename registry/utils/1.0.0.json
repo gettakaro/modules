@@ -1,0 +1,53 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "utils",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "A collection of useful commands",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "ping",
+          "trigger": "ping",
+          "description": null,
+          "helpText": "Replies with pong, useful for testing if the connection works.",
+          "function": "import { data } from '@takaro/helpers';\n\nasync function main() {\n  await data.player.pm('Pong!');\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "help",
+          "trigger": "help",
+          "description": null,
+          "helpText": "The text you are reading right now, displays information about commands.",
+          "function": "import { data, takaro, TakaroUserError } from '@takaro/helpers';\n\n// Each command's permissions belong to its own Module, so they are matched against that Module's id.\nfunction holdsModulePermission(pog, code, moduleId) {\n  return pog.roles.some(({ role }) =>\n    role.permissions.some(\n      ({ permission }) =>\n        (permission.permission === 'ROOT' && !permission.module) ||\n        (permission.permission === code && permission.module?.id === moduleId),\n    ),\n  );\n}\n\nfunction canUse(command) {\n  return (\n    !command.requiredPermissions ||\n    command.requiredPermissions.length === 0 ||\n    command.requiredPermissions.every((permission) => holdsModulePermission(data.pog, permission, command.moduleId))\n  );\n}\n\n// oxlint-disable-next-line sonarjs/cognitive-complexity -- GH #4103\nasync function main() {\n  const enabledModules = await takaro.module.moduleInstallationsControllerGetInstalledModules({\n    filters: { gameserverId: [data.gameServerId] },\n  });\n\n  const moduleCommands = await Promise.all(\n    enabledModules.data.data.map(async (mod) => {\n      // Check if the module itself is enabled\n      if (!mod.systemConfig.enabled) {\n        return [];\n      }\n\n      const installedVersion = await takaro.module.moduleVersionControllerGetModuleVersion(mod.versionId);\n      const commands = installedVersion.data.data.commands;\n\n      // Filter out disabled commands\n      return commands\n        .filter((command) => {\n          const commandConfig = mod.systemConfig.commands && mod.systemConfig.commands[command.name];\n          return commandConfig && commandConfig.enabled;\n        })\n        .map((command) => ({ ...command, moduleId: mod.moduleId }));\n    }),\n  );\n  const allCommandsFlat = moduleCommands.flat();\n\n  const accessibleCommands = allCommandsFlat.filter(canUse);\n\n  if (data.arguments.command === 'search') {\n    // Check if a search term was actually provided (not the default 'none')\n    if (data.arguments.searchTerm === 'none') {\n      throw new TakaroUserError('Please provide a search term. Usage: /help search <term>');\n    }\n\n    // Search functionality\n    const searchTerm = data.arguments.searchTerm.toLowerCase();\n    const matchingCommands = accessibleCommands.filter((command) => {\n      // Check if command name contains search term\n      const nameMatch = command.name.toLowerCase().includes(searchTerm);\n      // Check if help text contains search term\n      const helpTextMatch = command.helpText.toLowerCase().includes(searchTerm);\n      return nameMatch || helpTextMatch;\n    });\n\n    if (matchingCommands.length === 0) {\n      await data.player.pm(`No commands found matching \"${data.arguments.searchTerm}\".`);\n    } else {\n      await data.player.pm(`Commands matching \"${data.arguments.searchTerm}\":`);\n      await Promise.all(\n        matchingCommands.map(async (command) => {\n          await data.player.pm(`${command.name}: ${command.helpText}`);\n        }),\n      );\n    }\n  } else if (data.arguments.command === 'all') {\n    await data.player.pm('Available commands:');\n\n    if (accessibleCommands.length === 0) {\n      await data.player.pm('No commands available to you.');\n    } else {\n      await Promise.all(\n        accessibleCommands.map(async (command) => {\n          await data.player.pm(`${command.name}: ${command.helpText}`);\n        }),\n      );\n    }\n  } else {\n    const requestedCommand = allCommandsFlat.find((c) => {\n      return c.name === data.arguments.command;\n    });\n\n    if (requestedCommand) {\n      if (!canUse(requestedCommand)) {\n        throw new TakaroUserError(`You don't have permission to use the \"${data.arguments.command}\" command.`);\n      }\n\n      await data.player.pm(`${requestedCommand.name}: ${requestedCommand.helpText}`);\n    } else {\n      throw new TakaroUserError(\n        `Unknown command \"${data.arguments.command}\", use this command without arguments to see all available commands.`,\n      );\n    }\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "command",
+              "type": "string",
+              "defaultValue": "all",
+              "helpText": "The command to get help for, or \"search\" to search for commands",
+              "position": 0
+            },
+            {
+              "name": "searchTerm",
+              "type": "string",
+              "defaultValue": "none",
+              "helpText": "Search term to find commands (when first argument is \"search\")",
+              "position": 1
+            }
+          ]
+        }
+      ],
+      "hooks": [],
+      "cronJobs": [],
+      "functions": [],
+      "permissions": []
+    }
+  ]
+}

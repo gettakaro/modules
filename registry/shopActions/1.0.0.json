@@ -1,0 +1,43 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "shopActions",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Built-in shop actions for common use cases like granting roles, sending messages, giving an Item Set, and executing commands. The give-item action gives an Item Set, managed on the server's Item Sets page. Upgrading from 0.0.1 unlinks every shop listing that uses one of these actions; re-link each listing to this version's action afterwards.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"grantRole\":{\"type\":\"object\",\"title\":\"Grant Role\",\"properties\":{\"roleId\":{\"type\":\"string\",\"x-component\":\"role\",\"title\":\"Role\",\"description\":\"The Takaro role to grant to the player.\"}}},\"sendMessage\":{\"type\":\"object\",\"title\":\"Send Message\",\"properties\":{\"message\":{\"type\":\"string\",\"title\":\"Message\",\"description\":\"The message to send.\",\"default\":\"Thank you for your purchase!\"},\"broadcast\":{\"type\":\"boolean\",\"title\":\"Broadcast\",\"description\":\"If true, sends to all players. Otherwise, only to the buyer.\",\"default\":false}}},\"giveItem\":{\"type\":\"object\",\"title\":\"Give Item\",\"properties\":{\"itemSet\":{\"type\":\"string\",\"title\":\"Bonus item set\",\"description\":\"The item set the buyer receives as a bonus on purchase.\",\"x-component\":\"itemSet\"}}},\"executeCommand\":{\"type\":\"object\",\"title\":\"Execute Command\",\"properties\":{\"command\":{\"type\":\"string\",\"title\":\"Command\",\"description\":\"The console command to execute on the game server.\"}}}},\"additionalProperties\":false}",
+      "uiSchema": "{\"grantRole\":{\"roleId\":{\"ui:widget\":\"role\"}},\"giveItem\":{\"itemSet\":{\"ui:widget\":\"itemSet\"}}}",
+      "commands": [],
+      "hooks": [],
+      "cronJobs": [],
+      "functions": [],
+      "permissions": [],
+      "shopActions": [
+        {
+          "name": "grantRole",
+          "description": "Grants a Takaro role to the player who made the purchase.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nasync function main() {\n  const roleId = data.module.userConfig.grantRole?.roleId;\n\n  if (!roleId) {\n    throw new TakaroUserError('No roleId configured for the grantRole shop action.');\n  }\n\n  if (!data.player) {\n    throw new TakaroUserError('Player data is not available for this shop action.');\n  }\n\n  await takaro.player.playerControllerAssignRole(data.player.id, roleId, {\n    gameServerId: data.gameServerId,\n  });\n\n  await data.player.pm(`You have been granted a new role!`);\n}\n\nawait main();\n"
+        },
+        {
+          "name": "sendMessage",
+          "description": "Sends an in-game message to the buyer or broadcasts to all players.",
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const config = data.module.userConfig.sendMessage || {};\n  const message = config.message || 'Thank you for your purchase!';\n  const broadcast = config.broadcast || false;\n\n  if (broadcast) {\n    await takaro.gameserver.gameServerControllerSendMessage(data.gameServerId, {\n      message,\n    });\n  } else {\n    if (!data.player) {\n      return;\n    }\n    await data.player.pm(message);\n  }\n}\n\nawait main();\n"
+        },
+        {
+          "name": "giveItem",
+          "description": "Gives an Item Set as a bonus to the player who made the purchase.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nconst SET_MISSING =\n  'The item set configured for the giveItem shop action no longer exists. Reconfigure the shopActions module.';\n\nfunction list(lines) {\n  return lines.map((line) => `${line.name} x${line.amount}`).join(', ');\n}\n\nasync function readSet(setId) {\n  let res;\n  try {\n    res = await takaro.itemSet.itemSetControllerGetOne(setId);\n  } catch (error) {\n    const status = error.response?.status;\n    if (status === 404 || status === 400) {\n      throw new TakaroUserError(SET_MISSING);\n    }\n    throw error;\n  }\n  const set = res.data.data;\n  if (set.gameServerId !== data.gameServerId) {\n    throw new TakaroUserError(SET_MISSING);\n  }\n  if (set.lines.length === 0) {\n    throw new TakaroUserError('The item set configured for the giveItem shop action has no items.');\n  }\n  return set;\n}\n\nasync function giveLines(set) {\n  const lines = set.lines.map((line) => ({\n    itemId: line.itemId,\n    amount: line.amount,\n    ...(line.quality ? { quality: line.quality } : {}),\n  }));\n  try {\n    const res = await takaro.gameserver.gameServerControllerGiveItems(data.gameServerId, data.player.id, { lines });\n    return res.data.data.lines;\n  } catch (error) {\n    if (error.response?.status === 400) {\n      const reason = error.response.data?.meta?.error?.message ?? 'the server refused it';\n      throw new TakaroUserError(`The giveItem shop action could not give the item set: ${reason}`);\n    }\n    throw error;\n  }\n}\n\nasync function main() {\n  const setId = data.module.userConfig.giveItem?.itemSet;\n\n  if (!setId) {\n    throw new TakaroUserError('No item set configured for the giveItem shop action.');\n  }\n\n  if (!data.player) {\n    throw new TakaroUserError('Player data is not available for this shop action.');\n  }\n\n  const set = await readSet(setId);\n  const results = await giveLines(set);\n  const delivered = results.filter((line) => line.result === 'DELIVERED');\n  const failed = results.filter((line) => line.result === 'FAILED');\n  const unknown = results.filter((line) => line.result === 'UNKNOWN');\n  const total = results.length;\n\n  if (failed.length === total) {\n    await data.player.pm(\n      `Your bonus items could not be given: ${list(failed)}. Please contact a server administrator.`,\n    );\n    throw new TakaroUserError(`The giveItem shop action could not give any item: ${list(failed)}`);\n  }\n\n  if (delivered.length === total) {\n    await data.player.pm(`You received ${total} bonus item(s) from your purchase!`);\n    return;\n  }\n\n  let message = `You received ${delivered.length} of ${total} bonus item(s) from your purchase.`;\n  if (failed.length > 0) {\n    message += ` These could not be given: ${list(failed)}.`;\n  }\n  if (unknown.length > 0) {\n    message += ` These may not have arrived: ${list(unknown)}.`;\n  }\n  message += ' Please contact a server administrator.';\n  await data.player.pm(message);\n}\n\nawait main();\n"
+        },
+        {
+          "name": "executeCommand",
+          "description": "Executes a console command on the game server.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nasync function main() {\n  const command = data.module.userConfig.executeCommand?.command;\n\n  if (!command) {\n    throw new TakaroUserError('No command configured for the executeCommand shop action.');\n  }\n\n  await takaro.gameserver.gameServerControllerExecuteCommand(data.gameServerId, {\n    command,\n  });\n}\n\nawait main();\n"
+        }
+      ]
+    }
+  ]
+}
