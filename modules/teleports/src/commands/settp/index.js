@@ -1,68 +1,50 @@
-import { data, takaro, checkPermission, TakaroUserError } from '@takaro/helpers';
+import { takaro, data, checkPermission, TakaroUserError } from '@takaro/helpers';
+import { getVariableKey, findTp } from './utils.js';
 
 async function main() {
   const { pog, gameServerId, module: mod, arguments: args } = data;
-  const name = args.name;
-  const maxPoints = mod.userConfig.maxTeleportPoints ?? 3;
 
-  if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
-    throw new TakaroUserError('Invalid name. Use only letters, numbers, underscores, and hyphens.');
-  }
-  if (name.length > 20) {
-    throw new TakaroUserError('Name is too long. Maximum 20 characters.');
-  }
+  const prefix = (await takaro.settings.settingsControllerGetOne('commandPrefix', gameServerId)).data.data.value;
 
-  // Get current position from the player record
-  const pogRes = await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(gameServerId, pog.playerId);
-  const pos = pogRes.data.data;
+  const existingVariable = await findTp(args.tp, pog.playerId);
 
-  if (pos.positionX == null || pos.positionY == null || pos.positionZ == null) {
-    throw new TakaroUserError('Could not read your position. Make sure you are fully in-game.');
+  if (existingVariable.data.data.length > 0) {
+    throw new TakaroUserError(`Teleport ${args.tp} already exists, use ${prefix}deletetp ${args.tp} to delete it.`);
   }
 
-  // Load existing waypoints
-  const varRes = await takaro.variable.variableControllerSearch({
-    filters: { key: ['teleports'], gameServerId: [gameServerId], moduleId: [mod.moduleId], playerId: [pog.playerId] },
+  const hasPermission = checkPermission(pog, 'TELEPORTS_USE');
+  const allPlayerTeleports = await takaro.variable.variableControllerSearch({
+    search: {
+      key: [getVariableKey(undefined), getVariableKey(undefined, true)],
+    },
+    filters: {
+      gameServerId: [gameServerId],
+      playerId: [pog.playerId],
+      moduleId: [mod.moduleId],
+    },
   });
-  const existingVar = varRes.data.data[0];
-  let teleports = [];
-  if (existingVar) {
-    try { teleports = JSON.parse(existingVar.value); } catch { teleports = []; }
-  }
 
-  // Account for TELEPORT_EXTRA_POINTS permission
-  const extraPerm = pog.roles?.flatMap(r => r.permissions ?? []).find(p => p.permission?.permission === 'TELEPORT_EXTRA_POINTS');
-  const effectiveMax = maxPoints + (extraPerm?.count ?? 0);
-
-  const existingIdx = teleports.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
-
-  if (existingIdx === -1 && teleports.length >= effectiveMax) {
+  if (allPlayerTeleports.data.data.length >= hasPermission.count) {
     throw new TakaroUserError(
-      `You already have ${teleports.length}/${effectiveMax} waypoints saved. Delete one with /deltp <name> first.`
+      `You have reached the maximum number of teleports for your role, maximum allowed is ${hasPermission.count}`,
     );
   }
 
-  const coords = { name, x: pos.positionX, y: pos.positionY, z: pos.positionZ };
+  await takaro.variable.variableControllerCreate({
+    key: getVariableKey(args.tp),
+    value: JSON.stringify({
+      name: args.tp,
+      x: data.pog.positionX,
+      y: data.pog.positionY,
+      z: data.pog.positionZ,
+      dimension: data.pog.dimension,
+    }),
+    gameServerId,
+    moduleId: mod.moduleId,
+    playerId: pog.playerId,
+  });
 
-  if (existingIdx !== -1) {
-    teleports[existingIdx] = coords;
-  } else {
-    teleports.push(coords);
-  }
-
-  const newValue = JSON.stringify(teleports);
-  if (existingVar) {
-    await takaro.variable.variableControllerUpdate(existingVar.id, { value: newValue });
-  } else {
-    await takaro.variable.variableControllerCreate({
-      key: 'teleports', value: newValue, gameServerId, moduleId: mod.moduleId, playerId: pog.playerId,
-    });
-  }
-
-  const action = existingIdx !== -1 ? 'updated' : 'saved';
-  await pog.pm(
-    `Waypoint "${name}" ${action} at (${Math.round(pos.positionX)}, ${Math.round(pos.positionY)}, ${Math.round(pos.positionZ)}). You have ${teleports.length}/${effectiveMax} waypoints used.`
-  );
+  await data.player.pm(`Teleport ${args.tp} set.`);
 }
 
 await main();

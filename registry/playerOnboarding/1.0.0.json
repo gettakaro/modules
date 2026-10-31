@@ -1,0 +1,38 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "playerOnboarding",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Collection of functions that are executed when a player joins the server. Helps with onboarding new players, like sending a welcome message. The starter kit is an Item Set, managed on the server's Item Sets page.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"message\":{\"title\":\"Message\",\"description\":\"The message to send to the player when they join the server.\",\"type\":\"string\",\"minLength\":1,\"maxLength\":256,\"default\":\"Welcome {player} to the server!\"},\"starterKitItemSet\":{\"type\":\"string\",\"title\":\"Starter kit item set\",\"description\":\"The item set a player receives when they run the starterkit command for the first time on this server.\",\"x-component\":\"itemSet\"}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{\"starterKitItemSet\":{\"ui:widget\":\"itemSet\"}}",
+      "commands": [
+        {
+          "name": "starterkit",
+          "trigger": "starterkit",
+          "description": null,
+          "helpText": "Get a starter kit, you can only execute this once on a server!",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nconst VARIABLE_KEY = 't_starterkit_lock';\n\nconst SET_MISSING =\n  'The starter kit item set no longer exists. Please ask your server administrator to reconfigure the starter kit.';\n\nfunction describe(lines) {\n  return lines.map((line) => `${line.name} x${line.amount}`).join(', ');\n}\n\nasync function readSet(setId) {\n  let res;\n  try {\n    res = await takaro.itemSet.itemSetControllerGetOne(setId);\n  } catch (error) {\n    const status = error.response?.status;\n    if (status === 404 || status === 400) {\n      throw new TakaroUserError(SET_MISSING);\n    }\n    throw error;\n  }\n  const set = res.data.data;\n  if (set.gameServerId !== data.gameServerId) {\n    throw new TakaroUserError(SET_MISSING);\n  }\n  if (set.lines.length === 0) {\n    throw new TakaroUserError(\n      'The starter kit item set has no items. Please ask your server administrator to configure this.',\n    );\n  }\n  return set;\n}\n\nasync function giveLines(set) {\n  const lines = set.lines.map((line) => ({\n    itemId: line.itemId,\n    amount: line.amount,\n    ...(line.quality ? { quality: line.quality } : {}),\n  }));\n  try {\n    const res = await takaro.gameserver.gameServerControllerGiveItems(data.gameServerId, data.player.id, { lines });\n    return res.data.data.lines;\n  } catch (error) {\n    if (error.response?.status === 400) {\n      const reason = error.response.data?.meta?.error?.message ?? 'the server refused it';\n      throw new TakaroUserError(`Your starter kit could not be given: ${reason}`);\n    }\n    throw error;\n  }\n}\n\nasync function main() {\n  const setId = data.module.userConfig.starterKitItemSet;\n\n  if (!setId) {\n    throw new TakaroUserError(\n      'No starter kit item set configured. Please ask your server administrator to configure this.',\n    );\n  }\n\n  const starterKitLockRes = await takaro.variable.variableControllerSearch({\n    filters: {\n      key: [VARIABLE_KEY],\n      gameServerId: [data.gameServerId],\n      playerId: [data.player.id],\n    },\n  });\n\n  if (starterKitLockRes.data.data.length > 0) {\n    throw new TakaroUserError('You already used starterkit on this server');\n  }\n\n  const set = await readSet(setId);\n\n  await data.player.pm('You are about to receive your starter kit...');\n\n  const results = await giveLines(set);\n  const failed = results.filter((line) => line.result === 'FAILED');\n  const unknown = results.filter((line) => line.result === 'UNKNOWN');\n  const delivered = results.filter((line) => line.result === 'DELIVERED');\n\n  if (failed.length === results.length) {\n    throw new TakaroUserError(\n      'Your starter kit could not be given. Please try again later or contact a server administrator.',\n    );\n  }\n\n  await takaro.variable.variableControllerCreate({\n    key: VARIABLE_KEY,\n    value: '1',\n    gameServerId: data.gameServerId,\n    playerId: data.player.id,\n  });\n\n  if (delivered.length === results.length) {\n    await data.player.pm(`Gave ${results.length} items, enjoy!`);\n    return;\n  }\n\n  let message = `Gave ${delivered.length} of ${results.length} items.`;\n  if (failed.length > 0) {\n    message += ` These could not be given: ${describe(failed)}.`;\n  }\n  if (unknown.length > 0) {\n    message += ` These may not have arrived: ${describe(unknown)}.`;\n  }\n  message += ' Please contact a server administrator.';\n  await data.player.pm(message);\n}\n\nawait main();\n",
+          "arguments": []
+        }
+      ],
+      "hooks": [
+        {
+          "name": "playerConnected",
+          "eventType": "player-connected",
+          "description": null,
+          "regex": null,
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const { player } = data;\n\n  const rawMessage = data.module.userConfig.message;\n  const message = rawMessage.replace('{player}', player.name);\n\n  await takaro.gameserver.gameServerControllerSendMessage(data.gameServerId, {\n    message,\n  });\n}\n\nawait main();\n"
+        }
+      ],
+      "cronJobs": [],
+      "functions": [],
+      "permissions": []
+    }
+  ]
+}

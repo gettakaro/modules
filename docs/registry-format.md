@@ -42,7 +42,11 @@ schema/                  JSON Schemas
 | `supportedGames` | no | Defaults to `["all"]`. |
 | `config`, `uiSchema` | no | JSON schema and UI schema of the module configuration. |
 | `defaultSystemConfig` | no | Default system config of an installation. |
-| `permissions`, `commands`, `hooks`, `cronJobs`, `functions` | no | The module's components. Function paths are relative to the module directory and must stay inside it. |
+| `permissions`, `commands`, `hooks`, `cronJobs`, `functions`, `shopActions` | no | The module's components. Function paths are relative to the module directory and must stay inside it. |
+
+A command may list `requiredPermissions`: permission keys a player must hold before Takaro runs it. `shopActions` is
+an object keyed by action name, each entry `{ "description"?: string | null, "function": "<path>" }`; a shop listing
+can run one when a player buys it.
 
 Unknown keys are refused, so a typo cannot silently be dropped.
 
@@ -117,7 +121,9 @@ The URL of a version file is `<base>/<module>/<version>.json`. Module names and 
 ## Version files
 
 `<module>/<version>.json` is Takaro's module export format, with exactly one entry in `versions`. Its `tag` is the
-semantic version, and `defaultSystemConfig` (a JSON string) is present when the module declares one.
+semantic version, and `defaultSystemConfig` (a JSON string) is present when the module declares one. A command
+carries `requiredPermissions` and the version carries `shopActions` (`name`, `description`, code) only when the module
+declares at least one, so files published before those keys existed keep their bytes.
 
 The files are written as `JSON.stringify(value, null, 2)` plus a trailing newline, with keys in a fixed order. A
 change to the serializer or to the export format therefore changes the bytes of a module's current version. That is

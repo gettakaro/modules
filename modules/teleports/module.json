@@ -1,131 +1,215 @@
 {
-  "name": "test-teleports",
-  "description": "Player-managed waypoints and fast travel",
-  "version": "latest",
+  "name": "teleports",
+  "author": "Takaro",
+  "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
+  "version": "1.0.0",
   "supportedGames": [
-    "all"
+    "7 days to die",
+    "rust",
+    "minecraft"
   ],
   "config": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-      "maxTeleportPoints": {
+      "timeout": {
+        "title": "Timeout",
+        "description": "The time one has to wait before teleporting again.",
+        "x-component": "duration",
         "type": "number",
-        "default": 3,
-        "description": "Maximum saved waypoints per player"
+        "minimum": 0,
+        "default": 1000
       },
-      "cooldown": {
-        "type": "number",
-        "default": 60,
-        "description": "Seconds between teleport uses"
-      },
-      "tpbackEnabled": {
+      "allowPublicTeleports": {
         "type": "boolean",
-        "default": true,
-        "description": "Whether /tpback is available"
-      },
-      "cost": {
-        "type": "number",
-        "default": 0,
-        "description": "Currency cost per teleport (0 = free)"
+        "description": "Players can create public teleports.",
+        "default": false
       }
     },
     "required": [],
     "additionalProperties": false
   },
+  "uiSchema": {
+    "timeout": {
+      "ui:widget": "duration"
+    }
+  },
   "permissions": [
     {
-      "permission": "TELEPORT_TP_PLAYER",
-      "friendlyName": "Teleport to Player",
-      "description": "Required to use /tpplayer (admin/moderator only)",
-      "canHaveCount": false
-    },
-    {
-      "permission": "TELEPORT_BYPASS_COOLDOWN",
-      "friendlyName": "Bypass Teleport Cooldown",
-      "description": "Skip the cooldown restriction",
-      "canHaveCount": false
-    },
-    {
-      "permission": "TELEPORT_EXTRA_POINTS",
-      "friendlyName": "Extra Teleport Points",
-      "description": "Each count grants one additional teleport point above the default limit",
+      "permission": "TELEPORTS_CREATE_PUBLIC",
+      "friendlyName": "Create Public Teleports",
+      "description": "Allows the player to create public teleports.",
       "canHaveCount": true
+    },
+    {
+      "permission": "TELEPORTS_USE",
+      "friendlyName": "Use Teleports",
+      "description": "Allows the player to use teleports modules.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "TELEPORTS_MANAGE_WAYPOINTS",
+      "friendlyName": "Manage waypoints",
+      "description": "Allows creating, deleting, and managing waypoints.",
+      "canHaveCount": false
     }
   ],
   "commands": {
+    "teleport": {
+      "trigger": "tp",
+      "description": null,
+      "helpText": "Teleports to one of your set locations.",
+      "function": "src/commands/teleport/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location to teleport to.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
+      ]
+    },
+    "tplist": {
+      "trigger": "tplist",
+      "description": null,
+      "helpText": "Lists all your set locations.",
+      "function": "src/commands/tplist/index.js",
+      "arguments": [],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
+      ]
+    },
     "settp": {
       "trigger": "settp",
-      "description": "Save your current position as a named waypoint",
-      "helpText": "Usage: /settp <name>",
+      "description": null,
+      "helpText": "Sets a location to teleport to.",
       "function": "src/commands/settp/index.js",
       "arguments": [
         {
-          "name": "name",
+          "name": "tp",
           "type": "string",
-          "helpText": "Name for the waypoint",
+          "defaultValue": null,
+          "helpText": "The location name.",
           "position": 0
         }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
       ]
     },
-    "tp": {
-      "trigger": "tp",
-      "description": "Teleport to a saved waypoint",
-      "helpText": "Usage: /tp <name>",
-      "function": "src/commands/tp/index.js",
+    "deletetp": {
+      "trigger": "deletetp",
+      "description": null,
+      "helpText": "Deletes a location.",
+      "function": "src/commands/deletetp/index.js",
       "arguments": [
         {
-          "name": "name",
+          "name": "tp",
           "type": "string",
-          "helpText": "Name of the waypoint",
+          "defaultValue": null,
+          "helpText": "The location name.",
           "position": 0
         }
       ]
     },
-    "deltp": {
-      "trigger": "deltp",
-      "description": "Delete a saved teleport point",
-      "helpText": "Usage: /deltp <name>",
-      "function": "src/commands/deltp/index.js",
+    "setpublic": {
+      "trigger": "setpublic",
+      "description": null,
+      "helpText": "Sets a teleport to be public, allowing other players to teleport to it.",
+      "function": "src/commands/setpublic/index.js",
       "arguments": [
         {
-          "name": "name",
+          "name": "tp",
           "type": "string",
-          "helpText": "Name of the waypoint to delete",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_CREATE_PUBLIC"
+      ]
+    },
+    "setprivate": {
+      "trigger": "setprivate",
+      "description": null,
+      "helpText": "Sets a teleport to be private, only the teleport owner can teleport to it.",
+      "function": "src/commands/setprivate/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
           "position": 0
         }
       ]
     },
-    "listtp": {
-      "trigger": "listtp",
-      "description": "List all your saved teleport points",
-      "helpText": "Usage: /listtp",
-      "function": "src/commands/listtp/index.js",
+    "setwaypoint": {
+      "trigger": "setwaypoint",
+      "description": null,
+      "helpText": "Creates a new waypoint.",
+      "function": "src/commands/setwaypoint/index.js",
+      "arguments": [
+        {
+          "name": "waypoint",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_MANAGE_WAYPOINTS"
+      ]
+    },
+    "deletewaypoint": {
+      "trigger": "deletewaypoint",
+      "description": null,
+      "helpText": "Deletes a waypoint.",
+      "function": "src/commands/deletewaypoint/index.js",
+      "arguments": [
+        {
+          "name": "waypoint",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_MANAGE_WAYPOINTS"
+      ]
+    },
+    "listwaypoints": {
+      "trigger": "waypoints",
+      "description": null,
+      "helpText": "Lists all waypoints.",
+      "function": "src/commands/listwaypoints/index.js",
       "arguments": []
     },
-    "tpback": {
-      "trigger": "tpback",
-      "description": "Teleport back to your previous location",
-      "helpText": "Usage: /tpback",
-      "function": "src/commands/tpback/index.js",
+    "teleportwaypoint": {
+      "trigger": "teleportwaypoint",
+      "description": null,
+      "helpText": "Placeholder command, this will not be used directly. The module will install aliases for this command corresponding to the waypoint names.",
+      "function": "src/commands/teleportwaypoint/index.js",
       "arguments": []
-    },
-    "tpplayer": {
-      "trigger": "tpplayer",
-      "description": "Teleport to another player's location (requires permission)",
-      "helpText": "Usage: /tpplayer <playerName>",
-      "function": "src/commands/tpplayer/index.js",
-      "arguments": [
-        {
-          "name": "playerName",
-          "type": "string",
-          "helpText": "Name of the player to teleport to",
-          "position": 0
-        }
-      ]
     }
   },
-  "hooks": {},
-  "cronJobs": {},
-  "functions": {}
+  "cronJobs": {
+    "Waypoint reconciler": {
+      "temporalValue": "*/30 * * * *",
+      "description": null,
+      "function": "src/cronjobs/Waypoint reconciler/index.js"
+    }
+  },
+  "functions": {
+    "utils": {
+      "function": "src/functions/utils.js"
+    }
+  }
 }

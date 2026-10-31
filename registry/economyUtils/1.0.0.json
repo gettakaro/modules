@@ -1,0 +1,187 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "economyUtils",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "A set of commands to allow players to manage their currency.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"pendingAmount\":{\"title\":\"Pending amount\",\"type\":\"number\",\"description\":\"When a player transfers money, they must confirm the transfer when the amount is equal or above this value. Set to 0 to disable.\",\"default\":0},\"zombieKillReward\":{\"title\":\"Zombie kill reward\",\"type\":\"number\",\"description\":\"The default amount of currency a player receives for killing a zombie. This can be overridden by roles.\",\"default\":1}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "balance",
+          "trigger": "balance",
+          "description": null,
+          "helpText": "Check your balance.",
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', data.gameServerId)).data.data;\n  await data.player.pm(`balance: ${data.pog.currency} ${currencyName.value}`);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "topCurrency",
+          "trigger": "topcurrency",
+          "description": null,
+          "helpText": "List of the 10 players with the highest balance.",
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const richest = (\n    await takaro.playerOnGameserver.playerOnGameServerControllerSearch({\n      limit: 10,\n      sortBy: 'currency',\n      sortDirection: 'desc',\n      extend: ['player'],\n    })\n  ).data.data;\n\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', data.gameServerId)).data.data\n    .value;\n\n  // TODO: change this to name when it become available in playerOnGameServer\n  const richestStrings = richest.map(async (pog, index) => {\n    const playerName = (await takaro.player.playerControllerGetOne(pog.playerId)).data.data.name;\n    return `${index + 1}. ${playerName} - ${pog.currency} ${currencyName}`;\n  });\n\n  await data.player.pm('Richest players:');\n\n  for (const string of richestStrings) {\n    await data.player.pm(await string);\n  }\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "grantCurrency",
+          "trigger": "grantcurrency",
+          "description": null,
+          "helpText": "Grant money to a player. The money is not taken from your own balance but is new currency.",
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const { pog: granter, arguments: args, gameServerId } = data;\n\n  // args.receiver has an argument type of \"player\". Arguments of this type are automatically resolved to the player's id.\n  // If the player doesn't exist or multiple players with the same name where found, it will have thrown an error before this command is executed.\n  const receiver = args.receiver;\n\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', gameServerId)).data.data.value;\n  const granterName = (await takaro.player.playerControllerGetOne(granter.playerId)).data.data.name;\n  const receiverName = (await takaro.player.playerControllerGetOne(receiver.playerId)).data.data.name;\n  await takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(receiver.gameServerId, receiver.playerId, {\n    currency: args.amount,\n    reason: 'Admin grant',\n  });\n\n  const messageToReceiver = takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message: `Granted ${args.amount} ${currencyName} by ${granterName}`,\n    opts: {\n      recipient: {\n        gameId: receiver.gameId,\n      },\n    },\n  });\n\n  await Promise.all([\n    granter.pm(`You successfully granted ${args.amount} ${currencyName} to ${receiverName}`),\n    messageToReceiver,\n  ]);\n\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "receiver",
+              "type": "player",
+              "helpText": "The player to grant currency to.",
+              "position": 0,
+              "defaultValue": null
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "helpText": "The amount of money.",
+              "position": 1,
+              "defaultValue": null
+            }
+          ],
+          "requiredPermissions": [
+            "ECONOMY_UTILS_MANAGE_CURRENCY"
+          ]
+        },
+        {
+          "name": "revokeCurrency",
+          "trigger": "revokecurrency",
+          "description": null,
+          "helpText": "Revokes money from a player. The money disappears.",
+          "function": "import { takaro, data } from '@takaro/helpers';\n\nasync function main() {\n  const { pog: revoker, arguments: args, gameServerId } = data;\n\n  // args.receiver has an argument type of \"player\". Arguments of this type are automatically resolved to the player's id.\n  // If the player doesn't exist or multiple players with the same name where found, it will have thrown an error before this command is executed.\n  const receiver = args.receiver;\n\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', gameServerId)).data.data.value;\n  const revokerName = (await takaro.player.playerControllerGetOne(revoker.playerId)).data.data.name;\n  const receiverName = (await takaro.player.playerControllerGetOne(receiver.playerId)).data.data.name;\n  await takaro.playerOnGameserver.playerOnGameServerControllerDeductCurrency(receiver.gameServerId, receiver.playerId, {\n    currency: args.amount,\n    reason: 'Admin revoke',\n  });\n\n  const messageToReceiver = takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message: `${args.amount} ${currencyName} were revoked by ${revokerName}`,\n    opts: {\n      recipient: {\n        gameId: receiver.gameId,\n      },\n    },\n  });\n\n  await Promise.all([\n    revoker.pm(`You successfully revoked ${args.amount} ${currencyName} of ${receiverName}'s balance`),\n    messageToReceiver,\n  ]);\n\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "receiver",
+              "type": "player",
+              "helpText": "The player to revoke currency from.",
+              "position": 0,
+              "defaultValue": null
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "helpText": "The amount of money.",
+              "position": 1,
+              "defaultValue": null
+            }
+          ],
+          "requiredPermissions": [
+            "ECONOMY_UTILS_MANAGE_CURRENCY"
+          ]
+        },
+        {
+          "name": "confirmTransfer",
+          "trigger": "confirmtransfer",
+          "description": null,
+          "helpText": "Confirms a pending transfer.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nasync function main() {\n  const { gameServerId, pog: sender, module: mod } = data;\n\n  // try to find a variable with key \"confirmTransfer\"\n  const variables = (\n    await takaro.variable.variableControllerSearch({\n      filters: {\n        key: ['confirmTransfer'],\n        gameServerId: [gameServerId],\n        moduleId: [mod.moduleId],\n        playerId: [sender.playerId],\n      },\n    })\n  ).data.data;\n\n  if (variables.length === 0) {\n    throw new TakaroUserError('You have no pending transfer.');\n  }\n\n  // Remove the variable before potentially executing the transaction.\n  await takaro.variable.variableControllerDelete(variables[0].id);\n  const pendingTransfer = JSON.parse(variables[0].value);\n\n  await takaro.playerOnGameserver.playerOnGameServerControllerTransactBetweenPlayers(\n    sender.gameServerId,\n    sender.id,\n    pendingTransfer.receiver.id,\n    {\n      currency: pendingTransfer.amount,\n      reason: 'Player transfer',\n    },\n  );\n\n  const receiverName = (await takaro.player.playerControllerGetOne(pendingTransfer.receiver.playerId)).data.data.name;\n  const senderName = (await takaro.player.playerControllerGetOne(sender.playerId)).data.data.name;\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', gameServerId)).data.data.value;\n\n  const messageToSender = sender.pm(\n    `You successfully transferred ${pendingTransfer.amount} ${currencyName} to ${receiverName}`,\n  );\n\n  const messageToReceiver = takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message: `You received ${pendingTransfer.amount} ${currencyName} from ${senderName}`,\n    opts: {\n      recipient: {\n        gameId: pendingTransfer.receiver.gameId,\n      },\n    },\n  });\n  await Promise.all([messageToSender, messageToReceiver]);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "transfer",
+          "trigger": "transfer",
+          "description": null,
+          "helpText": "Transfer money to another player.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nasync function main() {\n  const { pog: sender, arguments: args, gameServerId, module: mod } = data;\n\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', gameServerId)).data.data.value;\n\n  const prefix = (await takaro.settings.settingsControllerGetOne('commandPrefix', gameServerId)).data.data.value;\n\n  // args.receiver has an argument type of \"player\". Arguments of this type are automatically resolved to the player's id.\n  // If the player doesn't exist or multiple players with the same name where found, it will have thrown an error before this command is executed.\n  const receiver = args.receiver;\n  const senderName = (await takaro.player.playerControllerGetOne(sender.playerId)).data.data.name;\n  const receiverName = (await takaro.player.playerControllerGetOne(receiver.playerId)).data.data.name;\n\n  if (mod.userConfig.pendingAmount !== 0 && args.amount >= mod.userConfig.pendingAmount) {\n    // create a variable to store confirmation requirement\n    // TODO: in the future, we should probably add an expiration date to this variable.\n    await takaro.variable.variableControllerCreate({\n      key: 'confirmTransfer',\n      value: JSON.stringify({\n        amount: args.amount,\n        receiver: {\n          id: receiver.id,\n          gameId: receiver.gameId,\n          playerId: receiver.playerId,\n        },\n      }),\n      moduleId: mod.moduleId,\n      playerId: sender.playerId,\n      gameServerId,\n    });\n\n    // NOTE: we should maybe check if the player has enough balance to send the amount since this is only checked when the transaction is executed.\n    await sender.pm(\n      `You are about to send ${args.amount} ${currencyName} to ${receiverName}. (Please confirm by typing ${prefix}confirmtransfer)`,\n    );\n    return;\n  }\n\n  try {\n    await takaro.playerOnGameserver.playerOnGameServerControllerTransactBetweenPlayers(\n      sender.gameServerId,\n      sender.id,\n      receiver.id,\n      {\n        currency: args.amount,\n        reason: 'Player transfer',\n      },\n    );\n  } catch {\n    throw new TakaroUserError(\n      `Failed to transfer ${args.amount} ${currencyName} to ${receiverName}. Are you sure you have enough balance?`,\n    );\n  }\n\n  const messageToReceiver = takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message: `You received ${args.amount} ${currencyName} from ${senderName}`,\n    opts: {\n      recipient: {\n        gameId: receiver.gameId,\n      },\n    },\n  });\n\n  await Promise.all([\n    sender.pm(`You successfully transferred ${args.amount} ${currencyName} to ${receiverName}`),\n    messageToReceiver,\n  ]);\n\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "receiver",
+              "type": "player",
+              "helpText": "The player to transfer money to.",
+              "position": 0,
+              "defaultValue": null
+            },
+            {
+              "name": "amount",
+              "type": "number",
+              "helpText": "The amount of money to transfer.",
+              "position": 1,
+              "defaultValue": null
+            }
+          ]
+        },
+        {
+          "name": "claim",
+          "trigger": "claim",
+          "description": null,
+          "helpText": "Claim your pending shop orders.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\nasync function searchOrders(filters) {\n  const res = await takaro.shopOrder.shopOrderControllerSearch({\n    filters,\n    sortBy: 'createdAt',\n    sortDirection: 'asc',\n  });\n  return res.data.data;\n}\n\nasync function main() {\n  const { user, player, arguments: args, gameServerId } = data;\n\n  if (!user) {\n    throw new TakaroUserError('You must link your account to Takaro to use this command.');\n  }\n\n  const scope = { userId: [user.id] };\n\n  // Only filter by gameServerId if it's available (should always be present in command context)\n  if (gameServerId) {\n    scope.gameServerId = [gameServerId];\n  }\n\n  // Paid orders first, then claimed ones whose items definitively could not be handed over\n  // (claiming one again retries the delivery), each oldest first. A failed delivery that keeps\n  // failing must not stand in front of an order that was never claimed.\n  const paid = await searchOrders({ ...scope, status: ['PAID'] });\n  const failedDelivery = await searchOrders({ ...scope, status: ['COMPLETED'], deliveryStatus: ['FAILED'] });\n  const pendingOrders = [...paid, ...failedDelivery];\n\n  if (pendingOrders.length === 0) {\n    await player.pm('You have no pending orders.');\n    return;\n  }\n\n  let claimedAny = false;\n  for (const order of pendingOrders) {\n    let claimed;\n    try {\n      claimed = (await takaro.shopOrder.shopOrderControllerClaim(order.id)).data.data;\n    } catch (error) {\n      // A failed delivery can become unclaimable (its listing was removed or unpublished). It\n      // must not block the orders behind it, so it is skipped; a paid order's refusal is not.\n      if (order.status === 'PAID') {\n        throw error;\n      }\n      continue;\n    }\n    claimedAny = true;\n    if (claimed.deliveryStatus === 'FAILED') {\n      await player.pm('The items of an order could not be handed over. Use /claim to try again.');\n    } else if (claimed.deliveryStatus === 'UNKNOWN') {\n      await player.pm('The delivery of an order could not be confirmed. Ask an admin to check it.');\n    }\n    if (!args.all) {\n      break;\n    }\n  }\n\n  if (!claimedAny) {\n    await player.pm('None of your pending orders can be claimed right now. Ask an admin to check them.');\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "all",
+              "type": "boolean",
+              "helpText": "If true, claim ALL pending orders. If false, claim only the first one.",
+              "position": 0,
+              "defaultValue": "false"
+            }
+          ]
+        },
+        {
+          "name": "shop",
+          "trigger": "shop",
+          "description": null,
+          "helpText": "Browse the shop and view available items.",
+          "function": "import { takaro, data, TakaroUserError } from '@takaro/helpers';\n\n// The six operator phrases of a listing's variable purchase restriction (GH #2522), restated here\n// because a module cannot import from app-api. Only the PHRASING is copied: this command never\n// evaluates the requirement, it only prints it - the refusal still comes from the server.\nconst REQUIREMENT_PHRASES = {\n  gte: 'at least',\n  gt: 'more than',\n  lte: 'at most',\n  lt: 'less than',\n  eq: 'exactly',\n  ne: 'not',\n};\n\n// oxlint-disable-next-line sonarjs/cognitive-complexity -- GH #4103\nasync function main() {\n  const { arguments: args, player, gameServerId } = data;\n  const { page, item, action } = args;\n  const prefix = (await takaro.settings.settingsControllerGetOne('commandPrefix', gameServerId)).data.data.value;\n\n  // If command is called without any arguments\n  const messageWithoutPrefix = data.chatMessage.msg.slice(prefix.length).trim();\n  if (!messageWithoutPrefix.includes(' ')) {\n    await player.pm('This command allows you to browse the shop and view available items.');\n    await player.pm(`Usage: ${prefix}shop [page] [item] [action]`);\n    await player.pm(`${prefix}shop 2 - View the second page of shop items`);\n    await player.pm(`${prefix}shop 1 3 - View details about the third item on the first page`);\n    await player.pm(`${prefix}shop 1 3 buy - Purchase the third item on the first page`);\n    return;\n  }\n\n  const shopItems = await takaro.shopListing.shopListingControllerSearch({\n    limit: 5,\n    page: page - 1,\n    sortBy: 'name',\n    sortDirection: 'asc',\n    filters: {\n      gameServerId: [gameServerId],\n      draft: false,\n    },\n  });\n\n  if (shopItems.data.data.length === 0) {\n    await player.pm('No items found.');\n    return;\n  }\n\n  const currencyName = (await takaro.settings.settingsControllerGetOne('currencyName', data.gameServerId)).data.data;\n\n  if (!item) {\n    // List the shop items with index\n    let index = 1;\n    for (const listing of shopItems.data.data) {\n      const items = listing.items.slice(0, 3).map((item) => {\n        return `${item.amount}x ${item.item.name}`;\n      });\n      // GH #2520 - a finite stock is shown so a player can see what is left before buying.\n      const stockNote = listing.stock === null || listing.stock === undefined ? '' : ` (${listing.stock} left)`;\n      await player.pm(\n        `${index} - ${listing.name} - ${listing.price} ${currencyName.value}${stockNote}. ${items.join(', ')}`,\n      );\n      index++;\n    }\n    return;\n  }\n\n  const selectedItem = shopItems.data.data[item - 1];\n  if (!selectedItem) {\n    throw new TakaroUserError(\n      `Item not found. Please select an item from the list, valid options are 1-${shopItems.data.data.length}.`,\n    );\n  }\n\n  if (action === 'none') {\n    // Display more info about the item\n    await player.pm(`Listing ${selectedItem.name} - ${selectedItem.price} ${currencyName.value}`);\n    if (selectedItem.requiredVariableKey) {\n      const phrase = REQUIREMENT_PHRASES[selectedItem.requiredVariableOperator];\n      await player.pm(\n        `Requires ${selectedItem.requiredVariableKey} ${phrase} ${selectedItem.requiredVariableThreshold}.`,\n      );\n    }\n    await Promise.all(\n      selectedItem.items.map((item) => {\n        const quality = item.quality ? `Quality: ${item.quality}` : '';\n        const description = (item.item.description ? `Description: ${item.item.description}` : '').replaceAll(\n          '\\\\n',\n          ' ',\n        );\n\n        return player.pm(`- ${item.amount}x ${item.item.name}. ${quality} ${description}`);\n      }),\n    );\n    return;\n  }\n\n  if (action === 'buy') {\n    // Only a TakaroUserError reaches the player - anything else is shown as the generic\n    // \"Oops, something went wrong\". A refusal (GH #2520, GH #2522) is always a 400 carrying the\n    // reason, so translate that one status and let everything else rethrow: a 500's internals are\n    // not game chat, and a bug should look like a bug.\n    let orderRes;\n    try {\n      orderRes = await takaro.shopOrder.shopOrderControllerCreate({\n        amount: 1,\n        listingId: selectedItem.id,\n        playerId: player.id,\n      });\n    } catch (error) {\n      const apiMessage = error.response?.status === 400 ? error.response?.data?.meta?.error?.message : null;\n      if (!apiMessage) {\n        throw error;\n      }\n      throw new TakaroUserError(apiMessage);\n    }\n\n    // An instant listing comes back already COMPLETED; anything else still has to be claimed.\n    // Only a COMPLETED order whose items were confirmed (or that had none) is a purchase to report.\n    // The money is gone and the order stands either way, so buying again is never the advice.\n    const pending = `Your purchase of ${selectedItem.name} went through, but it could not be handed over yet. Use /claim once you are in game to receive it.`;\n    let order = orderRes.data.data;\n    if (order.status === 'PAID') {\n      try {\n        order = (await takaro.shopOrder.shopOrderControllerClaim(order.id)).data.data;\n      } catch {\n        await player.pm(pending);\n        return;\n      }\n    }\n\n    if (order.status === 'COMPLETED' && order.deliveryStatus === 'UNKNOWN') {\n      await player.pm(\n        `Your purchase of ${selectedItem.name} went through, but Takaro could not confirm the items were handed over. Ask an admin to check it, and do not buy it again.`,\n      );\n      return;\n    }\n    if (\n      order.status !== 'COMPLETED' ||\n      (order.deliveryStatus !== 'DELIVERED' && order.deliveryStatus !== 'NOT_APPLICABLE')\n    ) {\n      await player.pm(pending);\n      return;\n    }\n\n    await player.pm(`You have purchased ${selectedItem.name} for ${selectedItem.price} ${currencyName.value}.`);\n    return;\n  }\n\n  throw new TakaroUserError('Invalid action. Valid actions are \"buy\".');\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "page",
+              "type": "number",
+              "helpText": "Display more items from the shop by specifying a page number.",
+              "position": 0,
+              "defaultValue": "1"
+            },
+            {
+              "name": "item",
+              "type": "number",
+              "helpText": "Select a specific item to view more details.",
+              "position": 1,
+              "defaultValue": "0"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "helpText": "Perform an action on the selected item. Currently only \"buy\" is supported.",
+              "position": 2,
+              "defaultValue": "none"
+            }
+          ]
+        }
+      ],
+      "hooks": [],
+      "cronJobs": [
+        {
+          "name": "zombieKillReward",
+          "temporalValue": "*/5 * * * *",
+          "description": null,
+          "function": "import { data, takaro, checkPermission } from '@takaro/helpers';\n\nconst VARIABLE_KEY = 'lastZombieKillReward';\nconst EVENT_INDEX_DELAY_MS = 30 * 1000;\n\nasync function main() {\n  const { gameServerId, module: mod } = data;\n\n  const lastRunRes = (\n    await takaro.variable.variableControllerSearch({\n      filters: {\n        key: [VARIABLE_KEY],\n        gameServerId: [gameServerId],\n        moduleId: [mod.moduleId],\n      },\n    })\n  ).data.data;\n\n  // We last ran the rewards script at this time\n  // If this is the first time we run it, just get the last 5 minutes\n  const lastRun = lastRunRes.length ? new Date(JSON.parse(lastRunRes[0].value)) : new Date(Date.now() - 5 * 60 * 1000);\n\n  const windowEnd = new Date(Date.now() - EVENT_INDEX_DELAY_MS);\n\n  // Fetch all the kill events since the last time we gave out rewards\n  const killEvents = (\n    await takaro.event.eventControllerSearch({\n      filters: { eventName: ['entity-killed'], gameserverId: [gameServerId] },\n      greaterThan: { createdAt: lastRun.toISOString() },\n      lessThan: { createdAt: windowEnd.toISOString() },\n      limit: 1000,\n    })\n  ).data.data;\n\n  console.log(`Found ${killEvents.length} kill events since ${lastRun.toISOString()}`);\n\n  // Group the events by player\n  const playerKills = {};\n  for (const killEvent of killEvents) {\n    if (!playerKills[killEvent.playerId]) {\n      playerKills[killEvent.playerId] = [];\n    }\n\n    playerKills[killEvent.playerId].push(killEvent);\n  }\n\n  // Give each player their reward\n  // We use Promise.allSettled to run this concurrently\n  const results = await Promise.allSettled(\n    Object.entries(playerKills).map(async ([playerId, kills]) => {\n      const pog = (await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(gameServerId, playerId)).data\n        .data;\n      const hasPermission = checkPermission(pog, 'ZOMBIE_KILL_REWARD_OVERRIDE');\n      const defaultReward = mod.userConfig.zombieKillReward;\n      const reward =\n        hasPermission && hasPermission.count !== null && hasPermission.count !== undefined\n          ? hasPermission.count\n          : defaultReward;\n      const totalReward = reward * kills.length;\n      return takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(gameServerId, playerId, {\n        currency: totalReward,\n        reason: 'Zombie kill reward',\n      });\n    }),\n  );\n\n  // Log any errors\n  for (const result of results) {\n    if (result.status === 'rejected') {\n      console.error(result.reason);\n      throw new Error(`Failed to give rewards: ${result.reason}`);\n    }\n  }\n\n  // Update the last run time\n  if (lastRunRes.length) {\n    await takaro.variable.variableControllerUpdate(lastRunRes[0].id, {\n      value: JSON.stringify(windowEnd),\n    });\n  } else {\n    await takaro.variable.variableControllerCreate({\n      key: VARIABLE_KEY,\n      value: JSON.stringify(windowEnd),\n      moduleId: mod.moduleId,\n      gameServerId,\n    });\n  }\n}\n\nawait main();\n"
+        }
+      ],
+      "functions": [],
+      "permissions": [
+        {
+          "permission": "ECONOMY_UTILS_MANAGE_CURRENCY",
+          "friendlyName": "Manage currency",
+          "description": "Allows players to manage currency of other players. This includes granting and revoking currency.",
+          "canHaveCount": false
+        },
+        {
+          "permission": "ZOMBIE_KILL_REWARD_OVERRIDE",
+          "friendlyName": "Zombie kill reward override",
+          "description": "Allows a role to override the amount of currency a player receives for killing a entity.",
+          "canHaveCount": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "timedShutdown",
+  "author": "Takaro",
+  "description": "Automatically shut down the server at a specific time.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "warningMessage": {
+        "type": "string",
+        "title": "Warning message",
+        "description": "Message to send to players before the server shuts down.",
+        "default": "Server is shutting down in 5 minutes!",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "required": [
+      "warningMessage"
+    ]
+  },
+  "cronJobs": {
+    "Shutdown": {
+      "temporalValue": "30 3 * * *",
+      "description": null,
+      "function": "src/cronjobs/Shutdown/index.js"
+    },
+    "warning": {
+      "temporalValue": "25 3 * * *",
+      "description": null,
+      "function": "src/cronjobs/warning/index.js"
+    }
+  }
+}

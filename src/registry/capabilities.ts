@@ -20,9 +20,13 @@ const METHOD_CAPABILITIES: Record<string, string> = {
 };
 
 export function deriveRequiredCapabilities(version: ModuleVersion): string[] {
-  const code = [...version.commands, ...version.hooks, ...version.cronJobs, ...version.functions].map(
-    (entity) => entity.function,
-  );
+  const code = [
+    ...version.commands,
+    ...version.hooks,
+    ...version.cronJobs,
+    ...version.functions,
+    ...(version.shopActions ?? []),
+  ].map((entity) => entity.function);
   const capabilities = new Set<string>();
   for (const source of code) {
     for (const match of source.matchAll(/gameServerController([A-Za-z]+)/g)) {

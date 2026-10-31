@@ -15,7 +15,9 @@ import {
   LocalHookDef,
   LocalCronJobDef,
   LocalFunctionDef,
+  LocalShopActionDef,
 } from '../types/module.js';
+import { EMPTY_CONFIG_SCHEMA } from '../registry/export.js';
 import { validateEntityName as assertEntityName } from '../utils/validate.js';
 
 function validateEntityName(entityName: string, entityType: string): void {
@@ -117,6 +119,15 @@ if (version.functions) {
     }
   }
 }
+if (version.shopActions) {
+  for (const action of version.shopActions) {
+    validateEntityName(action.name, 'shopAction');
+    if (!action.function || typeof action.function !== 'string') {
+      console.error(`ERROR: shopAction '${action.name}' is missing required field 'function' (JS code)`);
+      process.exit(1);
+    }
+  }
+}
 
 console.error(`Extracting module '${name}' to ${outputDir}`);
 if (fs.existsSync(outputDir)) {
@@ -133,16 +144,15 @@ const newModule: LocalModuleJson = {
   supportedGames,
 };
 
-// Parse and inline the config schema — only include if it has actual properties
+// Inline the config schema unless it is the one the exporter writes for a module without config,
+// so any other schema (even one without properties) survives a round trip.
 try {
-  const configSchema =
-    typeof version.configSchema === 'string'
-      ? (JSON.parse(version.configSchema) as Record<string, unknown>)
-      : ((version.configSchema ?? {}) as Record<string, unknown>);
-  const props = configSchema['properties'];
-  const hasProperties = props !== null && typeof props === 'object' && !Array.isArray(props) && Object.keys(props as object).length > 0;
-  if (hasProperties) {
-    newModule.config = configSchema;
+  if (version.configSchema != null) {
+    const configText =
+      typeof version.configSchema === 'string' ? version.configSchema : JSON.stringify(version.configSchema);
+    if (configText !== EMPTY_CONFIG_SCHEMA) {
+      newModule.config = JSON.parse(configText) as Record<string, unknown>;
+    }
   }
 } catch (err) {
   console.error(`WARN: Failed to parse configSchema, omitting: ${(err as Error).message}`);
@@ -184,6 +194,9 @@ if (version.commands && version.commands.length > 0) {
       function: relPath,
       arguments: cmd.arguments ?? [],
     };
+    if (cmd.requiredPermissions && cmd.requiredPermissions.length > 0) {
+      commands[cmd.name].requiredPermissions = cmd.requiredPermissions;
+    }
     console.error(`  command: ${cmd.name}`);
   }
   newModule.commands = commands;
@@ -245,6 +258,32 @@ if (version.functions && version.functions.length > 0) {
     console.error(`  function: ${fn.name}`);
   }
   newModule.functions = functions;
+}
+
+// Shop actions
+if (version.shopActions && version.shopActions.length > 0) {
+  const actionsDir = path.join(outputDir, 'src', 'shopActions');
+  const shopActions: Record<string, LocalShopActionDef> = {};
+  for (const action of version.shopActions) {
+    const actionDir = path.join(actionsDir, action.name);
+    fs.mkdirSync(actionDir, { recursive: true });
+    fs.writeFileSync(path.join(actionDir, 'index.js'), action.function);
+    shopActions[action.name] = {
+      description: action.description ?? null,
+      function: `src/shopActions/${action.name}/index.js`,
+    };
+    console.error(`  shopAction: ${action.name}`);
+  }
+  newModule.shopActions = shopActions;
+}
+
+if (version.defaultSystemConfig) {
+  try {
+    newModule.defaultSystemConfig = JSON.parse(version.defaultSystemConfig) as Record<string, unknown>;
+  } catch (err) {
+    console.error(`ERROR: Failed to parse defaultSystemConfig: ${(err as Error).message}`);
+    process.exit(1);
+  }
 }
 
 // Write the single consolidated module.json

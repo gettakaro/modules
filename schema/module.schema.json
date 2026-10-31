@@ -29,7 +29,8 @@
         "description": { "type": ["string", "null"], "description": "What the command does." },
         "helpText": { "type": "string", "description": "Usage text shown in the command help." },
         "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the command code, relative to the module directory." },
-        "arguments": { "type": "array", "items": { "$ref": "#/definitions/commandArgument" }, "description": "Arguments of the command." }
+        "arguments": { "type": "array", "items": { "$ref": "#/definitions/commandArgument" }, "description": "Arguments of the command." },
+        "requiredPermissions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Permission keys a player must hold to run the command. Takaro checks them before the command code runs." }
       }
     },
     "hook": {
@@ -61,6 +62,15 @@
         "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the shared function code, relative to the module directory." }
       }
     },
+    "shopAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["function"],
+      "properties": {
+        "description": { "type": ["string", "null"], "description": "What the shop action does when a player buys a listing that uses it." },
+        "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the shop action code, relative to the module directory." }
+      }
+    },
     "permission": {
       "type": "object",
       "additionalProperties": false,
@@ -88,6 +98,7 @@
     "commands": { "type": "object", "additionalProperties": { "$ref": "#/definitions/command" }, "description": "Chat commands, keyed by command name." },
     "hooks": { "type": "object", "additionalProperties": { "$ref": "#/definitions/hook" }, "description": "Event hooks, keyed by hook name." },
     "cronJobs": { "type": "object", "additionalProperties": { "$ref": "#/definitions/cronJob" }, "description": "Scheduled jobs, keyed by job name." },
-    "functions": { "type": "object", "additionalProperties": { "$ref": "#/definitions/function" }, "description": "Shared functions other code in the module can import, keyed by function name." }
+    "functions": { "type": "object", "additionalProperties": { "$ref": "#/definitions/function" }, "description": "Shared functions other code in the module can import, keyed by function name." },
+    "shopActions": { "type": "object", "additionalProperties": { "$ref": "#/definitions/shopAction" }, "description": "Shop actions, keyed by action name. A shop listing can run one when a player buys it." }
   }
 }

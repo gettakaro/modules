@@ -1,0 +1,34 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "timedShutdown",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Automatically shut down the server at a specific time.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"warningMessage\":{\"type\":\"string\",\"title\":\"Warning message\",\"description\":\"Message to send to players before the server shuts down.\",\"default\":\"Server is shutting down in 5 minutes!\",\"minLength\":1,\"maxLength\":1024}},\"required\":[\"warningMessage\"]}",
+      "uiSchema": "{}",
+      "commands": [],
+      "hooks": [],
+      "cronJobs": [
+        {
+          "name": "Shutdown",
+          "temporalValue": "30 3 * * *",
+          "description": null,
+          "function": "import { data, takaro } from '@takaro/helpers';\n\nasync function main() {\n  const { gameServerId } = data;\n  await takaro.gameserver.gameServerControllerShutdown(gameServerId);\n}\n\nawait main();\n"
+        },
+        {
+          "name": "warning",
+          "temporalValue": "25 3 * * *",
+          "description": null,
+          "function": "import { data, takaro } from '@takaro/helpers';\n\nasync function main() {\n  const { gameServerId } = data;\n\n  const msg = data.module.userConfig.warningMessage;\n\n  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message: msg,\n  });\n}\n\nawait main();\n"
+        }
+      ],
+      "functions": [],
+      "permissions": []
+    }
+  ]
+}

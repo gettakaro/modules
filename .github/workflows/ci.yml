@@ -35,6 +35,18 @@ jobs:
             npm run registry:check -- --base "$BASE"
           fi
 
+  module-tests:
+    name: Module tests (module-VM harness)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run test:modules
+
   minecraft-bot:
     name: Minecraft dev environment bot
     runs-on: ubuntu-latest
