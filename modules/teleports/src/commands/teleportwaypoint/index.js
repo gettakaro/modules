@@ -25,7 +25,7 @@ async function main() {
   const teleportsModule = (
     await takaro.module.moduleControllerSearch({
       filters: {
-        builtin: ['teleports'],
+        name: ['teleports'],
       },
     })
   ).data.data[0];
