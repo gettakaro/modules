@@ -1,0 +1,215 @@
+{
+  "name": "teleports",
+  "author": "Takaro",
+  "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "7 days to die",
+    "rust",
+    "minecraft"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "timeout": {
+        "title": "Timeout",
+        "description": "The time one has to wait before teleporting again.",
+        "x-component": "duration",
+        "type": "number",
+        "minimum": 0,
+        "default": 1000
+      },
+      "allowPublicTeleports": {
+        "type": "boolean",
+        "description": "Players can create public teleports.",
+        "default": false
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "timeout": {
+      "ui:widget": "duration"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "TELEPORTS_CREATE_PUBLIC",
+      "friendlyName": "Create Public Teleports",
+      "description": "Allows the player to create public teleports.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "TELEPORTS_USE",
+      "friendlyName": "Use Teleports",
+      "description": "Allows the player to use teleports modules.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "TELEPORTS_MANAGE_WAYPOINTS",
+      "friendlyName": "Manage waypoints",
+      "description": "Allows creating, deleting, and managing waypoints.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "teleport": {
+      "trigger": "tp",
+      "description": null,
+      "helpText": "Teleports to one of your set locations.",
+      "function": "src/commands/teleport/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location to teleport to.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
+      ]
+    },
+    "tplist": {
+      "trigger": "tplist",
+      "description": null,
+      "helpText": "Lists all your set locations.",
+      "function": "src/commands/tplist/index.js",
+      "arguments": [],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
+      ]
+    },
+    "settp": {
+      "trigger": "settp",
+      "description": null,
+      "helpText": "Sets a location to teleport to.",
+      "function": "src/commands/settp/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_USE"
+      ]
+    },
+    "deletetp": {
+      "trigger": "deletetp",
+      "description": null,
+      "helpText": "Deletes a location.",
+      "function": "src/commands/deletetp/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ]
+    },
+    "setpublic": {
+      "trigger": "setpublic",
+      "description": null,
+      "helpText": "Sets a teleport to be public, allowing other players to teleport to it.",
+      "function": "src/commands/setpublic/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_CREATE_PUBLIC"
+      ]
+    },
+    "setprivate": {
+      "trigger": "setprivate",
+      "description": null,
+      "helpText": "Sets a teleport to be private, only the teleport owner can teleport to it.",
+      "function": "src/commands/setprivate/index.js",
+      "arguments": [
+        {
+          "name": "tp",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ]
+    },
+    "setwaypoint": {
+      "trigger": "setwaypoint",
+      "description": null,
+      "helpText": "Creates a new waypoint.",
+      "function": "src/commands/setwaypoint/index.js",
+      "arguments": [
+        {
+          "name": "waypoint",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_MANAGE_WAYPOINTS"
+      ]
+    },
+    "deletewaypoint": {
+      "trigger": "deletewaypoint",
+      "description": null,
+      "helpText": "Deletes a waypoint.",
+      "function": "src/commands/deletewaypoint/index.js",
+      "arguments": [
+        {
+          "name": "waypoint",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "The location name.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TELEPORTS_MANAGE_WAYPOINTS"
+      ]
+    },
+    "listwaypoints": {
+      "trigger": "waypoints",
+      "description": null,
+      "helpText": "Lists all waypoints.",
+      "function": "src/commands/listwaypoints/index.js",
+      "arguments": []
+    },
+    "teleportwaypoint": {
+      "trigger": "teleportwaypoint",
+      "description": null,
+      "helpText": "Placeholder command, this will not be used directly. The module will install aliases for this command corresponding to the waypoint names.",
+      "function": "src/commands/teleportwaypoint/index.js",
+      "arguments": []
+    }
+  },
+  "cronJobs": {
+    "Waypoint reconciler": {
+      "temporalValue": "*/30 * * * *",
+      "description": null,
+      "function": "src/cronjobs/Waypoint reconciler/index.js"
+    }
+  },
+  "functions": {
+    "utils": {
+      "function": "src/functions/utils.js"
+    }
+  }
+}

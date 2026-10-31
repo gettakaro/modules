@@ -1,0 +1,99 @@
+{
+  "name": "shopActions",
+  "author": "Takaro",
+  "description": "Built-in shop actions for common use cases like granting roles, sending messages, giving an Item Set, and executing commands. The give-item action gives an Item Set, managed on the server's Item Sets page. Upgrading from 0.0.1 unlinks every shop listing that uses one of these actions; re-link each listing to this version's action afterwards.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "grantRole": {
+        "type": "object",
+        "title": "Grant Role",
+        "properties": {
+          "roleId": {
+            "type": "string",
+            "x-component": "role",
+            "title": "Role",
+            "description": "The Takaro role to grant to the player."
+          }
+        }
+      },
+      "sendMessage": {
+        "type": "object",
+        "title": "Send Message",
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "The message to send.",
+            "default": "Thank you for your purchase!"
+          },
+          "broadcast": {
+            "type": "boolean",
+            "title": "Broadcast",
+            "description": "If true, sends to all players. Otherwise, only to the buyer.",
+            "default": false
+          }
+        }
+      },
+      "giveItem": {
+        "type": "object",
+        "title": "Give Item",
+        "properties": {
+          "itemSet": {
+            "type": "string",
+            "title": "Bonus item set",
+            "description": "The item set the buyer receives as a bonus on purchase.",
+            "x-component": "itemSet"
+          }
+        }
+      },
+      "executeCommand": {
+        "type": "object",
+        "title": "Execute Command",
+        "properties": {
+          "command": {
+            "type": "string",
+            "title": "Command",
+            "description": "The console command to execute on the game server."
+          }
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "grantRole": {
+      "roleId": {
+        "ui:widget": "role"
+      }
+    },
+    "giveItem": {
+      "itemSet": {
+        "ui:widget": "itemSet"
+      }
+    }
+  },
+  "shopActions": {
+    "grantRole": {
+      "description": "Grants a Takaro role to the player who made the purchase.",
+      "function": "src/shopActions/grantRole/index.js"
+    },
+    "sendMessage": {
+      "description": "Sends an in-game message to the buyer or broadcasts to all players.",
+      "function": "src/shopActions/sendMessage/index.js"
+    },
+    "giveItem": {
+      "description": "Gives an Item Set as a bonus to the player who made the purchase.",
+      "function": "src/shopActions/giveItem/index.js"
+    },
+    "executeCommand": {
+      "description": "Executes a console command on the game server.",
+      "function": "src/shopActions/executeCommand/index.js"
+    }
+  }
+}

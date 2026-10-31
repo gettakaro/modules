@@ -1,0 +1,39 @@
+{
+  "name": "serverMessages",
+  "author": "Takaro",
+  "description": "Send automated, rotated, configurable messages to players on the server.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "messages": {
+        "type": "array",
+        "title": "Messages",
+        "description": "List of messages that will be sent to players on the server.",
+        "default": [
+          "This is an automated message, don't forget to read the server rules!"
+        ],
+        "items": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1024
+        },
+        "minItems": 1
+      }
+    },
+    "required": [
+      "messages"
+    ]
+  },
+  "cronJobs": {
+    "Automated message": {
+      "temporalValue": "*/30 * * * *",
+      "description": null,
+      "function": "src/cronjobs/Automated message/index.js"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "utils",
+  "author": "Takaro",
+  "description": "A collection of useful commands",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false
+  },
+  "commands": {
+    "ping": {
+      "trigger": "ping",
+      "description": null,
+      "helpText": "Replies with pong, useful for testing if the connection works.",
+      "function": "src/commands/ping/index.js",
+      "arguments": []
+    },
+    "help": {
+      "trigger": "help",
+      "description": null,
+      "helpText": "The text you are reading right now, displays information about commands.",
+      "function": "src/commands/help/index.js",
+      "arguments": [
+        {
+          "name": "command",
+          "type": "string",
+          "defaultValue": "all",
+          "helpText": "The command to get help for, or \"search\" to search for commands",
+          "position": 0
+        },
+        {
+          "name": "searchTerm",
+          "type": "string",
+          "defaultValue": "none",
+          "helpText": "Search term to find commands (when first argument is \"search\")",
+          "position": 1
+        }
+      ]
+    }
+  }
+}
