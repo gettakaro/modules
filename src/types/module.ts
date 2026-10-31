@@ -18,6 +18,8 @@ export interface ModuleCommand {
   helpText: string;
   function: string;
   arguments: CommandArgument[];
+  /** Permissions a player needs to run the command. */
+  requiredPermissions?: string[];
 }
 
 export interface ModuleHook {
@@ -40,6 +42,12 @@ export interface ModuleFunction {
   function: string;
 }
 
+export interface ModuleShopAction {
+  name: string;
+  description: string | null;
+  function: string;
+}
+
 export interface ModulePermission {
   permission: string;
   friendlyName: string;
@@ -57,6 +65,7 @@ export interface ModuleVersion {
   cronJobs: ModuleCronJob[];
   functions: ModuleFunction[];
   permissions: ModulePermission[];
+  shopActions?: ModuleShopAction[];
   /** JSON string of the default system config */
   defaultSystemConfig?: string;
 }
@@ -77,6 +86,7 @@ export interface LocalCommandDef {
   helpText?: string;
   function: string;
   arguments?: CommandArgument[];
+  requiredPermissions?: string[];
 }
 
 export interface LocalHookDef {
@@ -96,6 +106,11 @@ export interface LocalFunctionDef {
   function: string;
 }
 
+export interface LocalShopActionDef {
+  description?: string | null;
+  function: string;
+}
+
 export interface LocalModuleJson {
   name: string;
   author?: string;
@@ -109,6 +124,7 @@ export interface LocalModuleJson {
   hooks?: Record<string, LocalHookDef>;
   cronJobs?: Record<string, LocalCronJobDef>;
   functions?: Record<string, LocalFunctionDef>;
+  shopActions?: Record<string, LocalShopActionDef>;
   defaultSystemConfig?: Record<string, unknown>;
   /** Short manifest description, at most 500 characters. Used instead of `description` when present. */
   summary?: string;

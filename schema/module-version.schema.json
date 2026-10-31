@@ -29,7 +29,8 @@
         "description": { "type": ["string", "null"], "description": "What the command does." },
         "helpText": { "type": "string", "description": "Usage text." },
         "function": { "type": "string", "description": "The command's JavaScript code." },
-        "arguments": { "type": "array", "items": { "$ref": "#/definitions/argument" }, "description": "Command arguments." }
+        "arguments": { "type": "array", "items": { "$ref": "#/definitions/argument" }, "description": "Command arguments." },
+        "requiredPermissions": { "type": "array", "items": { "type": "string" }, "description": "Permission keys a player must hold to run the command. Present only when the module declares them." }
       }
     },
     "hook": {
@@ -64,6 +65,16 @@
         "function": { "type": "string", "description": "The function's JavaScript code." }
       }
     },
+    "shopAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "function"],
+      "properties": {
+        "name": { "type": "string", "description": "Shop action name." },
+        "description": { "type": ["string", "null"], "description": "What the shop action does." },
+        "function": { "type": "string", "description": "The shop action's JavaScript code." }
+      }
+    },
     "permission": {
       "type": "object",
       "additionalProperties": false,
@@ -89,7 +100,8 @@
         "hooks": { "type": "array", "items": { "$ref": "#/definitions/hook" }, "description": "Event hooks." },
         "cronJobs": { "type": "array", "items": { "$ref": "#/definitions/cronJob" }, "description": "Scheduled jobs." },
         "functions": { "type": "array", "items": { "$ref": "#/definitions/function" }, "description": "Shared functions." },
-        "permissions": { "type": "array", "items": { "$ref": "#/definitions/permission" }, "description": "Permissions." }
+        "permissions": { "type": "array", "items": { "$ref": "#/definitions/permission" }, "description": "Permissions." },
+        "shopActions": { "type": "array", "items": { "$ref": "#/definitions/shopAction" }, "description": "Shop actions. Present only when the module declares them." }
       }
     }
   },

@@ -6,6 +6,7 @@ import {
   ModuleCronJob,
   ModuleFunction,
   ModuleHook,
+  ModuleShopAction,
   TakaroModuleExport,
   ModuleVersion,
 } from '../types/module.js';
@@ -13,7 +14,7 @@ import { validateEntityName } from '../utils/validate.js';
 
 export class ModuleSourceError extends Error {}
 
-const EMPTY_CONFIG_SCHEMA =
+export const EMPTY_CONFIG_SCHEMA =
   '{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{},"required":[],"additionalProperties":false}';
 
 export function readModuleJson(moduleDir: string): LocalModuleJson {
@@ -70,7 +71,7 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
   const mod = readModuleJson(moduleDir);
 
   checkName(mod.name ?? '', 'module');
-  for (const field of ['commands', 'hooks', 'cronJobs', 'functions', 'config', 'uiSchema'] as const) {
+  for (const field of ['commands', 'hooks', 'cronJobs', 'functions', 'shopActions', 'config', 'uiSchema'] as const) {
     requirePlainObject(moduleJsonPath, field, mod[field]);
   }
 
@@ -83,7 +84,7 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
     if (!def.function) {
       throw new ModuleSourceError(`command '${name}' is missing required field 'function' (path to JS file)`);
     }
-    return {
+    const command: ModuleCommand = {
       name,
       trigger: def.trigger ?? name,
       description: def.description ?? null,
@@ -91,6 +92,8 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
       function: readJsFile(moduleDir, def.function, `command '${name}'`),
       arguments: def.arguments ?? [],
     };
+    if (def.requiredPermissions !== undefined) command.requiredPermissions = def.requiredPermissions;
+    return command;
   });
 
   const hooks: ModuleHook[] = entries(mod.hooks).map(([name, def]) => {
@@ -142,6 +145,20 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
     functions,
     permissions: mod.permissions ?? [],
   };
+  // Conditional so versions published before shop actions existed keep their exact bytes.
+  if (mod.shopActions !== undefined) {
+    version.shopActions = entries(mod.shopActions).map(([name, def]): ModuleShopAction => {
+      checkName(name, 'shopAction');
+      if (!def.function) {
+        throw new ModuleSourceError(`shopAction '${name}' is missing required field 'function' (path to JS file)`);
+      }
+      return {
+        name,
+        description: def.description ?? null,
+        function: readJsFile(moduleDir, def.function, `shopAction '${name}'`),
+      };
+    });
+  }
   if (mod.defaultSystemConfig !== undefined) {
     requirePlainObject(moduleJsonPath, 'defaultSystemConfig', mod.defaultSystemConfig);
     version.defaultSystemConfig = JSON.stringify(mod.defaultSystemConfig);
