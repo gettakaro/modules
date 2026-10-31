@@ -1,6 +1,6 @@
 name: Publish registry
 
-# Publish notifications (repository_dispatch) are added separately.
+# The monorepo notification is added by gettakaro/takaro#4630.
 
 on:
   push:
@@ -65,3 +65,25 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # takaro.io/modules is built from a committed mirror of this registry. The dispatch makes the
+  # website refresh that mirror now instead of at its next daily run (gettakaro/static-sites#29).
+  notify-website:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy
+    runs-on: ubuntu-latest
+    # The dispatch uses the CI App token, so this job needs none of the workflow's Pages grants.
+    permissions: {}
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.TAKARO_CI_APP_ID }}
+          private-key: ${{ secrets.TAKARO_CI_APP_PRIV_KEY }}
+          owner: gettakaro
+          repositories: static-sites
+      - name: Ask takaro.io to refresh its module pages
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh api repos/gettakaro/static-sites/dispatches -f event_type=module-registry-published
