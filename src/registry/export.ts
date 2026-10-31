@@ -92,7 +92,7 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
       function: readJsFile(moduleDir, def.function, `command '${name}'`),
       arguments: def.arguments ?? [],
     };
-    if (def.requiredPermissions !== undefined) command.requiredPermissions = def.requiredPermissions;
+    if (def.requiredPermissions?.length) command.requiredPermissions = def.requiredPermissions;
     return command;
   });
 
@@ -145,8 +145,9 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
     functions,
     permissions: mod.permissions ?? [],
   };
-  // Conditional so versions published before shop actions existed keep their exact bytes.
-  if (mod.shopActions !== undefined) {
+  // Conditional so versions published before shop actions existed keep their exact bytes; an empty
+  // declaration is left out too, matching what json-to-module writes back.
+  if (mod.shopActions !== undefined && Object.keys(mod.shopActions).length > 0) {
     version.shopActions = entries(mod.shopActions).map(([name, def]): ModuleShopAction => {
       checkName(name, 'shopAction');
       if (!def.function) {

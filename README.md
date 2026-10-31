@@ -73,7 +73,8 @@ In Takaro, subscribe a domain to `https://gettakaro.github.io/modules` and insta
 domain, `registry.takaro.io`, will follow.
 
 The modules Takaro used to bundle are published here under their existing camelCase names. Each `1.0.0` holds the
-same content as the last version Takaro bundled:
+same content as the last version Takaro bundled, except that teleports' `teleportwaypoint` finds the teleports module
+by name instead of the built-in flag:
 
 - `chatBridge`
 - `dailyRewards`

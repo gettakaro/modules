@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,9 +10,12 @@ import { schemaErrors } from '../src/registry/schema.js';
 const GREET = "import { data } from '@takaro/helpers';\nawait data.pog.pm('hi');\n";
 const GIVE = "import { takaro } from '@takaro/helpers';\nawait takaro.gameserver.gameServerControllerGiveItem();\n";
 
-/** A module directory in a temp dir: module.json plus the given files. */
+const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-export-'));
+after(() => fs.rmSync(workDir, { recursive: true, force: true }));
+
+/** A module directory below the test's temp dir: module.json plus the given files. */
 function moduleDir(moduleJson: Record<string, unknown>, files: Record<string, string>): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-export-'));
+  const dir = fs.mkdtempSync(path.join(workDir, 'module-'));
   for (const [rel, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.writeFileSync(path.join(dir, rel), text);
@@ -46,13 +49,14 @@ describe('module export', () => {
     assert.deepEqual(schemaErrors('moduleVersion', exported), []);
   });
 
-  it('adds neither key when module.json declares neither', () => {
-    const exported = buildModuleExport(
-      moduleDir({ ...base, commands: { greet: { function: 'src/greet.js' } } }, { 'src/greet.js': GREET }),
-    );
-    const version = exported.versions[0];
-    assert.equal('shopActions' in version, false);
-    assert.equal('requiredPermissions' in version.commands[0], false);
+  it('adds neither key when module.json declares neither, or declares them empty', () => {
+    const absent = { ...base, commands: { greet: { function: 'src/greet.js' } } };
+    const empty = { ...base, commands: { greet: { function: 'src/greet.js', requiredPermissions: [] } }, shopActions: {} };
+    for (const moduleJson of [absent, empty]) {
+      const version = buildModuleExport(moduleDir(moduleJson, { 'src/greet.js': GREET })).versions[0];
+      assert.equal('shopActions' in version, false);
+      assert.equal('requiredPermissions' in version.commands[0], false);
+    }
   });
 
   it('derives capabilities from shop action code', () => {

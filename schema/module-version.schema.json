@@ -30,7 +30,7 @@
         "helpText": { "type": "string", "description": "Usage text." },
         "function": { "type": "string", "description": "The command's JavaScript code." },
         "arguments": { "type": "array", "items": { "$ref": "#/definitions/argument" }, "description": "Command arguments." },
-        "requiredPermissions": { "type": "array", "items": { "type": "string" }, "description": "Permission keys a player must hold to run the command. Present only when the module declares them." }
+        "requiredPermissions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Permission keys a player must hold to run the command. Present only when the module declares at least one." }
       }
     },
     "hook": {
@@ -101,7 +101,7 @@
         "cronJobs": { "type": "array", "items": { "$ref": "#/definitions/cronJob" }, "description": "Scheduled jobs." },
         "functions": { "type": "array", "items": { "$ref": "#/definitions/function" }, "description": "Shared functions." },
         "permissions": { "type": "array", "items": { "$ref": "#/definitions/permission" }, "description": "Permissions." },
-        "shopActions": { "type": "array", "items": { "$ref": "#/definitions/shopAction" }, "description": "Shop actions. Present only when the module declares them." }
+        "shopActions": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/shopAction" }, "description": "Shop actions. Present only when the module declares at least one." }
       }
     }
   },

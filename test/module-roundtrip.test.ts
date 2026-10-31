@@ -32,12 +32,13 @@ describe('module round trip', () => {
     it(`${versionFile} survives json-to-module and back`, () => {
       const published = fs.readFileSync(path.join(registryDir, versionFile), 'utf-8');
       const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'roundtrip-'));
-      const moduleDir = path.join(workDir, 'module');
-      execFileSync(process.execPath, [converter, path.join(registryDir, versionFile), moduleDir], { stdio: 'pipe' });
-      const exported = canonicalJson(buildModuleExport(moduleDir));
-      fs.rmSync(workDir, { recursive: true });
-
-      assert.equal(exported, published);
+      try {
+        const moduleDir = path.join(workDir, 'module');
+        execFileSync(process.execPath, [converter, path.join(registryDir, versionFile), moduleDir], { stdio: 'pipe' });
+        assert.equal(canonicalJson(buildModuleExport(moduleDir)), published);
+      } finally {
+        fs.rmSync(workDir, { recursive: true, force: true });
+      }
     });
   }
 });

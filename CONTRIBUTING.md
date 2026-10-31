@@ -42,7 +42,8 @@ Each module is one directory under `modules/`, containing a `module.json` and it
 - A `summary` (at most 500 characters) is used as the registry description when the full `description` is longer than
   500 characters.
 - `minTakaroVersion` (`x.y.z`) is optional and declares the lowest Takaro version the module needs.
-- The `1.0.0` of each formerly bundled module (the `legacyModuleNames`) matches what Takaro last bundled, and Takaro's
+- The `1.0.0` of each formerly bundled module (the `legacyModuleNames`) matches what Takaro last bundled (apart from the
+  teleports `teleportwaypoint` lookup by name), and Takaro's
   conversion relies on that. Those versions are frozen like any other: ship a change as `1.0.1` or `1.1.0`.
 
 ## Testing a module against your own Takaro domain
