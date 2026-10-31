@@ -27,6 +27,16 @@ npm run build
 npm test
 ```
 
+## Testing modules
+
+`npm test` runs the offline checks. Module tests live next to each module in `modules/<name>/test/vm/` and run the
+module code in Takaro's module VM against an in-memory fake, through
+[`@takaro/module-test`](https://www.npmjs.com/package/@takaro/module-test). They need Node 24 or newer:
+
+```bash
+npm run test:modules
+```
+
 ## Using a module with your Takaro domain
 
 Convert a module to Takaro's import format and import it:
@@ -60,7 +70,26 @@ claude
 ## Subscribing
 
 In Takaro, subscribe a domain to `https://gettakaro.github.io/modules` and install modules from there. A custom
-domain, `registry.takaro.io`, will follow. The published modules are:
+domain, `registry.takaro.io`, will follow.
+
+The modules Takaro used to bundle are published here under their existing camelCase names. Each `1.0.0` holds the
+same content as the last version Takaro bundled:
+
+- `chatBridge`
+- `dailyRewards`
+- `economyUtils`
+- `geoBlock`
+- `gimme`
+- `highPingKicker`
+- `lottery`
+- `playerOnboarding`
+- `serverMessages`
+- `shopActions`
+- `teleports`
+- `timedShutdown`
+- `utils`
+
+The other published modules are:
 
 - `afk-kick`
 - `community-fund`

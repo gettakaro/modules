@@ -20,6 +20,7 @@ bash scripts/takaro-auth.sh
 npm run build       # compile src/ to dist/
 npm run typecheck
 npm test            # offline checks, what CI runs
+npm run test:modules   # module-VM tests in modules/*/test/vm (Node 24+), also in CI
 npm run test:live   # live suite against a Takaro domain; dormant, see test/README.md
 npm run registry:build   # validate, then write new files below registry/
 npm run registry:check   # validate without writing; CI runs this
@@ -46,7 +47,8 @@ Modules live locally in `modules/` as editable files, then get pushed to a Takar
 ### Testing Guidance
 
 - When you have a Takaro domain, prefer checking behaviour through Takaro: the live suite (`npm run test:live`, see `test/README.md`) or in-game with the Minecraft dev environment in `dev/minecraft`.
-- Pure helper logic may be unit tested offline. Example: `modules/daily-rewards/test/helpers.test.ts`.
+- Module logic is tested offline in the module VM with `@takaro/module-test`. Example: `modules/gimme/test/vm/gimme.test.ts`.
+- Never edit a published module's code without bumping its `version`.
 - Do not use ad-hoc mocking hacks such as `globalThis.__mocks` or source-string replacement. Mocked tests pass while the real system fails.
 - In-game verification is expected for behaviour changes when you have access to a Takaro domain and the Minecraft dev environment.
 

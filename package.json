@@ -7,9 +7,10 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.module-tests.json",
     "pretest": "npm run build",
     "test": "node --test --import=ts-node-maintained/register/esm 'test/*.test.ts'",
+    "test:modules": "node --experimental-vm-modules --test 'modules/*/test/vm/*.test.ts'",
     "test:live": "npm run build && T_WS_CONTINUOUS_RECONNECT=false T_WS_HEARTBEAT_INTERVAL_MS=120000 LOGGING_LEVEL=warn node --test-force-exit --test-concurrency 1 --import=ts-node-maintained/register/esm --test 'modules/*/test/*.test.ts'",
     "module:to-json": "node dist/scripts/module-to-json.js",
     "module:from-json": "node dist/scripts/json-to-module.js",
@@ -19,8 +20,13 @@
   },
   "devDependencies": {
     "@takaro/apiclient": "^0.7.5",
+    "@takaro/module-test": "0.0.0-dev.4dbe15b",
+    "@types/chai": "4.3.20",
     "@types/node": "^22",
+    "@types/sinon-chai": "3.2.12",
+    "chai": "4.5.0",
     "dotenv": "^16.4.0",
+    "sinon-chai": "3.7.0",
     "ts-node-maintained": "^10.9.6",
     "typescript": "~5.5.4"
   },
