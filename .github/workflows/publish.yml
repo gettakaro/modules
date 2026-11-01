@@ -1,6 +1,6 @@
 name: Publish registry
 
-# Publish notifications (repository_dispatch) are added separately.
+# Each publish asks the Takaro monorepo to open a compatibility-snapshot bump PR (gettakaro/takaro#4630).
 
 on:
   push:
@@ -65,3 +65,25 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # Takaro's CI installs every module from a pinned snapshot of this registry. The dispatch makes the
+  # monorepo open a snapshot bump PR that runs its compatibility lane (gettakaro/takaro#4630).
+  notify-monorepo:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy
+    runs-on: ubuntu-latest
+    # The dispatch uses the CI App token, so this job needs none of the workflow's Pages grants.
+    permissions: {}
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.TAKARO_CI_APP_ID }}
+          private-key: ${{ secrets.TAKARO_CI_APP_PRIV_KEY }}
+          owner: gettakaro
+          repositories: takaro
+      - name: Ask the Takaro monorepo to bump its registry snapshot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh api repos/gettakaro/takaro/dispatches -f event_type=module-registry-published
