@@ -323,14 +323,22 @@
     {
       "name": "teleports",
       "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
-      "latestVersion": "1.0.0",
+      "latestVersion": "1.0.1",
       "versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
       "versionDetails": [
         {
           "version": "1.0.0",
           "sha256": "9f37e09015019f2305c6aaf5d2defa6b5bc28c133c2cf6db9fc44b666bb314f1",
+          "requiredCapabilities": [
+            "players.teleport"
+          ]
+        },
+        {
+          "version": "1.0.1",
+          "sha256": "390714ebe18c45d7df8f56d6bb223c6d2bcfa45ed7bb8055dae43bcd3291450e",
           "requiredCapabilities": [
             "players.teleport"
           ]

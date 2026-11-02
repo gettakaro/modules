@@ -22,13 +22,19 @@ async function main() {
     throw new TakaroUserError(`You are not allowed to use the waypoint ${trigger}.`);
   }
 
-  const teleportsModule = (
+  // By registry source, not by name: the official module is renamed (e.g. `teleports-1a2b3c4d`)
+  // when a Domain already has its own module called `teleports`.
+  const candidates = (
     await takaro.module.moduleControllerSearch({
-      filters: {
-        name: ['teleports'],
-      },
+      filters: { source: ['official'] },
+      search: { name: ['teleports'] },
     })
-  ).data.data[0];
+  ).data.data;
+  const teleportsModule = candidates.find((mod) => mod.latestVersion?.sourceModuleName === 'teleports');
+
+  if (!teleportsModule) {
+    throw new TakaroUserError('The official teleports module is not available, so waypoints cannot be used.');
+  }
 
   const variable = await takaro.variable.variableControllerSearch({
     filters: {
