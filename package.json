@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@takaro/apiclient": "^0.7.5",
+    "@takaro/helpers": "0.0.0-dev.4dbe15b",
     "@takaro/module-test": "0.0.0-dev.4dbe15b",
     "@types/chai": "4.3.20",
     "@types/node": "^22",

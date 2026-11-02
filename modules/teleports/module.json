@@ -2,7 +2,7 @@
   "name": "teleports",
   "author": "Takaro",
   "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "supportedGames": [
     "7 days to die",
     "rust",

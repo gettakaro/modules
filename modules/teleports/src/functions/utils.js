@@ -138,6 +138,7 @@ export async function waypointReconciler() {
   const teleportCommand = await takaro.command.commandControllerSearch({
     filters: {
       moduleId: [mod.moduleId],
+      versionId: [mod.versionId],
       name: ['teleportwaypoint'],
     },
   });
