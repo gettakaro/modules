@@ -170,6 +170,7 @@ version or `versionDetails` entry published there was removed or changed. This c
 
 CI runs `npm run registry:check -- --base origin/main` on every pull request. Merging to `main` publishes the
 committed `registry/` and `schema/` to GitHub Pages. CI never builds or commits the registry itself.
+Merging to `main` also asks the Takaro monorepo to open a snapshot bump PR.
 
 ## Commands
 
