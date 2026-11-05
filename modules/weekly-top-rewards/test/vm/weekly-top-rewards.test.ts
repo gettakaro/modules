@@ -21,22 +21,30 @@ type Ctx = {
   client: { stubs: any };
 };
 
-/** Pog search with lifetime playtime; the fake can't answer `greaterThan`, so it is stubbed. */
-function stubPogs(t: Ctx, playtime: Record<number, number>, createdAt: Record<number, string> = {}) {
+type Session = { eventName: 'player-connected' | 'player-disconnected'; playerId: string; createdAt: string };
+
+/** Players seen this period; the fake can't answer `greaterThan` / `online`, so it is stubbed. */
+function stubPogs(t: Ctx, lastSeen: Record<number, string> = {}) {
   const all = [t.pog, ...t.otherPlayers.map((o) => o.pog)];
   t.client.stubs.playerOnGameserver.playerOnGameServerControllerSearch?.callsFake(async () =>
     paginated(
       all.map((p, i) => ({
         ...p,
-        playtimeSeconds: playtime[i] ?? 0,
-        createdAt: createdAt[i] ?? OLD,
+        online: p.online !== false,
+        lastSeen: lastSeen[i] ?? NOW.toISOString(),
+        playtimeSeconds: 0,
+        createdAt: OLD,
       })),
     ),
   );
 }
 
-/** Kill counts per player id (fallback path: analytics is not in the fake), and currency-added events. */
-function stubEvents(t: Ctx, kills: Record<string, number>, currencyEvents: unknown[]) {
+const at = (iso: string, seconds: number) => new Date(new Date(iso).getTime() + seconds * 1000).toISOString();
+const conn = (playerId: string, createdAt: string): Session => ({ eventName: 'player-connected', playerId, createdAt });
+const disc = (playerId: string, createdAt: string): Session => ({ eventName: 'player-disconnected', playerId, createdAt });
+
+/** Kill counts per player id (fallback path: analytics is not in the fake), currency-added and session events. */
+function stubEvents(t: Ctx, kills: Record<string, number>, currencyEvents: unknown[], sessions: Session[] = []) {
   t.client.stubs.event.eventControllerSearch?.callsFake(async (query: any) => {
     const name = query.filters.eventName[0];
     if (name === 'entity-killed') {
@@ -44,14 +52,18 @@ function stubEvents(t: Ctx, kills: Record<string, number>, currencyEvents: unkno
       return paginated([], { total: count });
     }
     if (name === 'currency-added') return paginated(query.page === 0 ? currencyEvents : []);
+    if (name === 'player-connected') {
+      expect(query.filters.eventName).to.deep.equal(['player-connected', 'player-disconnected']);
+      return paginated(query.page === 0 ? sessions : []);
+    }
     throw new Error(`unexpected event query ${name}`);
   });
 }
 
-function seedState(t: Ctx & { variables: any }, playtime: Record<string, number>) {
+function seedState(t: Ctx & { variables: any }, extra: Record<string, unknown>) {
   t.variables.insert({
     key: 'wtr_state',
-    value: JSON.stringify({ periodStart: PERIOD_START, playtime }),
+    value: JSON.stringify({ periodStart: PERIOD_START, ...extra }),
     gameServerId: t.gameServerId,
     moduleId: t.moduleId,
   });
@@ -65,12 +77,12 @@ const players = [{ name: 'Bravo' }, { name: 'Charlie', online: false }, { name: 
 
 const tests = [
   createModuleTest({
-    name: 'First /weeklytop starts tracking and stores a playtime baseline',
+    name: 'First /weeklytop starts tracking and stores who is online',
     module: MODULE,
     now: NOW,
     otherPlayers: players,
     setup: function () {
-      stubPogs(this as unknown as Ctx, { 0: 3600, 1: 0, 2: 7200 });
+      stubPogs(this as unknown as Ctx);
     },
     test: async function () {
       const result = await this.runCommand('weeklytop');
@@ -78,11 +90,9 @@ const tests = [
       expect(this.pms()).to.deep.equal(['Weekly Top tracking just started. Play, and check back later!']);
       const state = JSON.parse(stateRow(this).value);
       expect(state.periodStart).to.equal(NOW.toISOString());
-      // Only players with playtime are stored.
-      expect(state.playtime).to.deep.equal({
-        [this.pog.playerId]: 3600,
-        [this.otherPlayers[1].pog.playerId]: 7200,
-      });
+      // Charlie is offline, so only the other three have a session open at the start.
+      const [b, , d] = this.otherPlayers.map((o) => o.pog.playerId);
+      expect(state.onlineAtStart).to.deep.equal([this.pog.playerId, b, d]);
     },
   }),
 
@@ -95,9 +105,20 @@ const tests = [
     setup: function () {
       const t = this as unknown as Ctx;
       const [b, c, d] = t.otherPlayers.map((o) => o.pog.playerId);
-      seedState(this as any, { [t.pog.playerId]: 1000, [b]: 0, [d]: 50000 });
-      // Gains: me 600s (10m), Bravo 7200s, Charlie new this week 3600s, Delta 1800s.
-      stubPogs(t, { 0: 1600, 1: 7200, 2: 3600, 3: 51800 }, { 2: '2026-11-03T00:00:00.000Z' });
+      seedState(this as any, { onlineAtStart: [t.pog.playerId, d] });
+      // Charlie (offline) lost his disconnect event: his session ends at lastSeen.
+      stubPogs(t, { 2: at(PERIOD_START, 86400 + 3600) });
+      const sessions = [
+        // Me: online when the week started, left after 10 min.
+        disc(t.pog.playerId, at(PERIOD_START, 600)),
+        conn(c, at(PERIOD_START, 86400)),
+        // Delta: a connect without disconnect is dropped, then a 30 min session.
+        conn(d, at(PERIOD_START, 90000)),
+        conn(d, at(PERIOD_START, 95000)),
+        disc(d, at(PERIOD_START, 95000 + 1800)),
+        // Bravo: still online, his running session counts up to now.
+        conn(b, at(NOW.toISOString(), -7200)),
+      ];
       stubEvents(t, { [t.pog.playerId]: 4, [b]: 10, [c]: 0, [d]: 25 }, [
         { playerId: c, actingModuleId: OTHER_MODULE_ID, meta: { amount: 300 } },
         { playerId: c, actingModuleId: OTHER_MODULE_ID, meta: { amount: 200 } },
@@ -105,7 +126,7 @@ const tests = [
         // Own payouts and manual grants are ignored by default.
         { playerId: b, actingModuleId: t.moduleId, meta: { amount: 9999 } },
         { playerId: d, actingModuleId: null, actingUserId: 'admin', meta: { amount: 8888 } },
-      ]);
+      ], sessions);
     },
     test: async function () {
       const result = await this.runCommand('weeklytop');
@@ -150,7 +171,7 @@ const tests = [
     now: NOW,
     otherPlayers: players,
     setup: function () {
-      stubPogs(this as unknown as Ctx, { 0: 100 });
+      stubPogs(this as unknown as Ctx);
     },
     test: async function () {
       const result = await this.runCronJob('award-weekly');
@@ -181,9 +202,19 @@ const tests = [
     setup: function () {
       const t = this as unknown as Ctx;
       const [b, c, d] = t.otherPlayers.map((o) => o.pog.playerId);
-      seedState(this as any, { [t.pog.playerId]: 0, [b]: 0, [c]: 0, [d]: 0 });
+      // State from 1.0.0 (lifetime snapshot, no onlineAtStart): a first event that is a disconnect
+      // means the player was online when the week started.
+      seedState(this as any, { playtime: { [c]: 99999 } });
+      stubPogs(t);
       // Charlie (offline) 1st, Delta 2nd, me 3rd, Bravo 4th.
-      stubPogs(t, { 0: 600, 1: 300, 2: 3600, 3: 1800 });
+      stubEvents(t, {}, [], [
+        disc(c, at(PERIOD_START, 3600)),
+        conn(t.pog.playerId, at(PERIOD_START, 7200)),
+        disc(t.pog.playerId, at(PERIOD_START, 7800)),
+        conn(b, at(PERIOD_START, 9000)),
+        disc(b, at(PERIOD_START, 9300)),
+        conn(d, at(NOW.toISOString(), -1800)),
+      ]);
     },
     test: async function () {
       const [b, c, d] = this.otherPlayers.map((o) => o.pog.playerId);
@@ -225,7 +256,8 @@ const tests = [
 
       const state = JSON.parse(stateRow(this).value);
       expect(state.periodStart).to.equal(NOW.toISOString());
-      expect(state.playtime[c]).to.equal(3600);
+      expect(state.onlineAtStart).to.deep.equal([this.pog.playerId, b, d]);
+      expect(state.playtime).to.equal(undefined);
 
       const last = JSON.parse(this.variables.all.find((r) => r.key === 'wtr_last_results')!.value);
       expect(last.periodStart).to.equal(PERIOD_START);
@@ -241,8 +273,9 @@ const tests = [
     userConfig: { categories: ['playtime'], broadcastResults: false, minimumPlaytimeMinutes: 60 },
     setup: function () {
       const t = this as unknown as Ctx;
-      seedState(this as any, { [t.pog.playerId]: 0 });
-      stubPogs(t, { 0: 600 });
+      seedState(this as any, { onlineAtStart: [] });
+      stubPogs(t);
+      stubEvents(t, {}, [], [conn(t.pog.playerId, at(PERIOD_START, 60)), disc(t.pog.playerId, at(PERIOD_START, 660))]);
     },
     test: async function () {
       const result = await this.runCronJob('award-weekly');

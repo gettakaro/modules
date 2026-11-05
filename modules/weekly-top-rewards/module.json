@@ -1,7 +1,7 @@
 {
   "name": "weekly-top-rewards",
   "author": "Takaro",
-  "description": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned, using data Takaro already records. A cron job (default Sunday 20:00 UTC, change it in the cron job settings) pays the top 3 of each category with currency, optional items and an optional expiring role, broadcasts the winners and can post them to Discord. Players see live standings with /weeklytop [playtime|kills|currency|last]. Items for offline winners are delivered at their next login.",
+  "description": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned, using data Takaro already records. A cron job (default Sunday 20:00 UTC, change it in the cron job settings) pays the top 3 of each category with currency, optional items and an optional expiring role, broadcasts the winners and can post them to Discord. Players see live standings with the weeklytop command (add playtime, kills, currency or last). Items for offline winners are delivered at their next login.",
   "version": "1.0.0",
   "supportedGames": [
     "all"
@@ -13,7 +13,7 @@
       "categories": {
         "type": "array",
         "title": "Categories",
-        "description": "What players are ranked on. playtime = time online this week, kills = entity kills, currency = currency earned from modules this week.",
+        "description": "What players are ranked on. playtime = time online this week (from connect and disconnect events, live for online players), kills = entity kills, currency = currency earned from modules this week.",
         "uniqueItems": true,
         "items": {
           "type": "string",
@@ -48,7 +48,7 @@
         "x-component": "item",
         "type": "array",
         "title": "Items for 1st place",
-        "description": "Optional items for 1st place. Offline winners get them at their next login.",
+        "description": "Optional items for 1st place, given once per category won (a player who wins 2 categories gets them twice). Offline winners get them at their next login.",
         "default": [],
         "items": {
           "type": "object",
@@ -74,7 +74,7 @@
         "x-component": "item",
         "type": "array",
         "title": "Items for 2nd place",
-        "description": "Optional items for 2nd place.",
+        "description": "Optional items for 2nd place, given once per category.",
         "default": [],
         "items": {
           "type": "object",
@@ -100,7 +100,7 @@
         "x-component": "item",
         "type": "array",
         "title": "Items for 3rd place",
-        "description": "Optional items for 3rd place.",
+        "description": "Optional items for 3rd place, given once per category.",
         "default": [],
         "items": {
           "type": "object",
@@ -160,7 +160,7 @@
       "liveListSize": {
         "type": "number",
         "title": "Live list size",
-        "description": "How many players /weeklytop <category> shows.",
+        "description": "How many players the weeklytop command shows when one category is asked for.",
         "minimum": 3,
         "maximum": 10,
         "default": 5
@@ -211,7 +211,7 @@
     "weeklytop": {
       "trigger": "weeklytop",
       "description": "Show this week's live standings",
-      "helpText": "Shows this week's top players. Use /weeklytop playtime, /weeklytop kills or /weeklytop currency for one category, /weeklytop last for last week's winners.",
+      "helpText": "Shows this week's top players. Add playtime, kills or currency to see one category, or last to see last week's winners.",
       "function": "src/commands/weeklytop/index.js",
       "arguments": [
         {

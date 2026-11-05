@@ -9,9 +9,9 @@ export const PLACES = 3;
 
 const PAGE_SIZE = 1000;
 const MAX_POG_PAGES = 20;
-// Players unseen for this long are left out of the playtime snapshot to keep it small.
-// Such a player who returns mid-week is skipped for playtime until the next snapshot.
-const SNAPSHOT_LOOKBACK_MS = 60 * 24 * 60 * 60 * 1000;
+// Upper limit of 1000-event pages of connect/disconnect events read for the playtime ranking.
+const MAX_SESSION_EVENT_PAGES = 20;
+const SESSION_EVENTS = ['player-connected', 'player-disconnected'];
 // Cap for the per-player kill count fallback (used only when the analytics endpoint is unavailable).
 const MAX_KILL_FALLBACK_PLAYERS = 100;
 
@@ -133,21 +133,29 @@ async function fetchPogsSeenSince(gameServerId, sinceIso) {
   return pogs;
 }
 
-/** Baseline for the new period: lifetime playtime per player right now. */
-export async function takeSnapshot(gameServerId, nowIso) {
-  const since = new Date(new Date(nowIso).getTime() - SNAPSHOT_LOOKBACK_MS).toISOString();
-  const pogs = await fetchPogsSeenSince(gameServerId, since);
-  const playtime = {};
-  for (const pog of pogs) {
-    if (pog.playtimeSeconds > 0) playtime[pog.playerId] = pog.playtimeSeconds;
+async function fetchOnlinePlayerIds(gameServerId) {
+  const ids = [];
+  for (let page = 0; page < MAX_POG_PAGES; page++) {
+    const res = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({
+      filters: { gameServerId: [gameServerId], online: [true] },
+      limit: PAGE_SIZE,
+      page,
+    });
+    const rows = res.data.data;
+    ids.push(...rows.filter((p) => p.online !== false).map((p) => p.playerId));
+    if (rows.length < PAGE_SIZE) break;
   }
-  return { periodStart: nowIso, playtime };
+  return ids;
+}
+
+/** State for a new period: its start time and who is online right now (their session counts from here). */
+export async function takeSnapshot(gameServerId, nowIso) {
+  return { periodStart: nowIso, onlineAtStart: await fetchOnlinePlayerIds(gameServerId) };
 }
 
 export async function loadState(gameServerId, moduleId) {
   const state = await readJson(STATE_KEY, gameServerId, moduleId);
   if (!state || !state.periodStart) return null;
-  if (!state.playtime) state.playtime = {};
   return state;
 }
 
@@ -160,22 +168,99 @@ export async function startNewPeriod(gameServerId, moduleId, nowIso) {
 // ---------- category scores ----------
 // Each scorer returns an array of { playerId, value, name? } (unsorted, value > 0).
 
-async function playtimeScores(ctx) {
-  const { state } = ctx;
-  const periodStartMs = new Date(state.periodStart).getTime();
-  const scores = [];
-  for (const pog of ctx.activePogs) {
-    let base = state.playtime[pog.playerId];
-    if (base === undefined) {
-      // Unknown baseline: only safe when the player first joined during this period.
-      if (new Date(pog.createdAt).getTime() >= periodStartMs) base = 0;
-      else continue;
+async function fetchSessionEvents(gameServerId, startIso, endIso) {
+  const events = [];
+  for (let page = 0; page < MAX_SESSION_EVENT_PAGES; page++) {
+    const res = await takaro.event.eventControllerSearch({
+      filters: { eventName: SESSION_EVENTS, gameserverId: [gameServerId] },
+      greaterThan: { createdAt: startIso },
+      lessThan: { createdAt: endIso },
+      sortBy: 'createdAt',
+      sortDirection: 'asc',
+      limit: PAGE_SIZE,
+      page,
+    });
+    const rows = res.data.data;
+    events.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    if (page === MAX_SESSION_EVENT_PAGES - 1) {
+      console.log(`weekly-top-rewards: playtime ranking stopped after ${MAX_SESSION_EVENT_PAGES} pages of session events`);
     }
-    const delta = (pog.playtimeSeconds || 0) - base;
-    if (delta > 0) scores.push({ playerId: pog.playerId, value: delta });
   }
+  return events;
+}
+
+/**
+ * Seconds each player was online inside [startMs, endMs], from connect/disconnect events.
+ * Takaro only updates the lifetime playtime counter on disconnect, so it can't be used for a
+ * live weekly ranking. Sessions are clamped to the window:
+ * - a player online at the period start (onlineAtStart) has a session open from startMs;
+ *   when onlineAtStart is unknown (state from an older version), a first event that is a
+ *   disconnect means the session started before the period;
+ * - a session still open at the end counts up to endMs when the player is online now,
+ *   otherwise up to their lastSeen (the disconnect event went missing);
+ * - a second connect without a disconnect in between drops the earlier open session
+ *   (its end is unknown, so it is not counted).
+ *
+ * @param events   session events sorted by createdAt ascending ({ eventName, playerId, createdAt })
+ * @param pogs     players seen in the period ({ playerId, online, lastSeen })
+ */
+export function sessionPlaytime(events, pogs, startMs, endMs, onlineAtStart) {
+  const byPlayer = new Map();
+  for (const event of events) {
+    if (!event.playerId) continue;
+    if (!byPlayer.has(event.playerId)) byPlayer.set(event.playerId, []);
+    byPlayer.get(event.playerId).push(event);
+  }
+  const pogById = new Map(pogs.map((p) => [p.playerId, p]));
+  const startSet = Array.isArray(onlineAtStart) ? new Set(onlineAtStart) : null;
+  const playerIds = new Set([...byPlayer.keys(), ...pogById.keys()]);
+  const totals = new Map();
+
+  for (const playerId of playerIds) {
+    const list = byPlayer.get(playerId) || [];
+    const pog = pogById.get(playerId);
+    let openAt = null;
+    if (startSet) {
+      if (startSet.has(playerId)) openAt = startMs;
+    } else if (list.length > 0 ? list[0].eventName === 'player-disconnected' : Boolean(pog && pog.online)) {
+      openAt = startMs;
+    }
+    let total = 0;
+    for (const event of list) {
+      const at = Math.min(Math.max(new Date(event.createdAt).getTime(), startMs), endMs);
+      if (event.eventName === 'player-connected') {
+        openAt = at;
+      } else if (openAt !== null) {
+        total += Math.max(0, at - openAt);
+        openAt = null;
+      }
+    }
+    if (openAt !== null && pog) {
+      const lastSeenMs = pog.lastSeen ? new Date(pog.lastSeen).getTime() : openAt;
+      const end = pog.online ? endMs : Math.min(Math.max(lastSeenMs, openAt), endMs);
+      total += Math.max(0, end - openAt);
+    }
+    const seconds = Math.floor(total / 1000);
+    if (seconds > 0) totals.set(playerId, seconds);
+  }
+  return totals;
+}
+
+async function playtimeScores(ctx) {
+  const { state, gameServerId, startIso, endIso } = ctx;
+  const events = await fetchSessionEvents(gameServerId, startIso, endIso);
+  const totals = sessionPlaytime(
+    events,
+    ctx.activePogs,
+    new Date(state.periodStart).getTime(),
+    new Date(endIso).getTime(),
+    state.onlineAtStart,
+  );
   const minSeconds = Math.max(0, Number(ctx.config.minimumPlaytimeMinutes) || 0) * 60;
-  return scores.filter((s) => s.value >= minSeconds);
+  return [...totals.entries()]
+    .map(([playerId, value]) => ({ playerId, value }))
+    .filter((s) => s.value >= minSeconds);
 }
 
 async function killScores(ctx) {
