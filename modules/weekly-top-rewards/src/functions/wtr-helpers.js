@@ -459,3 +459,79 @@ export async function rewardWinner({ gameServerId, moduleId, config, playerId, p
 
   return result;
 }
+
+// ---------- live Discord leaderboard ----------
+
+export const DISCORD_LIVE_KEY = 'wtr_discord_live';
+const EMBED_COLOR = 0xf1c40f;
+
+/** Player names come from players; never let them ping @everyone or a user/role. */
+export function sanitizeDiscord(text) {
+  return String(text ?? '')
+    .replace(/@everyone/g, '@​everyone')
+    .replace(/@here/g, '@​here')
+    .replace(/<@([!&]?)(\d+)>/g, '<@$1​$2>');
+}
+
+export function liveListSize(config) {
+  return Math.min(10, Math.max(3, Math.floor(Number(config.discordLiveSize) || 5)));
+}
+
+/**
+ * One embed with a field per category. `final` turns it into the closed week's results.
+ * Entries must already carry names.
+ */
+export function buildLeaderboardEmbed({ standings, categories, periodStart, periodEnd, currencyName, size, final, nowIso }) {
+  const fields = categories.map((category) => {
+    const ranked = standings[category];
+    let value;
+    if (ranked === null || ranked === undefined) value = 'Not available right now.';
+    else if (ranked.length === 0) value = 'Nobody yet.';
+    else {
+      value = ranked
+        .slice(0, size)
+        .map((e, i) => `**${i + 1}.** ${sanitizeDiscord(e.name)} - ${formatValue(category, e.value, currencyName)}`)
+        .join('\n');
+    }
+    return { name: CATEGORY_LABELS[category], value: value.slice(0, 1024), inline: true };
+  });
+  const range = final ? `${formatDate(periodStart)} - ${formatDate(periodEnd)}` : `Since ${formatDate(periodStart)}`;
+  return {
+    title: final ? 'Weekly Top - final results' : 'Weekly Top - live standings',
+    description: final ? `${range}\nTop 3 in each category have been rewarded.` : `${range}\nUpdates automatically.`,
+    color: EMBED_COLOR,
+    fields,
+    footer: { text: final ? 'A new week has started.' : `Last updated ${formatDate(nowIso)}` },
+  };
+}
+
+/**
+ * Keeps one Discord message per week up to date: edits it when it exists for this week,
+ * posts a new one otherwise (new week, other channel, or the old one was deleted).
+ */
+export async function upsertLiveMessage({ gameServerId, moduleId, channelId, periodStart, embed }) {
+  const stored = await readJson(DISCORD_LIVE_KEY, gameServerId, moduleId);
+  if (stored && stored.messageId && stored.channelId === channelId && stored.periodStart === periodStart) {
+    try {
+      await takaro.discord.discordControllerUpdateMessage(channelId, stored.messageId, { embed });
+      return stored.messageId;
+    } catch (err) {
+      console.error(`weekly-top-rewards: could not edit Discord message ${stored.messageId}, posting a new one: ${err}`);
+    }
+  }
+  const sent = await takaro.discord.discordControllerSendMessage(channelId, { embed });
+  const messageId = sent?.data?.data?.id;
+  if (messageId) await writeJson(DISCORD_LIVE_KEY, gameServerId, moduleId, null, { channelId, messageId, periodStart });
+  return messageId || null;
+}
+
+/** Live standings with names for the top `size` of each category. */
+export async function liveStandingsWithNames({ gameServerId, moduleId, config, state, categories, endIso, size }) {
+  const standings = await computeStandings({ gameServerId, moduleId, config, state, categories, endIso });
+  const shown = [];
+  for (const category of categories) {
+    if (standings[category]) shown.push(...standings[category].slice(0, size));
+  }
+  await attachNames(shown);
+  return standings;
+}

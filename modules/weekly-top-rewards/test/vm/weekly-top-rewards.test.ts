@@ -1,6 +1,6 @@
 import { expect } from '../../../../test/support/expect.ts';
 import { describe } from 'node:test';
-import { createModuleTest, paginated } from '@takaro/module-test';
+import { createModuleTest, paginated, single } from '@takaro/module-test';
 
 const MODULE = new URL('../../', import.meta.url);
 const group = 'weekly-top-rewards suite (module-VM)';
@@ -71,6 +71,29 @@ function seedState(t: Ctx & { variables: any }, extra: Record<string, unknown>) 
 
 function stateRow(t: { variables: any; moduleId: string }) {
   return t.variables.all.find((r: any) => r.key === 'wtr_state' && r.moduleId === t.moduleId);
+}
+
+const LIVE_CHANNEL = '998877665544';
+
+/** discordControllerUpdateMessage is not in the fake; record calls on a plain function. */
+function stubDiscordLive(t: Ctx, opts: { failUpdate?: boolean } = {}) {
+  const updates: unknown[][] = [];
+  let sent = 0;
+  t.client.stubs.discord.discordControllerSendMessage?.callsFake(async (channelId: string) => {
+    sent += 1;
+    return single({ id: `msg-${sent}`, channelId, guildId: 'g1' });
+  });
+  t.client.stubs.discord.discordControllerUpdateMessage = async (...args: unknown[]) => {
+    updates.push(args);
+    if (opts.failUpdate) throw new Error('Unknown Message');
+    return single({ id: args[1], channelId: args[0], guildId: 'g1' });
+  };
+  return updates;
+}
+
+function liveRow(t: { variables: any; moduleId: string }) {
+  const row = t.variables.all.find((r: any) => r.key === 'wtr_discord_live' && r.moduleId === t.moduleId);
+  return row ? JSON.parse(row.value) : null;
 }
 
 const players = [{ name: 'Bravo' }, { name: 'Charlie', online: false }, { name: 'Delta' }];
@@ -338,6 +361,139 @@ const tests = [
       const again = await this.runHook('deliver-pending');
       expect(again.success).to.be.true;
       expect(give).to.have.been.calledOnce;
+    },
+  }),
+
+  createModuleTest({
+    name: 'Live Discord cron does nothing without a channel',
+    module: MODULE,
+    now: NOW,
+    test: async function () {
+      const result = await this.runCronJob('update-discord-leaderboard');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.client.stubs.variable.variableControllerSearch).to.not.have.been.called;
+      expect(this.client.stubs.discord.discordControllerSendMessage).to.not.have.been.called;
+    },
+  }),
+
+  createModuleTest({
+    name: 'Live Discord cron posts one embed, then edits that same message',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    userConfig: { categories: ['playtime'], minimumPlaytimeMinutes: 0, discordLiveChannelId: LIVE_CHANNEL, discordLiveSize: 3 },
+    setup: function () {
+      const t = this as unknown as Ctx;
+      const [b, c, d] = t.otherPlayers.map((o) => o.pog.playerId);
+      seedState(this as any, { onlineAtStart: [] });
+      stubPogs(t);
+      stubEvents(t, {}, [], [
+        conn(t.pog.playerId, PERIOD_START),
+        conn(b, PERIOD_START),
+        conn(c, PERIOD_START),
+        conn(d, PERIOD_START),
+        disc(b, at(PERIOD_START, 300)),
+        disc(t.pog.playerId, at(PERIOD_START, 600)),
+        disc(d, at(PERIOD_START, 1800)),
+        disc(c, at(PERIOD_START, 3600)),
+      ]);
+    },
+    test: async function () {
+      const updates = stubDiscordLive(this as unknown as Ctx);
+      const send = this.client.stubs.discord.discordControllerSendMessage!;
+
+      const first = await this.runCronJob('update-discord-leaderboard');
+      expect(first.success, JSON.stringify(first.logs)).to.be.true;
+      expect(send).to.have.been.calledOnce;
+      expect(send.firstCall.args[0]).to.equal(LIVE_CHANNEL);
+      const embed = (send.firstCall.args[1] as any).embed;
+      expect(embed.title).to.equal('Weekly Top - live standings');
+      expect(embed.fields).to.deep.equal([
+        {
+          name: 'Playtime',
+          value: '**1.** Charlie - 1h\n**2.** Delta - 30m\n**3.** Test player - 10m',
+          inline: true,
+        },
+      ]);
+      expect(liveRow(this)).to.deep.equal({ channelId: LIVE_CHANNEL, messageId: 'msg-1', periodStart: PERIOD_START });
+
+      const second = await this.runCronJob('update-discord-leaderboard');
+      expect(second.success, JSON.stringify(second.logs)).to.be.true;
+      expect(send).to.have.been.calledOnce;
+      expect(updates).to.have.length(1);
+      expect(updates[0].slice(0, 2)).to.deep.equal([LIVE_CHANNEL, 'msg-1']);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Live Discord cron posts a replacement when the old message is gone',
+    module: MODULE,
+    now: NOW,
+    userConfig: { categories: ['playtime'], discordLiveChannelId: LIVE_CHANNEL },
+    setup: function () {
+      seedState(this as any, { onlineAtStart: [] });
+      stubPogs(this as unknown as Ctx);
+      stubEvents(this as unknown as Ctx, {}, [], []);
+      this.variables.insert({
+        key: 'wtr_discord_live',
+        value: JSON.stringify({ channelId: LIVE_CHANNEL, messageId: 'deleted', periodStart: PERIOD_START }),
+        gameServerId: this.gameServerId,
+        moduleId: this.moduleId,
+      });
+    },
+    test: async function () {
+      const updates = stubDiscordLive(this as unknown as Ctx, { failUpdate: true });
+      const result = await this.runCronJob('update-discord-leaderboard');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(updates).to.have.length(1);
+      expect(this.client.stubs.discord.discordControllerSendMessage).to.have.been.calledOnce;
+      const embed = (this.client.stubs.discord.discordControllerSendMessage!.firstCall.args[1] as any).embed;
+      expect(embed.fields[0].value).to.equal('Nobody yet.');
+      expect(liveRow(this).messageId).to.equal('msg-1');
+    },
+  }),
+
+  createModuleTest({
+    name: 'Award cron turns the live message into final results and the next week gets a new message',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: [{ name: '@everyone' }],
+    userConfig: { categories: ['playtime'], minimumPlaytimeMinutes: 0, broadcastResults: false, discordLiveChannelId: LIVE_CHANNEL },
+    setup: function () {
+      const t = this as unknown as Ctx;
+      const e = t.otherPlayers[0].pog.playerId;
+      seedState(this as any, { onlineAtStart: [] });
+      stubPogs(t);
+      stubEvents(t, {}, [], [
+        conn(t.pog.playerId, PERIOD_START),
+        conn(e, PERIOD_START),
+        disc(t.pog.playerId, at(PERIOD_START, 600)),
+        disc(e, at(PERIOD_START, 1200)),
+      ]);
+      this.variables.insert({
+        key: 'wtr_discord_live',
+        value: JSON.stringify({ channelId: LIVE_CHANNEL, messageId: 'live-1', periodStart: PERIOD_START }),
+        gameServerId: this.gameServerId,
+        moduleId: this.moduleId,
+      });
+    },
+    test: async function () {
+      const updates = stubDiscordLive(this as unknown as Ctx);
+      const result = await this.runCronJob('award-weekly');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(updates).to.have.length(1);
+      expect(updates[0].slice(0, 2)).to.deep.equal([LIVE_CHANNEL, 'live-1']);
+      const embed = (updates[0][2] as any).embed;
+      expect(embed.title).to.equal('Weekly Top - final results');
+      // Player names cannot ping the server.
+      expect(embed.fields[0].value).to.equal('**1.** @\u200beveryone - 20m\n**2.** Test player - 10m');
+      expect(this.client.stubs.discord.discordControllerSendMessage).to.not.have.been.called;
+
+      // The stored message still belongs to the closed week, so the next live run posts a fresh one.
+      const next = await this.runCronJob('update-discord-leaderboard');
+      expect(next.success, JSON.stringify(next.logs)).to.be.true;
+      expect(this.client.stubs.discord.discordControllerSendMessage).to.have.been.calledOnce;
+      expect(liveRow(this).periodStart).to.equal(NOW.toISOString());
     },
   }),
 ];

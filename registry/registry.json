@@ -398,7 +398,7 @@
     },
     {
       "name": "weekly-top-rewards",
-      "description": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned, using data Takaro already records. A cron job (default Sunday 20:00 UTC, change it in the cron job settings) pays the top 3 of each category with currency, optional items and an optional expiring role, broadcasts the winners and can post them to Discord. Players see live standings with the weeklytop command (add playtime, kills, currency or last). Items for offline winners are delivered at their next login.",
+      "description": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned. A cron job pays the top 3 per category (currency, optional items, optional expiring role), broadcasts the winners and can post them to Discord, including a live Discord leaderboard that keeps updating. Players check live standings with /weeklytop.",
       "latestVersion": "1.0.0",
       "versions": [
         "1.0.0"
@@ -406,7 +406,7 @@
       "versionDetails": [
         {
           "version": "1.0.0",
-          "sha256": "9bcd8c4cfc74028f5df317cece789bf709c2f6710751ab9010b6699cde94f4eb",
+          "sha256": "40a7a589b4a8bd156da73a03cd70cc45d85dd3503ddabb4ad39353d69ca3c10d",
           "requiredCapabilities": [
             "chat.send",
             "items.give"

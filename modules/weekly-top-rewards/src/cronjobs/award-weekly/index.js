@@ -13,6 +13,9 @@ import {
   getSetting,
   formatValue,
   currencyForPlace,
+  liveListSize,
+  buildLeaderboardEmbed,
+  upsertLiveMessage,
 } from './wtr-helpers.js';
 
 async function broadcast(gameServerId, message) {
@@ -72,6 +75,35 @@ async function main() {
   }
 
   await writeJson(LAST_RESULTS_KEY, gameServerId, moduleId, null, results);
+
+  if (config.discordLiveChannelId) {
+    // Turn this week's live message into the final results; the next live run posts a fresh one.
+    try {
+      const size = liveListSize(config);
+      const shown = [];
+      for (const category of categories) if (standings[category]) shown.push(...standings[category].slice(0, size));
+      await attachNames(shown);
+      const embed = buildLeaderboardEmbed({
+        standings,
+        categories,
+        periodStart: state.periodStart,
+        periodEnd: nowIso,
+        currencyName,
+        size,
+        final: true,
+        nowIso,
+      });
+      await upsertLiveMessage({
+        gameServerId,
+        moduleId,
+        channelId: config.discordLiveChannelId,
+        periodStart: state.periodStart,
+        embed,
+      });
+    } catch (err) {
+      console.error(`weekly-top-rewards: could not finalise the live Discord leaderboard: ${err}`);
+    }
+  }
 
   const prizes = [1, 2, 3].map((p) => currencyForPlace(config, p));
   const prizeLine = prizes.some((p) => p > 0) ? `Prizes: ${prizes.join(' / ')} ${currencyName} for places 1-3.` : null;
