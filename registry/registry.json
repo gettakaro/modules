@@ -108,6 +108,24 @@
       ]
     },
     {
+      "name": "daily-quests",
+      "description": "Daily quests: every day each player gets a few random quests from a pool you configure, like kill 30 enemies, play 60 minutes, send 10 chat messages, buy something in the shop, earn currency or use a command (claim daily, vote). Progress is tracked from game events, players get a PM at milestones and are paid currency and/or items on completion. Players see their quests with /quests and can swap one with /questreroll for a fee. Quest types your game doesn't emit can be switched off.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "33c5a7e2ed5a0f97e865c51dbdc0a703d947b86f9259b254ce8de78612b52a27",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "dailyRewards",
       "description": "Provides daily login rewards with streak tracking",
       "latestVersion": "1.0.0",

@@ -1,0 +1,416 @@
+{
+  "name": "daily-quests",
+  "author": "Takaro",
+  "description": "Daily quests: every day each player gets a few random quests from a pool you configure, like kill 30 enemies, play 60 minutes, send 10 chat messages, buy something in the shop, earn currency or use a command (claim daily, vote). Progress is tracked from game events, players get a PM at milestones and are paid currency and/or items on completion. Players see their quests with /quests and can swap one with /questreroll for a fee. Quest types your game doesn't emit can be switched off.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "questsPerDay": {
+        "type": "number",
+        "title": "Quests per day",
+        "minimum": 1,
+        "maximum": 10,
+        "default": 3,
+        "description": "Quests each player gets per day. Players with DAILY_QUESTS_EXTRA_QUESTS get extra (count)."
+      },
+      "resetHourUtc": {
+        "type": "number",
+        "title": "Reset hour (UTC)",
+        "minimum": 0,
+        "maximum": 23,
+        "default": 0,
+        "description": "Hour (UTC, 0-23) when new quests are handed out."
+      },
+      "enabledTypes": {
+        "type": "object",
+        "title": "Quest types this game supports",
+        "description": "Turn off types your game or server doesn't emit; those quests are never picked.",
+        "properties": {
+          "kill": {
+            "type": "boolean",
+            "default": true
+          },
+          "death": {
+            "type": "boolean",
+            "default": true
+          },
+          "playtime": {
+            "type": "boolean",
+            "default": true
+          },
+          "shop": {
+            "type": "boolean",
+            "default": true
+          },
+          "currency": {
+            "type": "boolean",
+            "default": true
+          },
+          "chat": {
+            "type": "boolean",
+            "default": true
+          },
+          "command": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "default": {
+          "kill": true,
+          "death": true,
+          "playtime": true,
+          "shop": true,
+          "currency": true,
+          "chat": true,
+          "command": true
+        },
+        "additionalProperties": false
+      },
+      "quests": {
+        "type": "array",
+        "title": "Quest pool",
+        "description": "Each day every player gets random quests from this pool. Command quests are only picked when that command is installed on the server.",
+        "items": {
+          "type": "object",
+          "title": "Quest",
+          "required": [
+            "id",
+            "type",
+            "target"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "title": "ID",
+              "minLength": 1,
+              "description": "Unique short name, e.g. kill-30."
+            },
+            "type": {
+              "type": "string",
+              "title": "Type",
+              "enum": [
+                "kill",
+                "death",
+                "playtime",
+                "shop",
+                "currency",
+                "chat",
+                "command"
+              ],
+              "description": "kill = entity-killed, death = player-death, playtime = minutes online, shop = shop order, currency = currency earned, chat = chat messages, command = a command used."
+            },
+            "target": {
+              "type": "number",
+              "title": "Target",
+              "minimum": 1,
+              "description": "How many (kills, minutes, messages, currency...) are needed."
+            },
+            "description": {
+              "type": "string",
+              "title": "Text shown to players",
+              "default": "",
+              "description": "Placeholders: {target}, {filter}, {prefix}, {currency}. Empty = automatic text."
+            },
+            "filter": {
+              "type": "string",
+              "title": "Filter",
+              "default": "",
+              "description": "kill: entity name contains (comma list, e.g. zombie,wolf). shop: listing/item name contains. chat: message contains. command: command name(s), comma list (required). Empty = anything."
+            },
+            "rewardCurrency": {
+              "type": "number",
+              "title": "Currency reward",
+              "minimum": 0,
+              "default": 0
+            },
+            "rewardItems": {
+              "type": "array",
+              "title": "Item rewards",
+              "x-component": "item",
+              "default": [],
+              "items": {
+                "type": "object",
+                "title": "Item",
+                "properties": {
+                  "item": {
+                    "type": "string",
+                    "title": "Item"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "title": "Amount",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "quality": {
+                    "type": "string",
+                    "title": "Quality"
+                  }
+                },
+                "required": [
+                  "item"
+                ]
+              }
+            },
+            "weight": {
+              "type": "number",
+              "title": "Weight",
+              "minimum": 0,
+              "default": 1,
+              "description": "Higher = picked more often."
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "Enabled",
+              "default": true
+            }
+          }
+        },
+        "default": [
+          {
+            "id": "kill-30",
+            "type": "kill",
+            "target": 30,
+            "description": "Kill {target} enemies",
+            "filter": "",
+            "rewardCurrency": 100,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "kill-zombies-50",
+            "type": "kill",
+            "target": 50,
+            "description": "Kill {target} zombies",
+            "filter": "zombie",
+            "rewardCurrency": 150,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": false
+          },
+          {
+            "id": "play-60",
+            "type": "playtime",
+            "target": 60,
+            "description": "Play {target} minutes",
+            "filter": "",
+            "rewardCurrency": 100,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "chat-10",
+            "type": "chat",
+            "target": 10,
+            "description": "Send {target} chat messages",
+            "filter": "",
+            "rewardCurrency": 50,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "shop-1",
+            "type": "shop",
+            "target": 1,
+            "description": "Buy something in the shop",
+            "filter": "",
+            "rewardCurrency": 75,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "earn-500",
+            "type": "currency",
+            "target": 500,
+            "description": "Earn {target} {currency}",
+            "filter": "",
+            "rewardCurrency": 100,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "claim-daily",
+            "type": "command",
+            "target": 1,
+            "description": "Claim your daily reward ({prefix}daily)",
+            "filter": "daily",
+            "rewardCurrency": 50,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          },
+          {
+            "id": "vote",
+            "type": "command",
+            "target": 1,
+            "description": "Vote for the server",
+            "filter": "vote,claimvote",
+            "rewardCurrency": 100,
+            "rewardItems": [],
+            "weight": 1,
+            "enabled": true
+          }
+        ]
+      },
+      "milestonePercents": {
+        "type": "array",
+        "title": "Progress milestones (%)",
+        "items": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 99
+        },
+        "default": [
+          50
+        ],
+        "description": "Send a progress PM when a quest passes these percentages."
+      },
+      "rerollCost": {
+        "type": "number",
+        "title": "Reroll cost",
+        "minimum": 0,
+        "default": 100,
+        "description": "Currency to swap one open quest. 0 = free."
+      },
+      "rerollsPerDay": {
+        "type": "number",
+        "title": "Rerolls per day",
+        "minimum": 0,
+        "default": 1,
+        "description": "0 disables rerolls. Players with DAILY_QUESTS_EXTRA_REROLLS get extra (count)."
+      },
+      "allCompleteBonus": {
+        "type": "number",
+        "title": "All-quests bonus",
+        "minimum": 0,
+        "default": 0,
+        "description": "Extra currency when a player finishes all of today's quests."
+      },
+      "chatMinLength": {
+        "type": "number",
+        "title": "Min chat message length",
+        "minimum": 1,
+        "default": 3,
+        "description": "Shorter messages don't count for chat quests."
+      },
+      "announceNewQuests": {
+        "type": "boolean",
+        "title": "Announce new quests at reset",
+        "default": true,
+        "description": "PM online players their new quests at the reset hour."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "quests": {
+      "items": {
+        "rewardItems": {
+          "items": {
+            "item": {
+              "ui:widget": "item"
+            }
+          }
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "DAILY_QUESTS_EXTRA_QUESTS",
+      "friendlyName": "Extra daily quests",
+      "description": "Count = extra quests this player gets each day (e.g. for VIPs).",
+      "canHaveCount": true
+    },
+    {
+      "permission": "DAILY_QUESTS_EXTRA_REROLLS",
+      "friendlyName": "Extra quest rerolls",
+      "description": "Count = extra quest rerolls per day on top of the configured amount.",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "quests": {
+      "trigger": "quests",
+      "description": "Show today's quests and progress",
+      "helpText": "Shows your daily quests, progress and rewards.",
+      "function": "src/commands/quests/index.js",
+      "arguments": []
+    },
+    "questreroll": {
+      "trigger": "questreroll",
+      "description": "Swap one open quest for another (costs currency)",
+      "helpText": "Swap one of today's open quests for a random other one. Usage: questreroll <number from the quests list>.",
+      "function": "src/commands/questreroll/index.js",
+      "arguments": [
+        {
+          "name": "number",
+          "type": "number",
+          "helpText": "Quest number from the quests list",
+          "position": 0,
+          "defaultValue": "0"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "on-entity-killed": {
+      "eventType": "entity-killed",
+      "description": "Progress kill quests",
+      "function": "src/hooks/on-entity-killed/index.js"
+    },
+    "on-player-death": {
+      "eventType": "player-death",
+      "description": "Progress death quests",
+      "function": "src/hooks/on-player-death/index.js"
+    },
+    "on-chat-message": {
+      "eventType": "chat-message",
+      "description": "Progress chat quests (commands don't count)",
+      "function": "src/hooks/on-chat-message/index.js"
+    },
+    "on-command-executed": {
+      "eventType": "command-executed",
+      "description": "Progress command quests (successful runs only)",
+      "function": "src/hooks/on-command-executed/index.js"
+    },
+    "on-shop-order": {
+      "eventType": "shop-order-created",
+      "description": "Progress shop quests",
+      "function": "src/hooks/on-shop-order/index.js"
+    },
+    "on-currency-added": {
+      "eventType": "currency-added",
+      "description": "Progress earn-currency quests (this module's own payouts don't count)",
+      "function": "src/hooks/on-currency-added/index.js"
+    }
+  },
+  "cronJobs": {
+    "playtime-tick": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Count online minutes for playtime quests and hand out quests to online players",
+      "function": "src/cronjobs/playtime-tick/index.js"
+    },
+    "daily-reset": {
+      "temporalValue": "0 * * * *",
+      "description": "At the configured reset hour, give online players new quests and PM them",
+      "function": "src/cronjobs/daily-reset/index.js"
+    }
+  },
+  "functions": {
+    "quest-helpers": {
+      "function": "src/functions/quest-helpers.js"
+    }
+  }
+}
