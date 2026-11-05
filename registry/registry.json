@@ -195,7 +195,7 @@
       "versionDetails": [
         {
           "version": "1.0.0",
-          "sha256": "35571e6f889a6d5ba0189c56b0c79dea187e2b2a18ccd7e2937e879e9de58313",
+          "sha256": "a6ff2e10d3909be561f78cc4e7ced312b78a7f1bce55015f1b66932bcd97cd7d",
           "requiredCapabilities": [
             "chat.send",
             "players.teleport"

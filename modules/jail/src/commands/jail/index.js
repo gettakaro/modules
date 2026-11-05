@@ -13,15 +13,16 @@ import {
   broadcast,
   playerName,
   formatRemaining,
+  parseReason,
   requireManage,
 } from './jail-helpers.js';
 
 async function main() {
   requireManage(checkPermission);
-  const { arguments: args, module: mod } = data;
+  const { arguments: args, module: mod, chatMessage } = data;
   const target = args.target;
   const minutes = Number(args.minutes);
-  const reason = String(args.reason ?? '').trim() || 'No reason given';
+  const reason = parseReason(chatMessage?.msg, args.reason) || 'No reason given';
   const prefix = await getPrefix();
 
   if (!Number.isInteger(minutes) || minutes < 0) {

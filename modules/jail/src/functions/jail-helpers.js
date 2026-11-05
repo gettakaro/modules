@@ -239,6 +239,16 @@ export async function releasePlayer(record, { online, gameId, reasonText }) {
   return 'pending';
 }
 
+/**
+ * The full reason text. Takaro hands only the first word of the last text argument to the
+ * command, so the words after `<command> <player> <minutes>` are read from the chat line.
+ */
+export function parseReason(rawMessage, fallback) {
+  const tokens = typeof rawMessage === 'string' ? rawMessage.match(/(?:[^\s"]+|"[^"]*")+/g) : null;
+  const fromChat = tokens && tokens.length > 3 ? tokens.slice(3).join(' ').replace(/"/g, '').trim() : '';
+  return (fromChat || String(fallback ?? '').trim()).slice(0, 200);
+}
+
 export function requireManage(checkPermission) {
   if (!checkPermission(data.pog, 'JAIL_MANAGE')) {
     throw new TakaroUserError('You do not have permission to manage the jail.');

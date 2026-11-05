@@ -49,6 +49,22 @@ const tests = [
 
   createModuleTest({
     ...staff,
+    name: 'jail keeps the whole reason from the chat line, not only the first word',
+    test: async function () {
+      await this.runCommand('setjail');
+      const prisoner = this.otherPlayers[0];
+      const jail = await this.runCommand(
+        'jail',
+        { target: prisoner.pog, minutes: 10, reason: 'griefing' },
+        { chatMessage: '/jail Prisoner 10 griefing my "base" again' },
+      );
+      expect(jail.success, JSON.stringify(jail.logs)).to.be.true;
+      expect(record(this)!.value.reason).to.equal('griefing my base again');
+    },
+  }),
+
+  createModuleTest({
+    ...staff,
     name: 'setjail, jail, jailed and jailtime work end to end',
     userConfig: { jailedRoleId: JAILED_ROLE },
     test: async function () {
