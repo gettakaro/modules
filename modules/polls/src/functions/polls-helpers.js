@@ -115,10 +115,15 @@ export async function tally(gameServerId, moduleId, poll) {
   return { counts, total, voterIds, votes };
 }
 
+/** "1 vote", "2 votes". */
+export function voteCount(n) {
+  return `${n} vote${n === 1 ? '' : 's'}`;
+}
+
 export function formatResultLines(options, counts, total) {
   return options.map((opt, i) => {
     const pct = total > 0 ? Math.round((counts[i] / total) * 100) : 0;
-    return `${i + 1}. ${opt} - ${counts[i]} vote${counts[i] === 1 ? '' : 's'} (${pct}%)`;
+    return `${i + 1}. ${opt} - ${voteCount(counts[i])} (${pct}%)`;
   });
 }
 
@@ -167,7 +172,7 @@ export async function closePoll(gameServerId, mod, active, reason) {
 
   await broadcast(gameServerId, header);
   for (const line of lines) await broadcast(gameServerId, line);
-  await broadcast(gameServerId, winner ? `${winner} (${total} vote${total === 1 ? '' : 's'})` : 'Nobody voted.');
+  await broadcast(gameServerId, winner ? `${winner} (${voteCount(total)})` : 'Nobody voted.');
 
   await setModuleVariable(gameServerId, moduleId, LAST_POLL_KEY, {
     id: poll.id,
@@ -184,7 +189,7 @@ export async function closePoll(gameServerId, mod, active, reason) {
       console.log('polls: postResultsToDiscord is on but discordChannelId is empty, skipping Discord post');
     } else {
       try {
-        const body = [`**Poll results: ${poll.question}**`, ...lines, winner ? `**${winner}** (${total} votes)` : 'Nobody voted.'].join('\n');
+        const body = [`**Poll results: ${poll.question}**`, ...lines, winner ? `**${winner}** (${voteCount(total)})` : 'Nobody voted.'].join('\n');
         await takaro.discord.discordControllerSendMessage(channel, { message: body });
       } catch (err) {
         console.log(`polls: Discord post failed: ${err}`);

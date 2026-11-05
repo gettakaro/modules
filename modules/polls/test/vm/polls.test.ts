@@ -225,6 +225,30 @@ const tests = [
   }),
 
   createModuleTest({
+    name: 'poll shows the last poll with a singular vote count',
+    module: MODULE,
+    permissions: [],
+    setup: function () {
+      this.variables.insert({
+        key: 'polls_last',
+        value: JSON.stringify({ id: 'old', question: 'Early close?', options: ['Yes', 'No'], counts: [1, 0], total: 1 }),
+        gameServerId: this.gameServerId,
+        moduleId: this.moduleId,
+      });
+    },
+    test: async function () {
+      const r = await this.runCommand('poll', {}, { chatMessage: '/poll' });
+      expect(r.success, JSON.stringify(r.logs)).to.be.true;
+      expect(this.pms()).to.deep.equal([
+        'No poll is running. Last poll: Early close?',
+        '1. Yes - 1 vote (100%)',
+        '2. No - 0 votes (0%)',
+        'Winner: Yes (1 vote)',
+      ]);
+    },
+  }),
+
+  createModuleTest({
     name: 'poll without a running poll',
     module: MODULE,
     permissions: [],

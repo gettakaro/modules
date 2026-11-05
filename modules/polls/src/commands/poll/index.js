@@ -8,6 +8,7 @@ import {
   findPlayerVote,
   formatResultLines,
   winnerText,
+  voteCount,
   formatRemaining,
   broadcast,
   closePoll,
@@ -91,7 +92,7 @@ async function showPoll({ prefix, player, gameServerId, mod }) {
     await player.pm(`No poll is running. Last poll: ${last.question}`);
     for (const line of formatResultLines(last.options, last.counts, last.total)) await player.pm(line);
     const winner = winnerText(last.options, last.counts, last.total);
-    await player.pm(winner ? `${winner} (${last.total} votes)` : 'Nobody voted.');
+    await player.pm(winner ? `${winner} (${voteCount(last.total)})` : 'Nobody voted.');
     return;
   }
 
