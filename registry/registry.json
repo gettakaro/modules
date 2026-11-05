@@ -56,6 +56,23 @@
       ]
     },
     {
+      "name": "clans",
+      "description": "Clans: players form groups with a name and tag. Create a clan (optional currency cost), invite online players, join by invite, leave, and let leaders/officers kick members. Clan chat sends a private message to every online member. Optional shared clan bank (deposit; leader withdraws). Leaderboard ranks clans by total member playtime. All data lives in Takaro variables. Works on every game that supports private messages.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "d8169d42d994d544ced99bfd5521952ae86fec70cff64a4260b77246f7242c0f",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "community-fund",
       "description": "Community Fund — players contribute currency toward a shared goal. When the threshold is reached the fund resets and completion commands fire.",
       "latestVersion": "1.0.0",
