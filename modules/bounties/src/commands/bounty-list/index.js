@@ -25,8 +25,10 @@ async function main() {
   const lines = active
     .slice(0, MAX_LINES)
     .map((b, i) => `${i + 1}. ${b.name}: ${b.pot} ${currency}${b.placers > 1 ? ` (${b.placers} players)` : ''}`);
-  const more = active.length > MAX_LINES ? `\n...and ${active.length - MAX_LINES} more.` : '';
-  await pog.pm(`Active bounties:\n${lines.join('\n')}${more}`);
+  if (active.length > MAX_LINES) lines.push(`...and ${active.length - MAX_LINES} more.`);
+  // Some game chats (e.g. 7 Days to Die) don't render line breaks, so each line is its own message.
+  await pog.pm('Active bounties:');
+  for (const line of lines) await pog.pm(line);
 }
 
 await main();

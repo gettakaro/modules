@@ -176,7 +176,7 @@ const tests = [
     test: async function () {
       const result = await this.runCommand('bounty-list');
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
-      expect(this.pms()).to.deep.equal(['Active bounties:\n1. Big: 600 test coin (2 players)\n2. Small: 100 test coin']);
+      expect(this.pms()).to.deep.equal(['Active bounties:', '1. Big: 600 test coin (2 players)', '2. Small: 100 test coin']);
     },
   }),
 
