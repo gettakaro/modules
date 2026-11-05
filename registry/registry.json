@@ -335,7 +335,7 @@
       "versionDetails": [
         {
           "version": "1.0.0",
-          "sha256": "5108ece64694f204eec846c8205a3ec923c235b9308f8abcda644b8c9133b0cc",
+          "sha256": "681786c5feefd9eea3f532ec34b2e5b62d09de16fab4e4ec6dc970aba39712fe",
           "requiredCapabilities": [
             "chat.send",
             "items.give"

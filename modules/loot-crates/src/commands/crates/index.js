@@ -34,7 +34,9 @@ async function main() {
           `${formatPercent(Number(reward.weight), total)} [${reward.rarity || 'common'}] ${reward.name}: ${describeReward(reward, currencyName)}`,
       );
     const price = Number(crate.keyPrice) > 0 ? `${crate.keyPrice} ${currencyName}/key` : 'not for sale';
-    await pog.pm(`${crate.name} crate (${price}, you have ${keys} key(s)). Odds:\n${lines.join('\n')}`);
+    // Some game chats (e.g. 7 Days to Die) don't render line breaks, so each line is its own message.
+    await pog.pm(`${crate.name} crate (${price}, you have ${keys} key(s)). Odds:`);
+    for (const line of lines) await pog.pm(line);
     return;
   }
 
@@ -44,9 +46,9 @@ async function main() {
     const price = Number(crate.keyPrice) > 0 ? `${crate.keyPrice} ${currencyName}/key` : 'shop/admin only';
     lines.push(`${crate.name}: ${keys} key(s), ${price}`);
   }
-  await pog.pm(
-    `Loot crates:\n${lines.join('\n')}\nOdds: ${prefix}crates <name>. Buy: ${prefix}crate buy <name> [amount]. Open: ${prefix}crate open <name>`,
-  );
+  await pog.pm('Loot crates:');
+  for (const line of lines) await pog.pm(line);
+  await pog.pm(`Odds: ${prefix}crates <name>. Buy: ${prefix}crate buy <name> [amount]. Open: ${prefix}crate open <name>`);
 }
 
 await main();

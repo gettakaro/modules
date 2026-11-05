@@ -50,9 +50,12 @@ const tests = [
     test: async function () {
       const result = await this.runCommand('crates');
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
-      expect(this.pms()).to.have.length(1);
-      expect(this.pms()[0]).to.contain('basic: 0 key(s), 100 test coin/key');
-      expect(this.pms()[0]).to.contain('gold: 2 key(s), shop/admin only');
+      expect(this.pms()).to.deep.equal([
+        'Loot crates:',
+        'basic: 0 key(s), 100 test coin/key',
+        'gold: 2 key(s), shop/admin only',
+        'Odds: /crates <name>. Buy: /crate buy <name> [amount]. Open: /crate open <name>',
+      ]);
     },
   }),
 
@@ -63,8 +66,11 @@ const tests = [
     test: async function () {
       const result = await this.runCommand('crates', { crate: 'BASIC' });
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
-      expect(this.pms()[0]).to.contain('75% [common] Small purse: 30 test coin');
-      expect(this.pms()[0]).to.contain('25% [legendary] Jackpot: 800 test coin');
+      expect(this.pms()).to.deep.equal([
+        'basic crate (100 test coin/key, you have 0 key(s)). Odds:',
+        '75% [common] Small purse: 30 test coin',
+        '25% [legendary] Jackpot: 800 test coin',
+      ]);
     },
   }),
 
