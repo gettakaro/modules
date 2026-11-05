@@ -1,0 +1,164 @@
+{
+  "name": "playtime-ranks",
+  "author": "Takaro",
+  "description": "Playtime Ranks: promotes players up a ladder of Takaro roles by total playtime (e.g. Newbie 0 h, Regular 10 h, Veteran 50 h, Legend 200 h). Each rank can grant a role (so ranks unlock permissions like more teleports), pay a one-time currency reward, send a PM and broadcast. A cron job checks online players; players use 'rank' and 'ranks', admins use 'rankcheck <player>'. Roles are never taken away for a higher rank than the player earned.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "ranks": {
+        "type": "array",
+        "title": "Rank ladder",
+        "description": "Ranks ordered by the hours of playtime needed. Pick a Takaro role per rank to unlock that role's permissions. A rank without a role is a title plus reward only. Rank names must be unique: rewards are remembered by name.",
+        "default": [
+          { "name": "Newbie", "hours": 0, "reward": 0, "message": "" },
+          { "name": "Regular", "hours": 10, "reward": 100, "message": "" },
+          { "name": "Veteran", "hours": 50, "reward": 500, "message": "" },
+          { "name": "Legend", "hours": 200, "reward": 2000, "message": "" }
+        ],
+        "items": {
+          "type": "object",
+          "title": "Rank",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Rank name",
+              "minLength": 1
+            },
+            "hours": {
+              "type": "number",
+              "title": "Hours of playtime needed",
+              "minimum": 0
+            },
+            "roleId": {
+              "type": "string",
+              "x-component": "role",
+              "title": "Role",
+              "description": "Takaro role given at this rank (optional)."
+            },
+            "reward": {
+              "type": "number",
+              "title": "One-time currency reward",
+              "minimum": 0,
+              "default": 0
+            },
+            "message": {
+              "type": "string",
+              "title": "Promotion PM",
+              "description": "Private message on reaching this rank. Empty uses the default promotion message. Placeholders: {player}, {rank}, {hours}, {reward}, {currency}, {prefix}.",
+              "default": ""
+            }
+          },
+          "required": [
+            "name",
+            "hours"
+          ]
+        }
+      },
+      "playtimeSource": {
+        "type": "string",
+        "title": "Playtime source",
+        "enum": [
+          "server",
+          "global"
+        ],
+        "default": "server",
+        "description": "'server' counts playtime on this game server only. 'global' counts playtime on all game servers in your Takaro domain."
+      },
+      "removePreviousRoles": {
+        "type": "boolean",
+        "title": "Remove previous rank roles",
+        "default": true,
+        "description": "When promoted, remove the roles of lower ranks. Roles of higher ranks are never removed."
+      },
+      "roleScope": {
+        "type": "string",
+        "title": "Role scope",
+        "enum": [
+          "server",
+          "global"
+        ],
+        "default": "server",
+        "description": "'server' gives the rank role on this game server only. 'global' gives it on every game server."
+      },
+      "promotionMessage": {
+        "type": "string",
+        "title": "Default promotion PM",
+        "default": "Congratulations {player}! You reached the rank {rank} after {hours} h of playtime. Type {prefix}rank to see your progress.",
+        "description": "Used when a rank has no own message. Placeholders: {player}, {rank}, {hours}, {reward}, {currency}, {prefix}."
+      },
+      "rewardMessage": {
+        "type": "string",
+        "title": "Reward PM",
+        "default": "You received {reward} {currency} for reaching {rank}!",
+        "description": "Sent when a rank reward is paid. Empty sends nothing. Placeholders: {player}, {rank}, {reward}, {currency}."
+      },
+      "broadcastMessage": {
+        "type": "string",
+        "title": "Promotion broadcast",
+        "default": "{player} has reached the rank {rank} after {hours} h on the server!",
+        "description": "Sent to everyone on a promotion. Empty disables broadcasts. Placeholders: {player}, {rank}, {hours}."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "PLAYTIME_RANKS_ADMIN",
+      "friendlyName": "Manage Playtime Ranks",
+      "description": "Allows using rankcheck to view and re-check another player's playtime rank.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "rank": {
+      "trigger": "rank",
+      "description": "Show your playtime rank and the time to the next rank",
+      "helpText": "Shows your current playtime rank, your hours played and how long until the next rank.",
+      "function": "src/commands/rank/index.js",
+      "arguments": []
+    },
+    "ranks": {
+      "trigger": "ranks",
+      "description": "List all playtime ranks",
+      "helpText": "Lists every playtime rank with the hours needed and its reward.",
+      "function": "src/commands/ranks/index.js",
+      "arguments": []
+    },
+    "rankcheck": {
+      "trigger": "rankcheck",
+      "description": "Admin: check and apply a player's playtime rank",
+      "helpText": "Admin command. Shows a player's playtime and rank, and promotes them now if they are due.",
+      "function": "src/commands/rankcheck/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "helpText": "The player to check.",
+          "position": 0,
+          "defaultValue": null
+        }
+      ],
+      "requiredPermissions": [
+        "PLAYTIME_RANKS_ADMIN"
+      ]
+    }
+  },
+  "cronJobs": {
+    "check-ranks": {
+      "temporalValue": "*/15 * * * *",
+      "description": "Checks online players' playtime and promotes them to the rank they earned.",
+      "function": "src/cronjobs/check-ranks/index.js"
+    }
+  },
+  "functions": {
+    "rank-helpers": {
+      "function": "src/functions/rank-helpers.js"
+    }
+  }
+}
