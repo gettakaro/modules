@@ -1,0 +1,206 @@
+{
+  "name": "loot-crates",
+  "author": "Takaro",
+  "description": "Key-based loot crates. Admins define crates with a weighted reward table: currency, items or both, each with a rarity. Players get keys by buying them with currency ({prefix}crate buy), from a Takaro shop listing that uses the giveCrateKey shop action, or from an admin ({prefix}crate givekey). {prefix}crate open uses a key and rolls a reward; rare and better drops are announced to the server. {prefix}crates lists every crate, your keys and the odds.",
+  "summary": "Key-based loot crates with weighted reward tables (currency and/or items, with rarities). Players get keys by buying them with currency, from a Takaro shop listing (giveCrateKey shop action) or from an admin, then open crates in chat. Rare drops are broadcast; odds are shown in-game.",
+  "version": "1.0.0",
+  "supportedGames": ["all"],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "crates": {
+        "type": "array",
+        "title": "Crates",
+        "description": "The crates players can open. Use short names without spaces, players type them in chat.",
+        "default": [
+          {
+            "name": "basic",
+            "keyPrice": 100,
+            "rewards": [
+              { "name": "Small purse", "rarity": "common", "weight": 60, "currency": 30, "items": [] },
+              { "name": "Full purse", "rarity": "uncommon", "weight": 25, "currency": 80, "items": [] },
+              { "name": "Treasure chest", "rarity": "rare", "weight": 12, "currency": 250, "items": [] },
+              { "name": "Jackpot", "rarity": "legendary", "weight": 3, "currency": 800, "items": [] }
+            ]
+          }
+        ],
+        "items": {
+          "type": "object",
+          "title": "Crate",
+          "required": ["name", "rewards"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "One word, players type it: {prefix}crate open <name>. Also used to match shop listings.",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "^\\S+$"
+            },
+            "keyPrice": {
+              "type": "number",
+              "title": "Key price",
+              "description": "Currency per key for {prefix}crate buy. 0 = keys cannot be bought with currency (shop or admin only).",
+              "minimum": 0,
+              "default": 0
+            },
+            "rewards": {
+              "type": "array",
+              "title": "Rewards",
+              "description": "Weighted reward table. Chance of a reward = its weight / sum of all weights.",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "title": "Reward",
+                "required": ["name", "weight"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "title": "Name",
+                    "description": "Shown to the player and in broadcasts.",
+                    "minLength": 1
+                  },
+                  "rarity": {
+                    "type": "string",
+                    "title": "Rarity",
+                    "enum": ["common", "uncommon", "rare", "epic", "legendary"],
+                    "default": "common"
+                  },
+                  "weight": {
+                    "type": "number",
+                    "title": "Weight",
+                    "exclusiveMinimum": 0
+                  },
+                  "currency": {
+                    "type": "number",
+                    "title": "Currency",
+                    "description": "Currency the player receives. 0 = none.",
+                    "minimum": 0,
+                    "default": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "title": "Items",
+                    "description": "Items the player receives. Item = the game's item code or a Takaro item ID.",
+                    "default": [],
+                    "items": {
+                      "type": "object",
+                      "required": ["item"],
+                      "properties": {
+                        "item": { "type": "string", "title": "Item", "minLength": 1 },
+                        "amount": { "type": "number", "title": "Amount", "minimum": 1, "default": 1 },
+                        "quality": { "type": "string", "title": "Quality", "default": "" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "broadcastMinRarity": {
+        "type": "string",
+        "title": "Broadcast from rarity",
+        "description": "Rewards of this rarity or better are announced to the whole server.",
+        "enum": ["common", "uncommon", "rare", "epic", "legendary", "never"],
+        "default": "rare"
+      },
+      "broadcastMessage": {
+        "type": "string",
+        "title": "Broadcast message",
+        "description": "Placeholders: {player}, {crate}, {reward}, {rarity}.",
+        "default": "{player} opened a {crate} crate and got {reward} ({rarity})!"
+      },
+      "maxKeysPerPurchase": {
+        "type": "number",
+        "title": "Max keys per purchase",
+        "description": "Most keys a player can buy with one {prefix}crate buy.",
+        "minimum": 1,
+        "default": 10
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "LOOT_CRATES_MANAGE",
+      "friendlyName": "Manage loot crate keys",
+      "description": "Allows giving crate keys to players with crate givekey.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "LOOT_CRATES_KEY_DISCOUNT",
+      "friendlyName": "Crate key discount",
+      "description": "Discount in percent on crate keys bought with currency. The count is the percentage (for example 20 = 20% off). Good for VIP roles.",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "crate": {
+      "trigger": "crate",
+      "description": "Buy, open or give crate keys.",
+      "helpText": "crate buy <name> [amount] | crate open <name> | crate givekey <player> <name> [amount] (admin)",
+      "function": "src/commands/crate/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "helpText": "buy, open or givekey",
+          "defaultValue": "help",
+          "position": 0
+        },
+        {
+          "name": "first",
+          "type": "string",
+          "helpText": "Crate name (buy/open) or player name (givekey)",
+          "defaultValue": "-",
+          "position": 1
+        },
+        {
+          "name": "second",
+          "type": "string",
+          "helpText": "Amount (buy) or crate name (givekey)",
+          "defaultValue": "-",
+          "position": 2
+        },
+        {
+          "name": "third",
+          "type": "string",
+          "helpText": "Amount (givekey)",
+          "defaultValue": "-",
+          "position": 3
+        }
+      ]
+    },
+    "crates": {
+      "trigger": "crates",
+      "description": "List crates, your keys and the odds.",
+      "helpText": "crates shows every crate and your keys. crates <name> shows the odds of one crate.",
+      "function": "src/commands/crates/index.js",
+      "arguments": [
+        {
+          "name": "crate",
+          "type": "string",
+          "helpText": "Optional crate name to see its odds",
+          "defaultValue": "-",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "functions": {
+    "crate-helpers": {
+      "function": "src/functions/crate-helpers.js"
+    }
+  },
+  "shopActions": {
+    "giveCrateKey": {
+      "description": "Gives crate keys to the buyer. The listing name must contain the crate name (for example \"Gold crate key\"); start it with a number and x for packs (\"5x Gold crate key\"). Keys given = pack size x amount ordered.",
+      "function": "src/shopActions/giveCrateKey/index.js"
+    }
+  }
+}
