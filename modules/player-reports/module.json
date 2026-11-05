@@ -1,0 +1,153 @@
+{
+  "name": "player-reports",
+  "author": "Takaro",
+  "description": "Player reports: players type `report <player> <reason>` (or `report <reason>` for general issues) to open a numbered ticket. Staff online with REPORTS_RECEIVE get a PM, and an optional Discord channel gets an alert. Each ticket stores the reporter's and target's position and online status, plus the target's last chat lines. Staff use `reports`, `reportview <id>` and `reportclose <id> [note]`; the reporter is told when it is closed. Cooldown and max open reports stop spam.",
+  "summary": "Players report griefers, cheaters or problems with one command. Each report becomes a numbered ticket with positions and recent chat attached. Online staff get a PM, an optional Discord alert fires, and staff list, view and close tickets in game. The reporter is told when their report is handled. Cooldown and an open-report limit stop spam.",
+  "version": "1.0.0",
+  "supportedGames": ["all"],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "cooldownSeconds": {
+        "type": "number",
+        "title": "Cooldown (seconds)",
+        "default": 120,
+        "minimum": 0,
+        "description": "How long a player must wait between two reports. 0 = no cooldown."
+      },
+      "maxOpenReportsPerPlayer": {
+        "type": "number",
+        "title": "Max open reports per player",
+        "default": 3,
+        "minimum": 0,
+        "description": "A player cannot file a new report while this many of theirs are still open. 0 = no limit."
+      },
+      "allowGeneralReports": {
+        "type": "boolean",
+        "title": "Allow general reports",
+        "default": true,
+        "description": "Allow `report <reason>` without naming a player (bugs, stuck, general problems)."
+      },
+      "minReasonLength": {
+        "type": "number",
+        "title": "Minimum reason length",
+        "default": 3,
+        "minimum": 1,
+        "description": "Shortest reason (in characters) that is accepted."
+      },
+      "maxReasonLength": {
+        "type": "number",
+        "title": "Maximum reason length",
+        "default": 300,
+        "minimum": 20,
+        "maximum": 1000,
+        "description": "Longer reasons are cut to this many characters."
+      },
+      "chatContextLines": {
+        "type": "number",
+        "title": "Chat lines of the reported player",
+        "default": 5,
+        "minimum": 0,
+        "maximum": 20,
+        "description": "How many recent chat lines of the reported player to attach to the ticket. 0 = off."
+      },
+      "discordChannelId": {
+        "type": "string",
+        "title": "Discord channel ID",
+        "default": "",
+        "description": "Optional. Discord channel ID for report alerts (needs the Takaro Discord bot in your server). Empty = off."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "REPORTS_RECEIVE",
+      "friendlyName": "Receive report alerts",
+      "description": "Gets an in-game PM when a player files a report.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "REPORTS_MANAGE",
+      "friendlyName": "Manage reports",
+      "description": "Can list, view and close reports (reports, reportview, reportclose).",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "report": {
+      "trigger": "report",
+      "description": "Report a player or a problem to staff",
+      "helpText": "report <player> <reason> - report a player. report <reason> - report a general problem.",
+      "function": "src/commands/report/index.js",
+      "arguments": [
+        {
+          "name": "text",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "Player name followed by the reason, or just the reason",
+          "position": 0
+        }
+      ]
+    },
+    "reports": {
+      "trigger": "reports",
+      "description": "Staff: list open reports",
+      "helpText": "Lists the newest open reports. Needs REPORTS_MANAGE.",
+      "function": "src/commands/reports/index.js",
+      "arguments": []
+    },
+    "reportview": {
+      "trigger": "reportview",
+      "description": "Staff: show one report with its context",
+      "helpText": "reportview <id> - shows reporter, target, positions, reason and chat context. Needs REPORTS_MANAGE.",
+      "function": "src/commands/reportview/index.js",
+      "arguments": [
+        {
+          "name": "id",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "Report number",
+          "position": 0
+        }
+      ]
+    },
+    "reportclose": {
+      "trigger": "reportclose",
+      "description": "Staff: close a report, optionally with a note",
+      "helpText": "reportclose <id> [note] - closes the report and tells the reporter. Needs REPORTS_MANAGE.",
+      "function": "src/commands/reportclose/index.js",
+      "arguments": [
+        {
+          "name": "id",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "Report number",
+          "position": 0
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "Optional note for the reporter",
+          "position": 1
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "deliver-notices": {
+      "eventType": "player-connected",
+      "description": "Tells reporters about reports that were closed while they were offline",
+      "function": "src/hooks/deliver-notices/index.js"
+    }
+  },
+  "functions": {
+    "report-helpers": {
+      "function": "src/functions/report-helpers.js"
+    }
+  }
+}

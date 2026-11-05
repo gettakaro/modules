@@ -228,6 +228,23 @@
       ]
     },
     {
+      "name": "player-reports",
+      "description": "Players report griefers, cheaters or problems with one command. Each report becomes a numbered ticket with positions and recent chat attached. Online staff get a PM, an optional Discord alert fires, and staff list, view and close tickets in game. The reporter is told when their report is handled. Cooldown and an open-report limit stop spam.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "71018f7c77f5cfebbda723802360bc177cc9eca33be886618e5e1e22f7aac9be",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "playerOnboarding",
       "description": "Collection of functions that are executed when a player joins the server. Helps with onboarding new players, like sending a welcome message. The starter kit is an Item Set, managed on the server's Item Sets page.",
       "latestVersion": "1.0.0",
