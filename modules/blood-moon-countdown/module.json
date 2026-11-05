@@ -1,0 +1,85 @@
+{
+  "name": "blood-moon-countdown",
+  "author": "Takaro",
+  "description": "7 Days to Die helper commands that tell players how many in-game days remain until the next blood moon/horde night using live server time.",
+  "version": "latest",
+  "supportedGames": [
+    "7 days to die"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "hordeIntervalDays": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 7,
+        "description": "How often blood moon/horde night happens, in in-game days. Vanilla is every 7 days."
+      },
+      "firstHordeDay": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 7,
+        "description": "The first blood moon day in the cycle. Vanilla is day 7."
+      },
+      "timeConsoleCommand": {
+        "type": "string",
+        "default": "gettime",
+        "maxLength": 80,
+        "description": "Console command used to read current 7D2D game time. The output must include the current day, such as 'Day 12'."
+      },
+      "responseTemplate": {
+        "type": "string",
+        "default": "Blood moon: Day {nextHordeDay}. Current day: {currentDay}. {daysUntilText}.",
+        "maxLength": 300,
+        "description": "Player response template. Supports {currentDay}, {nextHordeDay}, {daysUntil}, {daysUntilText}, {interval}, {firstHordeDay}, and {source}."
+      },
+      "hordeTodayText": {
+        "type": "string",
+        "default": "Blood moon is tonight",
+        "maxLength": 120,
+        "description": "Text used for {daysUntilText} when the next horde day is today."
+      },
+      "daysUntilText": {
+        "type": "string",
+        "default": "{daysUntil} day(s) remaining",
+        "maxLength": 120,
+        "description": "Text used for {daysUntilText} when the horde is in the future. Supports {daysUntil}."
+      },
+      "parseErrorMessage": {
+        "type": "string",
+        "default": "I couldn't read the current game day. Ask an admin to check the blood-moon-countdown module config and timeConsoleCommand.",
+        "maxLength": 300,
+        "description": "Player-facing message when console time parsing fails."
+      },
+      "includeConsoleOutputInLogs": {
+        "type": "boolean",
+        "default": true,
+        "description": "Log the raw console output when parsing fails. Useful while tuning timeConsoleCommand."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "commands": {
+    "bloodmoon": {
+      "trigger": "bloodmoon",
+      "description": "Show how many in-game days remain until the next blood moon/horde night.",
+      "helpText": "Usage: /bloodmoon — shows current day, next horde day, and days remaining.",
+      "function": "src/commands/bloodmoon/index.js",
+      "arguments": []
+    },
+    "day7": {
+      "trigger": "day7",
+      "description": "Alias for /bloodmoon.",
+      "helpText": "Usage: /day7 — shows how many days remain until the next blood moon/horde night.",
+      "function": "src/commands/bloodmoon/index.js",
+      "arguments": []
+    }
+  },
+  "functions": {
+    "blood-moon-helpers": {
+      "function": "src/functions/blood-moon-helpers.js"
+    }
+  }
+}
