@@ -1,0 +1,256 @@
+{
+  "name": "lucky-drop",
+  "author": "Takaro",
+  "description": "Lucky Drop keeps players online with surprise rewards. Every so often (default 45 minutes, plus or minus a random jitter) a random online player wins a lucky drop: a reward rolled from a weighted table with rarities such as Common, Rare and Legendary. A reward can be currency, items, or both. The whole server sees \"🎁 {player} got a Rare lucky drop: 200 coins!\".\n\nWho can win:\n- players with the LUCKY_DROP_ELIGIBLE permission\n- at least `minSessionMinutes` online this session\n- not AFK (position unchanged since the last check), when `excludeAfk` is on\n- the drop only happens when at least `minOnlinePlayers` are online\n- LUCKY_DROP_VIP_WEIGHT (count) multiplies a player's chance to be picked\n\nClaim race mode: instead of picking a winner, the server announces \"type /grab within 30 s\" and the first eligible player to type it gets the drop.\n\nAdmins use `luckystats` to see the next drop time, totals per rarity and the latest drops, and `luckydropnow` to force a drop.\n\nThe `dropTick` cron job checks every 5 minutes whether a drop is due. Items are given with the game's give-item support; currency needs the economy enabled.",
+  "summary": "Surprise rewards that keep players online. Every ~45 minutes (with random jitter) a random eligible online player wins a lucky drop rolled from a weighted rarity table (Common/Rare/Legendary): currency, items or both, announced to the server. Optional claim race: first player to type grab wins. Min online players, min session time, AFK exclusion, VIP odds via permission count, admin stats.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "dropIntervalMinutes": {
+        "type": "number",
+        "title": "Drop interval (minutes)",
+        "default": 45,
+        "minimum": 5,
+        "description": "Average minutes between lucky drops. The dropTick cron job checks every 5 minutes, so the real timing has 5-minute steps."
+      },
+      "jitterMinutes": {
+        "type": "number",
+        "title": "Random jitter (minutes)",
+        "default": 15,
+        "minimum": 0,
+        "description": "Each drop happens up to this many minutes earlier or later than the interval, so players cannot predict it. 0 = exact interval."
+      },
+      "minOnlinePlayers": {
+        "type": "number",
+        "title": "Minimum online players",
+        "default": 2,
+        "minimum": 1,
+        "description": "No drop happens while fewer players are online. The drop fires as soon as enough players are online."
+      },
+      "minSessionMinutes": {
+        "type": "number",
+        "title": "Minimum session time (minutes)",
+        "default": 10,
+        "minimum": 0,
+        "description": "A player must be online at least this long in the current session to win a random drop. 0 = no minimum. Does not apply to claim races."
+      },
+      "excludeAfk": {
+        "type": "boolean",
+        "title": "Exclude AFK players",
+        "default": true,
+        "description": "Skip players whose position did not change since the previous check (about 5 minutes). Players without position data are never treated as AFK."
+      },
+      "mode": {
+        "type": "string",
+        "title": "Drop mode",
+        "enum": [
+          "random",
+          "claimRace"
+        ],
+        "default": "random",
+        "description": "random = pick a random eligible online player. claimRace = announce the drop and the first player to type the grab command wins."
+      },
+      "claimWindowSeconds": {
+        "type": "number",
+        "title": "Claim race window (seconds)",
+        "default": 30,
+        "minimum": 5,
+        "maximum": 600,
+        "description": "How long players have to type the grab command in claim race mode."
+      },
+      "rewards": {
+        "type": "array",
+        "title": "Reward table",
+        "description": "Weighted reward table. A higher weight makes that rarity more likely. Each entry gives its currency and/or all of its items.",
+        "default": [
+          {
+            "rarity": "Common",
+            "weight": 70,
+            "currency": 50,
+            "items": []
+          },
+          {
+            "rarity": "Rare",
+            "weight": 25,
+            "currency": 200,
+            "items": []
+          },
+          {
+            "rarity": "Legendary",
+            "weight": 5,
+            "currency": 1000,
+            "items": []
+          }
+        ],
+        "items": {
+          "type": "object",
+          "title": "Reward",
+          "required": [
+            "rarity",
+            "weight"
+          ],
+          "properties": {
+            "rarity": {
+              "type": "string",
+              "title": "Rarity name",
+              "minLength": 1,
+              "description": "Shown in the announcement, for example Common, Rare or Legendary."
+            },
+            "weight": {
+              "type": "number",
+              "title": "Weight",
+              "minimum": 0,
+              "description": "Relative chance. 70/25/5 means 70%, 25% and 5%."
+            },
+            "currency": {
+              "type": "number",
+              "title": "Currency",
+              "minimum": 0,
+              "default": 0,
+              "description": "Currency given. Needs the economy enabled."
+            },
+            "items": {
+              "x-component": "item",
+              "type": "array",
+              "title": "Items",
+              "default": [],
+              "description": "Items given, all of them.",
+              "items": {
+                "type": "object",
+                "title": "Item",
+                "required": [
+                  "item"
+                ],
+                "properties": {
+                  "item": {
+                    "type": "string",
+                    "title": "Item"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "title": "Amount",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "quality": {
+                    "type": "string",
+                    "title": "Quality",
+                    "default": ""
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "dropMessage": {
+        "type": "string",
+        "title": "Drop announcement",
+        "default": "🎁 {player} got a {rarity} lucky drop: {reward}!",
+        "description": "Broadcast when someone wins a drop. Placeholders: {player}, {rarity}, {reward}."
+      },
+      "claimAnnounceMessage": {
+        "type": "string",
+        "title": "Claim race announcement",
+        "default": "🎁 A {rarity} lucky drop appeared! Type {prefix}grab within {seconds} s to claim it!",
+        "description": "Broadcast when a claim race starts. Placeholders: {rarity}, {reward}, {prefix}, {seconds}."
+      },
+      "claimExpiredMessage": {
+        "type": "string",
+        "title": "Claim race expired message",
+        "default": "Nobody grabbed the {rarity} lucky drop in time. Better luck next time!",
+        "description": "Broadcast at the next check when nobody grabbed the drop. Placeholders: {rarity}, {reward}. Empty = no message."
+      },
+      "historySize": {
+        "type": "number",
+        "title": "History size",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 100,
+        "description": "How many recent drops luckystats keeps."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "rewards": {
+      "items": {
+        "items": {
+          "items": {
+            "item": {
+              "ui:widget": "item"
+            }
+          }
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "LUCKY_DROP_ELIGIBLE",
+      "friendlyName": "Lucky Drop: eligible",
+      "description": "Player can win random lucky drops and grab claim-race drops.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "LUCKY_DROP_VIP_WEIGHT",
+      "friendlyName": "Lucky Drop: VIP odds",
+      "description": "Multiplies the chance to be picked for a random drop. Count = multiplier, for example 2 = twice as likely.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "LUCKY_DROP_ADMIN",
+      "friendlyName": "Lucky Drop: admin",
+      "description": "Can see lucky drop stats and force a drop.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "grab": {
+      "trigger": "grab",
+      "description": "Grab the current claim-race lucky drop.",
+      "helpText": "Be the first to type this after a lucky drop appears to claim it.",
+      "function": "src/commands/grab/index.js",
+      "arguments": []
+    },
+    "luckystats": {
+      "trigger": "luckystats",
+      "description": "Admin: show the next drop time, totals per rarity and recent lucky drops.",
+      "helpText": "Shows lucky drop stats and recent winners. Admin only.",
+      "function": "src/commands/luckystats/index.js",
+      "arguments": []
+    },
+    "luckydropnow": {
+      "trigger": "luckydropnow",
+      "description": "Admin: force a lucky drop right now.",
+      "helpText": "Forces a lucky drop now in the configured mode. Skips the timer, minimum online players, session time and AFK checks; the eligible permission still counts. Admin only.",
+      "function": "src/commands/luckydropnow/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "on-player-connected": {
+      "eventType": "player-connected",
+      "description": "Remembers when a player's session started, for the minimum session time.",
+      "function": "src/hooks/on-player-connected/index.js"
+    }
+  },
+  "cronJobs": {
+    "dropTick": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Every 5 minutes: track AFK positions, close expired claim races and fire a lucky drop when one is due.",
+      "function": "src/cronjobs/drop-tick/index.js"
+    }
+  },
+  "functions": {
+    "lucky-drop-helpers": {
+      "function": "src/functions/lucky-drop-helpers.js"
+    }
+  }
+}
