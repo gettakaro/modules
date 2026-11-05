@@ -441,6 +441,25 @@ const tests = [
   }),
 
   createModuleTest({
+    name: 'tick pays a 1-minute interval even when the cron fires a bit early, without drifting',
+    module: MODULE,
+    now: THU_1200,
+    currency: 0,
+    userConfig: { playtimeIntervalMinutes: 1 },
+    setup: function () {
+      // Last payout 59.6 s ago: the cron fired 400 ms early.
+      seedState(this, runningState(THU_1200, 30, 2, { lastPlaytimeAt: new Date(THU_1200.getTime() - 59600).toISOString() }));
+    },
+    test: async function () {
+      const result = await this.runCronJob('tick');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(10);
+      // The anchor moves one full interval, not to "now".
+      expect(readState(this).lastPlaytimeAt).to.equal(new Date(THU_1200.getTime() + 400).toISOString());
+    },
+  }),
+
+  createModuleTest({
     name: 'tick broadcasts a reminder on the interval',
     module: MODULE,
     now: THU_1200,

@@ -3,6 +3,22 @@ import { takaro, checkPermission } from '@takaro/helpers';
 export const STATE_KEY = 'happy_hour_state';
 export const VIP_PERMISSION = 'HAPPY_HOUR_VIP_BONUS';
 export const MINUTE_MS = 60 * 1000;
+// The tick cron fires a few hundred ms to a few seconds early or late. A step that is due
+// within this slack counts as due, so a 1-minute interval never skips a tick.
+export const TICK_SLACK_MS = 15 * 1000;
+
+/**
+ * Interval step for a once-a-minute tick. Returns the new anchor (ISO) when a step is due, else null.
+ * The anchor moves forward in whole intervals from the last one, so jitter never adds up and
+ * missed ticks give one payout, not a burst.
+ */
+export function dueStep(lastIso, now, everyMs) {
+  const last = new Date(lastIso).getTime();
+  if (!Number.isFinite(last) || everyMs <= 0) return null;
+  const steps = Math.floor((now - last + TICK_SLACK_MS) / everyMs);
+  if (steps < 1) return null;
+  return new Date(last + steps * everyMs).toISOString();
+}
 // A delayed or skipped tick still catches schedule matches from this far back.
 const CATCH_UP_MINUTES = 10;
 

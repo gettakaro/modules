@@ -1,6 +1,7 @@
 import { data, takaro } from '@takaro/helpers';
 import {
   MINUTE_MS,
+  dueStep,
   getState,
   setState,
   isRunning,
@@ -116,18 +117,18 @@ async function main() {
     // 3. Reminders while the event runs.
     const reminderEvery = Number(config.reminderIntervalMinutes) || 0;
     const remaining = new Date(state.endsAt).getTime() - now;
-    const sinceReminder = now - new Date(state.lastReminderAt || state.startedAt).getTime();
-    if (reminderEvery > 0 && sinceReminder >= reminderEvery * MINUTE_MS && remaining > MINUTE_MS) {
+    const reminderAt = reminderEvery > 0 ? dueStep(state.lastReminderAt || state.startedAt, now, reminderEvery * MINUTE_MS) : null;
+    if (reminderAt && remaining > MINUTE_MS) {
       await broadcast(gameServerId, fill(config.reminderMessage, eventValues(state, now, ctx)));
-      state.lastReminderAt = new Date(now).toISOString();
+      state.lastReminderAt = reminderAt;
     }
 
     // 4. Playtime bonus for everyone online.
     const payEvery = Math.max(1, Number(config.playtimeIntervalMinutes) || 10);
-    const sincePay = now - new Date(state.lastPlaytimeAt || state.startedAt).getTime();
-    if (sincePay >= payEvery * MINUTE_MS) {
+    const payAt = dueStep(state.lastPlaytimeAt || state.startedAt, now, payEvery * MINUTE_MS);
+    if (payAt) {
       await payPlaytimeBonus(gameServerId, config, state, ctx);
-      state.lastPlaytimeAt = new Date(now).toISOString();
+      state.lastPlaytimeAt = payAt;
     }
   } else {
     // 5. Heads-up before a scheduled start.
