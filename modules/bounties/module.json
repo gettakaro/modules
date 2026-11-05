@@ -1,0 +1,149 @@
+{
+  "name": "bounties",
+  "author": "Takaro",
+  "description": "Player bounties for PvP servers. Players put currency on another player's head with `bounty <player> <amount>`; the amount is taken right away and held by the module. When the target is killed by another player, the killer collects the whole pot and the server hears about it. `bounties` lists the active bounties and `bountycancel <player>` refunds your own unclaimed bounty minus a cancel fee. Placers can never collect their own bounty, players in the same exclusion group cannot claim on each other, and bounties that nobody claims are refunded in full after a configurable number of days. Claims need the game to report who killed whom: a player-death event with an attacker (Rust, Minecraft and other connectors that send one) or a server log line such as 7 Days to Die's `GMSG: Player 'Victim' killed by 'Killer'` (pattern configurable). On games that report neither, no bounty is ever claimed and every bounty is refunded when it expires.",
+  "summary": "Player bounties for PvP servers: `bounty <player> <amount>` holds currency on a target, the player who kills the target collects the pot. List, cancel (minus a fee), exclusion groups, no self-claims and automatic refunds when a bounty expires. Needs the game to report the killer (player-death attacker, or a log line such as 7 Days to Die's `killed by`).",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "minAmount": {
+        "type": "integer",
+        "title": "Minimum bounty",
+        "description": "Smallest amount a player can put on someone in one go.",
+        "default": 100,
+        "minimum": 1
+      },
+      "placementFeePercent": {
+        "type": "number",
+        "title": "Placement fee (%)",
+        "description": "Fee charged on top of the amount when placing a bounty. The fee is kept by the server and does not go into the pot. 0 = no fee.",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 100
+      },
+      "cancelFeePercent": {
+        "type": "number",
+        "title": "Cancel fee (%)",
+        "description": "Part of the amount that is NOT refunded when a player cancels their own bounty with bountycancel. Expired bounties are always refunded in full.",
+        "default": 10,
+        "minimum": 0,
+        "maximum": 100
+      },
+      "expiryDays": {
+        "type": "number",
+        "title": "Expiry (days)",
+        "description": "Days after which an unclaimed bounty is refunded in full to the player who placed it. 0 = bounties never expire.",
+        "default": 7,
+        "minimum": 0
+      },
+      "broadcastNewBounties": {
+        "type": "boolean",
+        "title": "Announce new bounties",
+        "description": "Tell the whole server when someone places a bounty.",
+        "default": true
+      },
+      "exclusionGroups": {
+        "type": "array",
+        "title": "Exclusion groups",
+        "description": "Players in the same group cannot claim bounties on each other (for example clan mates or alt accounts). One group per entry: a comma-separated list of player names, Steam IDs or game IDs. Example: \"Alice, Bob, 76561198000000000\".",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "killLogPattern": {
+        "type": "string",
+        "title": "Kill log pattern",
+        "description": "For games that only report PvP kills in the server log. A JavaScript regular expression with the named groups 'victim' and 'killer'; it is only tried on log lines that contain 'killed by'. The default matches vanilla 7 Days to Die. Leave empty to turn the log source off.",
+        "default": "GMSG: Player '(?<victim>.+)' killed by '(?<killer>.+)'"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "BOUNTIES_PLACE",
+      "friendlyName": "Place bounties",
+      "description": "Allows a player to place bounties with the bounty command. The count is the maximum number of players they can have an active bounty on at the same time (0 or no count = no limit).",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "bounty-place": {
+      "trigger": "bounty",
+      "description": "Put a currency bounty on another player",
+      "helpText": "Usage: bounty <player> <amount>. The amount is taken now and paid to whoever kills the player.",
+      "function": "src/commands/bounty-place/index.js",
+      "arguments": [
+        {
+          "name": "target",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to put a bounty on",
+          "position": 0
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "defaultValue": null,
+          "helpText": "How much currency to put on their head",
+          "position": 1
+        }
+      ]
+    },
+    "bounty-list": {
+      "trigger": "bounties",
+      "description": "List the active bounties",
+      "helpText": "Shows who has a bounty on them and how big the pot is.",
+      "function": "src/commands/bounty-list/index.js",
+      "arguments": []
+    },
+    "bounty-cancel": {
+      "trigger": "bountycancel",
+      "description": "Cancel your own bounty on a player",
+      "helpText": "Usage: bountycancel <player>. Refunds your unclaimed bounty minus the cancel fee.",
+      "function": "src/commands/bounty-cancel/index.js",
+      "arguments": [
+        {
+          "name": "target",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player whose bounty you placed",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "on-player-death": {
+      "eventType": "player-death",
+      "description": "Pays the bounty when the game reports the killer as the attacker of a player-death event",
+      "function": "src/hooks/on-player-death/index.js"
+    },
+    "on-kill-log": {
+      "eventType": "log",
+      "regex": "killed by",
+      "description": "Pays the bounty when a server log line reports a PvP kill (default: 7 Days to Die's GMSG line)",
+      "function": "src/hooks/on-kill-log/index.js"
+    }
+  },
+  "cronJobs": {
+    "expire-bounties": {
+      "temporalValue": "17 * * * *",
+      "description": "Refunds bounties older than the expiry setting to the players who placed them",
+      "function": "src/cronjobs/expire-bounties/index.js"
+    }
+  },
+  "functions": {
+    "bounty-helpers": {
+      "function": "src/functions/bounty-helpers.js"
+    }
+  }
+}
