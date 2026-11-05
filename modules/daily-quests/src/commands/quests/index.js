@@ -36,7 +36,8 @@ async function main() {
     const costText = cost > 0 ? `${cost} ${await getSetting(ctx, 'currencyName', 'coins')}` : 'free';
     out.push(`Swap a quest: ${prefix}questreroll <number> (${costText}, ${left} left today)`);
   }
-  await pm(ctx, playerId, out.join('\n'));
+  // Some game chats (e.g. 7 Days to Die) don't render line breaks, so each line is its own message.
+  for (const line of out) await pm(ctx, playerId, line);
 }
 
 await main();

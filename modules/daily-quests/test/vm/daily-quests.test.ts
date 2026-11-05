@@ -77,11 +77,13 @@ const tests = [
       // chat is disabled, `daily` isn't installed: random 0 picks the first eligible each time.
       expect(state.quests.map((q: { id: string }) => q.id)).to.deep.equal(['kill-zombies', 'play-30']);
       expect(state.lastTick).to.equal(NOW.toISOString());
-      const pm = this.pms()[0];
-      expect(pm).to.contain('Daily quests (0/2 done, reset in 14h 0m):');
-      expect(pm).to.contain('1. Kill 4 zombies - 0/4 (100 test coin)');
-      expect(pm).to.contain('2. Play 30 minutes - 0/30 (20 test coin)');
-      expect(pm).to.contain('/questreroll <number> (100 test coin, 1 left today)');
+      // One message per line: 7 Days to Die chat does not render line breaks.
+      const pms = this.pms();
+      expect(pms).to.have.length(4);
+      expect(pms[0]).to.equal('Daily quests (0/2 done, reset in 14h 0m):');
+      expect(pms[1]).to.contain('1. Kill 4 zombies - 0/4 (100 test coin)');
+      expect(pms[2]).to.contain('2. Play 30 minutes - 0/30 (20 test coin)');
+      expect(pms[3]).to.contain('/questreroll <number> (100 test coin, 1 left today)');
     },
   }),
 
@@ -328,10 +330,14 @@ const tests = [
       const res = await this.runCronJob('daily-reset');
       expect(res.success, JSON.stringify(res.logs)).to.be.true;
       expect(stateOf(this, this.pog.playerId).day).to.equal(TODAY);
-      expect(this.pms()[0]).to.contain('New daily quests!\n1. Kill 4 zombies - 0/4');
+      const pms = this.pms();
+      expect(pms[0]).to.equal('New daily quests!');
+      expect(pms[1]).to.contain('1. Kill 4 zombies - 0/4');
+      expect(pms[pms.length - 1]).to.equal('Type /quests for progress.');
+      expect(pms.every((m: string) => !m.includes('\n'))).to.be.true;
       // A second run the same hour does nothing new.
       await this.runCronJob('daily-reset');
-      expect(this.pms()).to.have.length(1);
+      expect(this.pms()).to.have.length(pms.length);
     },
   }),
 

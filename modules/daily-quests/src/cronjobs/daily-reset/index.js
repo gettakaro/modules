@@ -27,11 +27,14 @@ async function main() {
       assigned++;
       if (ctx.config.announceNewQuests === false) continue;
       const lines = await questLines(ctx, record.state);
-      const body = lines.length ? lines.join('\n') : 'No quests available today.';
-      await takaro.gameserver.gameServerControllerSendMessage(ctx.gameServerId, {
-        message: `New daily quests!\n${body}\nType ${prefix}quests for progress.`,
-        opts: { recipient: { gameId: pog.gameId } },
-      });
+      // Some game chats (e.g. 7 Days to Die) don't render line breaks, so each line is its own message.
+      const messages = ['New daily quests!', ...(lines.length ? lines : ['No quests available today.']), `Type ${prefix}quests for progress.`];
+      for (const message of messages) {
+        await takaro.gameserver.gameServerControllerSendMessage(ctx.gameServerId, {
+          message,
+          opts: { recipient: { gameId: pog.gameId } },
+        });
+      }
     } catch (err) {
       console.error(`daily-reset: failed for player ${pog.playerId}: ${err}`);
     }
