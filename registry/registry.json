@@ -321,6 +321,24 @@
       ]
     },
     {
+      "name": "steam-profile-guard",
+      "description": "Checks a joining player's Steam profile: account age, private profile, Steam level, hours in this game, recent VAC/game bans and family sharing. Alerts admins in-game and on Discord by default; per rule it can kick or ban. Full checks need your Steam Web API key and api.steampowered.com allowed for modules (sgtest checks); otherwise it uses Takaro's stored Steam data. Whitelist, exempt permission and sgallow.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "f9b69d306bbee1ac5249abfa307b7119129fcefc5082c3c225bf1abc5bf98e3a",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
       "name": "teleports",
       "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
       "latestVersion": "1.0.1",
