@@ -1,0 +1,182 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "private-messages",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Private Messages — players talk one-to-one without spamming global chat. msg <player> <text> sends a private message to an online player, r <text> replies to whoever messaged you last. mail <player> <text> leaves a message for a player who is offline; it is shown when they next join (mailbox to read again, mailclear to empty it). seen <player> shows when someone was last online. ignore <player> blocks someone's messages and mail (ignore alone lists them, unignore to undo). A shared cooldown stops spam. Optional staff social spy (off by default): staff with PM_SPY can turn on socialspy to get copies of private messages — tell your players if you enable it. Note: the command line itself goes through game chat; use a command prefix your game hides from public chat if privacy matters.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"cooldownSeconds\":{\"type\":\"number\",\"default\":3,\"minimum\":0,\"description\":\"Seconds a player must wait between private messages or mails (shared by msg, r and mail). 0 = no cooldown.\"},\"maxMessageLength\":{\"type\":\"integer\",\"default\":200,\"minimum\":10,\"maximum\":500,\"description\":\"Longer messages are cut to this many characters.\"},\"mailboxSize\":{\"type\":\"integer\",\"default\":10,\"minimum\":1,\"maximum\":50,\"description\":\"Mails kept per player. When full, the oldest read mail makes room; a box full of unread mail refuses new mail.\"},\"mailExpiryDays\":{\"type\":\"number\",\"default\":30,\"minimum\":0,\"description\":\"Days until a mail is deleted automatically. 0 = mails never expire.\"},\"incomingFormat\":{\"type\":\"string\",\"default\":\"[PM from {sender}] {message}\",\"description\":\"What the receiver sees. Placeholders: {sender}, {receiver}, {message}, {prefix}\"},\"outgoingFormat\":{\"type\":\"string\",\"default\":\"[PM to {receiver}] {message}\",\"description\":\"Confirmation the sender sees. Placeholders: {sender}, {receiver}, {message}, {prefix}\"},\"newMailNotice\":{\"type\":\"string\",\"default\":\"New mail from {sender}. You have {count} unread. Type {prefix}mailbox to read it.\",\"description\":\"Sent to an online player who just got mail. Placeholders: {sender}, {count}, {prefix}\"},\"socialSpy\":{\"type\":\"boolean\",\"default\":false,\"description\":\"Allow staff with the PM_SPY permission to see copies of private messages and mail via the socialspy command. Off by default. If you turn this on, tell your players (e.g. in your rules) that staff can read private messages.\"},\"spyFormat\":{\"type\":\"string\",\"default\":\"[Spy] {message}\",\"description\":\"How a social spy copy looks. Placeholder: {message} (sender -> receiver: text)\"}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "msg",
+          "trigger": "msg",
+          "description": "Send a private message",
+          "helpText": "Usage: msg <player> <text> — sends a private message to an online player.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { deliverPrivate, getPlayerName, getPrefix, parseText } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod, chatMessage } = data;\n  const cfg = mod.userConfig;\n\n  const target = args.player;\n  if (!target || !target.playerId) throw new TakaroUserError('Please name a player to message.');\n\n  const text = parseText(chatMessage?.msg, 2, args.message, cfg.maxMessageLength);\n  if (!text) throw new TakaroUserError('Please write a message.');\n\n  const [prefix, targetName] = await Promise.all([\n    getPrefix(gameServerId),\n    getPlayerName(target.playerId, target.name || 'that player'),\n  ]);\n  const error = await deliverPrivate({\n    gameServerId,\n    moduleId: mod.moduleId,\n    cfg,\n    senderPog: pog,\n    senderName: player.name,\n    target: { playerId: target.playerId, name: targetName },\n    text,\n    prefix,\n    now: Date.now(),\n  });\n  if (error) throw new TakaroUserError(error);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The online player to message",
+              "position": 0
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "defaultValue": null,
+              "helpText": "Your message (the rest of the line)",
+              "position": 1
+            }
+          ]
+        },
+        {
+          "name": "r",
+          "trigger": "r",
+          "description": "Reply to your last private message",
+          "helpText": "Usage: r <text> — replies to the last player who messaged you.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { deliverPrivate, getPrefix, KEYS, parseText, readVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod, chatMessage } = data;\n  const cfg = mod.userConfig;\n\n  const [prefix, reply] = await Promise.all([\n    getPrefix(gameServerId),\n    readVar(gameServerId, mod.moduleId, player.id, KEYS.replyTo, null),\n  ]);\n  const last = reply.value;\n  if (!last || !last.playerId) {\n    throw new TakaroUserError(`Nobody has messaged you yet. Use ${prefix}msg <player> <text>.`);\n  }\n\n  const text = parseText(chatMessage?.msg, 1, args.message, cfg.maxMessageLength);\n  if (!text) throw new TakaroUserError('Please write a message.');\n\n  const error = await deliverPrivate({\n    gameServerId,\n    moduleId: mod.moduleId,\n    cfg,\n    senderPog: pog,\n    senderName: player.name,\n    target: { playerId: last.playerId, name: last.name },\n    text,\n    prefix,\n    now: Date.now(),\n  });\n  if (error) throw new TakaroUserError(error);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "message",
+              "type": "string",
+              "defaultValue": null,
+              "helpText": "Your reply (the rest of the line)",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "mail",
+          "trigger": "mail",
+          "description": "Leave mail for a player",
+          "helpText": "Usage: mail <player> <text> — stores a message; the player gets it when they next join (or now, if online).",
+          "function": "import { data, TakaroUserError, takaro } from '@takaro/helpers';\nimport {\n  checkCooldown,\n  getPlayerName,\n  getPrefix,\n  isIgnoredBy,\n  KEYS,\n  loadMailbox,\n  parseText,\n  pushMail,\n  renderTemplate,\n  sendTo,\n  spyCopy,\n  stampCooldown,\n  writeVar,\n} from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod, chatMessage } = data;\n  const cfg = mod.userConfig;\n  const moduleId = mod.moduleId;\n  const now = Date.now();\n\n  const target = args.player;\n  if (!target || !target.playerId) throw new TakaroUserError('Please name a player to mail.');\n\n  const text = parseText(chatMessage?.msg, 2, args.message, cfg.maxMessageLength);\n  if (!text) throw new TakaroUserError('Please write a message.');\n\n  const self = target.playerId === player.id;\n  const [prefix, targetName] = await Promise.all([\n    getPrefix(gameServerId),\n    self ? Promise.resolve(player.name) : getPlayerName(target.playerId, target.name || 'that player'),\n  ]);\n\n  if (!self && (await isIgnoredBy(gameServerId, moduleId, target.playerId, pog))) {\n    throw new TakaroUserError(`${targetName} is not accepting your messages.`);\n  }\n\n  const cooldown = await checkCooldown(gameServerId, moduleId, player.id, cfg.cooldownSeconds, now);\n  if (cooldown && cooldown.wait) {\n    throw new TakaroUserError(`Slow down: wait ${cooldown.wait}s before sending another message.`);\n  }\n\n  const box = await loadMailbox(gameServerId, moduleId, target.playerId, cfg.mailExpiryDays, now);\n  const mail = { fromId: player.id, fromName: player.name, text, sentAt: new Date(now).toISOString(), read: false };\n  const pushed = pushMail(box.mails, mail, cfg.mailboxSize);\n  if (!pushed.ok) throw new TakaroUserError(`${targetName}'s mailbox is full. Try again later.`);\n  await writeVar(gameServerId, moduleId, target.playerId, KEYS.mailbox, box.id, pushed.mails);\n  await stampCooldown(gameServerId, moduleId, player.id, cooldown, now);\n\n  const unread = pushed.mails.filter((m) => !m.read).length;\n  let online = false;\n  if (!self) {\n    try {\n      const res = await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(gameServerId, target.playerId);\n      const tPog = res.data.data;\n      online = Boolean(tPog.online);\n      if (online) {\n        await sendTo(\n          gameServerId,\n          tPog.gameId,\n          renderTemplate(cfg.newMailNotice, { sender: player.name, count: unread, prefix }),\n        );\n      }\n    } catch (err) {\n      console.error(`private-messages: new-mail notice failed: ${err}`);\n    }\n  }\n\n  await pog.pm(\n    online\n      ? `Mail sent to ${targetName}. They are online and were told about it.`\n      : `Mail sent to ${targetName}. They will get it when they next join.`,\n  );\n  if (!self) {\n    await spyCopy(gameServerId, moduleId, cfg, [player.id, target.playerId], `${player.name} -> ${targetName} (mail): ${text}`);\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to mail",
+              "position": 0
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "defaultValue": null,
+              "helpText": "Your message (the rest of the line)",
+              "position": 1
+            }
+          ]
+        },
+        {
+          "name": "mailbox",
+          "trigger": "mailbox",
+          "description": "Read your mail",
+          "helpText": "Usage: mailbox — shows the mail in your mailbox.",
+          "function": "import { data } from '@takaro/helpers';\nimport { formatMail, getPrefix, KEYS, loadMailbox, writeVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, module: mod } = data;\n  const cfg = mod.userConfig;\n  const now = Date.now();\n\n  const [prefix, box] = await Promise.all([\n    getPrefix(gameServerId),\n    loadMailbox(gameServerId, mod.moduleId, player.id, cfg.mailExpiryDays, now),\n  ]);\n  if (!box.mails.length) {\n    await pog.pm('Your mailbox is empty.');\n    if (box.id && box.pruned) await writeVar(gameServerId, mod.moduleId, player.id, KEYS.mailbox, box.id, []);\n    return;\n  }\n\n  const unread = box.mails.filter((m) => !m.read).length;\n  await pog.pm(`Mailbox: ${box.mails.length}/${cfg.mailboxSize} mails, ${unread} new.`);\n  for (const mail of box.mails) {\n    await pog.pm(`${mail.read ? '' : '[new] '}${formatMail(mail, now)}`);\n  }\n  await pog.pm(`Type ${prefix}mailclear to empty your mailbox.`);\n\n  if (unread || box.pruned) {\n    const updated = box.mails.map((m) => ({ ...m, read: true }));\n    await writeVar(gameServerId, mod.moduleId, player.id, KEYS.mailbox, box.id, updated);\n  }\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "mailclear",
+          "trigger": "mailclear",
+          "description": "Empty your mailbox",
+          "helpText": "Usage: mailclear — deletes all mail in your mailbox.",
+          "function": "import { data } from '@takaro/helpers';\nimport { deleteVar, KEYS, readVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, module: mod } = data;\n  const box = await readVar(gameServerId, mod.moduleId, player.id, KEYS.mailbox, []);\n  const count = Array.isArray(box.value) ? box.value.length : 0;\n  await deleteVar(box.id);\n  await pog.pm(count ? `Deleted ${count} mail${count === 1 ? '' : 's'}.` : 'Your mailbox was already empty.');\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "seen",
+          "trigger": "seen",
+          "description": "When was a player last online",
+          "helpText": "Usage: seen <player> — shows when a player was last seen on this server.",
+          "function": "import { data, TakaroUserError, takaro } from '@takaro/helpers';\nimport { formatAgo, getPlayerName } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args } = data;\n  const target = args.player;\n  if (!target || !target.playerId) throw new TakaroUserError('Please name a player.');\n  if (target.playerId === player.id) {\n    await pog.pm('You are right here.');\n    return;\n  }\n\n  const [name, res] = await Promise.all([\n    getPlayerName(target.playerId, target.name || 'That player'),\n    takaro.playerOnGameserver.playerOnGameServerControllerGetOne(gameServerId, target.playerId),\n  ]);\n  const tPog = res.data.data;\n  if (tPog.online) {\n    await pog.pm(`${name} is online right now.`);\n    return;\n  }\n  const lastSeen = tPog.lastSeen ? new Date(tPog.lastSeen) : null;\n  if (!lastSeen || Number.isNaN(lastSeen.getTime())) {\n    await pog.pm(`${name} has not been seen on this server yet.`);\n    return;\n  }\n  const stamp = lastSeen.toISOString().slice(0, 16).replace('T', ' ');\n  await pog.pm(`${name} was last seen ${formatAgo(Date.now() - lastSeen.getTime())} (${stamp} UTC).`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to look up",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "ignore",
+          "trigger": "ignore",
+          "description": "Block a player's messages",
+          "helpText": "Usage: ignore <player> — blocks their private messages and mail. Without a name (or with \"list\") it shows who you ignore.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { addIgnore, getPrefix, KEYS, loadIgnore, resolvePlayerByName, writeVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod } = data;\n  const input = String(args.player ?? '').trim();\n  const ignore = await loadIgnore(gameServerId, mod.moduleId, player.id);\n\n  // Takaro needs a non-empty default for an optional argument, so a bare `ignore` arrives as \"list\".\n  if (!input || input.toLowerCase() === 'list') {\n    const prefix = await getPrefix(gameServerId);\n    if (!ignore.list.length) {\n      await pog.pm(`You are not ignoring anyone. Use ${prefix}ignore <player> to block their messages.`);\n      return;\n    }\n    await pog.pm(`Ignored (${ignore.list.length}): ${ignore.list.map((e) => e.name).join(', ')}`);\n    await pog.pm(`Use ${prefix}unignore <player> to allow them again.`);\n    return;\n  }\n\n  const found = await resolvePlayerByName(gameServerId, input);\n  if (found.error) throw new TakaroUserError(found.error);\n  if (found.playerId === player.id) throw new TakaroUserError('You cannot ignore yourself.');\n\n  const result = addIgnore(ignore.list, { playerId: found.playerId, name: found.name });\n  if (result.full) throw new TakaroUserError('Your ignore list is full. Remove someone with unignore first.');\n  if (!result.added) {\n    await pog.pm(`You are already ignoring ${found.name}.`);\n    return;\n  }\n  await writeVar(gameServerId, mod.moduleId, player.id, KEYS.ignore, ignore.id, result.list);\n  await pog.pm(`You now ignore ${found.name}. Their private messages and mail are blocked.`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "string",
+              "defaultValue": "list",
+              "helpText": "Player name. Leave empty (or type list) to see your ignore list.",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "unignore",
+          "trigger": "unignore",
+          "description": "Unblock a player",
+          "helpText": "Usage: unignore <player|all> — allows their messages again.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { deleteVar, KEYS, loadIgnore, writeVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, arguments: args, module: mod } = data;\n  const input = String(args.player ?? '').trim().toLowerCase();\n  if (!input) throw new TakaroUserError('Please name the player to unignore, or \"all\".');\n\n  const ignore = await loadIgnore(gameServerId, mod.moduleId, player.id);\n  if (input === 'all') {\n    await deleteVar(ignore.id);\n    await pog.pm(ignore.list.length ? `You no longer ignore anyone (${ignore.list.length} removed).` : 'You were not ignoring anyone.');\n    return;\n  }\n\n  const exact = ignore.list.filter((e) => String(e.name).toLowerCase() === input);\n  const partial = ignore.list.filter((e) => String(e.name).toLowerCase().includes(input));\n  const matches = exact.length ? exact : partial;\n  if (!matches.length) throw new TakaroUserError(`\"${args.player}\" is not on your ignore list.`);\n  if (matches.length > 1) throw new TakaroUserError(`Several ignored players match \"${args.player}\". Please type more of the name.`);\n\n  const rest = ignore.list.filter((e) => e.playerId !== matches[0].playerId);\n  if (rest.length) {\n    await writeVar(gameServerId, mod.moduleId, player.id, KEYS.ignore, ignore.id, rest);\n  } else {\n    await deleteVar(ignore.id);\n  }\n  await pog.pm(`You no longer ignore ${matches[0].name}.`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "string",
+              "defaultValue": null,
+              "helpText": "Player name from your ignore list, or all",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "socialspy",
+          "trigger": "socialspy",
+          "description": "Toggle social spy (staff)",
+          "helpText": "Usage: socialspy — turns copies of private messages on or off. Needs PM_SPY and the socialSpy setting.",
+          "function": "import { data, TakaroUserError, checkPermission } from '@takaro/helpers';\nimport { deleteVar, KEYS, readVar, writeVar } from './pm-helpers.js';\n\nasync function main() {\n  const { pog, player, gameServerId, module: mod } = data;\n  if (!mod.userConfig.socialSpy) {\n    throw new TakaroUserError('Social spy is turned off on this server.');\n  }\n  if (!checkPermission(pog, 'PM_SPY')) {\n    throw new TakaroUserError('You do not have permission to use social spy.');\n  }\n\n  const current = await readVar(gameServerId, mod.moduleId, player.id, KEYS.spy, null);\n  if (current.id) {\n    await deleteVar(current.id);\n    await pog.pm('Social spy OFF. You no longer see copies of private messages.');\n  } else {\n    await writeVar(gameServerId, mod.moduleId, player.id, KEYS.spy, null, true);\n    await pog.pm('Social spy ON. You now see copies of private messages and mail while online.');\n  }\n}\n\nawait main();\n",
+          "arguments": []
+        }
+      ],
+      "hooks": [
+        {
+          "name": "deliver-mail",
+          "eventType": "player-connected",
+          "description": "Shows new mail to a player when they join",
+          "regex": null,
+          "function": "import { data } from '@takaro/helpers';\nimport { formatMail, getPrefix, KEYS, loadMailbox, writeVar } from './pm-helpers.js';\n\nconst MAX_ON_JOIN = 5;\n\nasync function main() {\n  const { gameServerId, player, pog, module: mod } = data;\n  if (!player || !pog) return;\n  const cfg = mod.userConfig;\n  const now = Date.now();\n\n  const box = await loadMailbox(gameServerId, mod.moduleId, player.id, cfg.mailExpiryDays, now);\n  if (!box.id) return;\n  const unread = box.mails.filter((m) => !m.read);\n  if (!unread.length) {\n    if (box.pruned) await writeVar(gameServerId, mod.moduleId, player.id, KEYS.mailbox, box.id, box.mails);\n    return;\n  }\n\n  const prefix = await getPrefix(gameServerId);\n  await pog.pm(`You have ${unread.length} new mail${unread.length === 1 ? '' : 's'}:`);\n  const shown = unread.slice(0, MAX_ON_JOIN);\n  for (const mail of shown) {\n    await pog.pm(formatMail(mail, now));\n  }\n  if (unread.length > shown.length) {\n    await pog.pm(`...and ${unread.length - shown.length} more. Type ${prefix}mailbox to read them.`);\n  } else {\n    await pog.pm(`Reply with ${prefix}mail <player> <text>. Type ${prefix}mailclear to empty your mailbox.`);\n  }\n\n  const shownSet = new Set(shown);\n  const updated = box.mails.map((m) => (shownSet.has(m) ? { ...m, read: true } : m));\n  await writeVar(gameServerId, mod.moduleId, player.id, KEYS.mailbox, box.id, updated);\n}\n\nawait main();\n"
+        }
+      ],
+      "cronJobs": [],
+      "functions": [
+        {
+          "name": "pm-helpers",
+          "function": "import { takaro, checkPermission } from '@takaro/helpers';\n\nexport const KEYS = {\n  replyTo: 'pm_reply_to',\n  ignore: 'pm_ignore',\n  cooldown: 'pm_last_sent',\n  mailbox: 'pm_mailbox',\n  spy: 'pm_spy',\n};\n\nconst DAY_MS = 24 * 60 * 60 * 1000;\nconst MAX_IGNORED = 50;\n\nexport function renderTemplate(template, values) {\n  return String(template ?? '').replace(/\\{(\\w+)\\}/g, (match, key) => (key in values ? String(values[key]) : match));\n}\n\nexport async function getPrefix(gameServerId) {\n  try {\n    const res = await takaro.settings.settingsControllerGetOne('commandPrefix', gameServerId);\n    return res.data.data.value || '/';\n  } catch {\n    return '/';\n  }\n}\n\n/**\n * Takaro hands a `string` argument only its first word, so the full text is read from the raw chat\n * line with Takaro's own tokenizer: everything after the first `skip` tokens (command, player name).\n */\nexport function parseText(rawMessage, skip, fallback, maxLength) {\n  const tokens = typeof rawMessage === 'string' ? rawMessage.match(/(?:[^\\s\"]+|\"[^\"]*\")+/g) : null;\n  const fromChat = tokens && tokens.length > skip ? tokens.slice(skip).join(' ').replace(/\"/g, '').trim() : '';\n  const text = (fromChat || String(fallback ?? '').trim()).replace(/\\s+/g, ' ');\n  return text.slice(0, Math.max(1, Number(maxLength) || 200));\n}\n\n// ---- per-player variables -------------------------------------------------------------------\n\nasync function findVar(gameServerId, moduleId, playerId, key) {\n  const res = await takaro.variable.variableControllerSearch({\n    filters: { key: [key], gameServerId: [gameServerId], moduleId: [moduleId], playerId: [playerId] },\n  });\n  return res.data.data[0] ?? null;\n}\n\nexport async function readVar(gameServerId, moduleId, playerId, key, fallback) {\n  const row = await findVar(gameServerId, moduleId, playerId, key);\n  if (!row) return { id: null, value: fallback };\n  try {\n    return { id: row.id, value: JSON.parse(row.value) };\n  } catch {\n    console.error(`private-messages: could not parse ${key} of player ${playerId}, starting fresh`);\n    return { id: row.id, value: fallback };\n  }\n}\n\nexport async function writeVar(gameServerId, moduleId, playerId, key, id, value) {\n  const json = JSON.stringify(value);\n  if (id) {\n    await takaro.variable.variableControllerUpdate(id, { value: json });\n    return id;\n  }\n  const res = await takaro.variable.variableControllerCreate({ key, value: json, gameServerId, moduleId, playerId });\n  return res.data.data.id;\n}\n\nexport async function deleteVar(id) {\n  if (id) await takaro.variable.variableControllerDelete(id);\n}\n\n// ---- sending ------------------------------------------------------------------------------\n\nexport async function sendTo(gameServerId, gameId, message) {\n  await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {\n    message,\n    opts: { recipient: { gameId } },\n  });\n}\n\n/**\n * Anti-spam: one private message or mail per `cooldownSeconds` per sender, shared by msg, r and mail.\n * Throws a user-facing message string when the sender has to wait.\n */\nexport async function checkCooldown(gameServerId, moduleId, playerId, cooldownSeconds, now) {\n  const seconds = Number(cooldownSeconds) || 0;\n  if (seconds <= 0) return null;\n  const { id, value } = await readVar(gameServerId, moduleId, playerId, KEYS.cooldown, 0);\n  const waitMs = Number(value) + seconds * 1000 - now;\n  if (waitMs > 0) return { wait: Math.ceil(waitMs / 1000) };\n  return { id };\n}\n\nexport async function stampCooldown(gameServerId, moduleId, playerId, cooldown, now) {\n  if (!cooldown) return;\n  await writeVar(gameServerId, moduleId, playerId, KEYS.cooldown, cooldown.id, now);\n}\n\n// ---- ignore list --------------------------------------------------------------------------\n\nexport async function loadIgnore(gameServerId, moduleId, playerId) {\n  const { id, value } = await readVar(gameServerId, moduleId, playerId, KEYS.ignore, []);\n  return { id, list: Array.isArray(value) ? value : [] };\n}\n\nexport function addIgnore(list, entry) {\n  if (list.some((e) => e.playerId === entry.playerId)) return { list, added: false };\n  if (list.length >= MAX_IGNORED) return { list, added: false, full: true };\n  return { list: [...list, entry], added: true };\n}\n\n/** True when `receiverId` ignores `senderPog`'s player and the sender is not exempt (staff). */\nexport async function isIgnoredBy(gameServerId, moduleId, receiverId, senderPog) {\n  if (checkPermission(senderPog, 'PM_IGNORE_EXEMPT')) return false;\n  const { list } = await loadIgnore(gameServerId, moduleId, receiverId);\n  return list.some((e) => e.playerId === senderPog.playerId);\n}\n\n// ---- mailbox ------------------------------------------------------------------------------\n\nexport function pruneMail(mails, expiryDays, now) {\n  const days = Number(expiryDays) || 0;\n  if (days <= 0) return mails;\n  return mails.filter((m) => new Date(m.sentAt).getTime() + days * DAY_MS > now);\n}\n\nexport async function loadMailbox(gameServerId, moduleId, playerId, expiryDays, now) {\n  const { id, value } = await readVar(gameServerId, moduleId, playerId, KEYS.mailbox, []);\n  const all = Array.isArray(value) ? value : [];\n  const mails = pruneMail(all, expiryDays, now);\n  return { id, mails, pruned: all.length - mails.length };\n}\n\n/**\n * Adds a mail. When the box is full the oldest READ mail makes room; a box full of unread mail\n * refuses new mail so nothing unread is lost.\n */\nexport function pushMail(mails, mail, size) {\n  const max = Math.max(1, Number(size) || 10);\n  const next = [...mails];\n  while (next.length >= max) {\n    const readIdx = next.findIndex((m) => m.read);\n    if (readIdx === -1) return { mails, ok: false };\n    next.splice(readIdx, 1);\n  }\n  next.push(mail);\n  return { mails: next, ok: true };\n}\n\nexport function formatAgo(ms) {\n  const minutes = Math.floor(Math.max(0, ms) / 60000);\n  if (minutes < 1) return 'just now';\n  if (minutes < 60) return `${minutes}m ago`;\n  const hours = Math.floor(minutes / 60);\n  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;\n  const days = Math.floor(hours / 24);\n  return `${days}d ${hours % 24}h ago`;\n}\n\nexport function formatMail(mail, now) {\n  return `${mail.fromName} (${formatAgo(now - new Date(mail.sentAt).getTime())}): ${mail.text}`;\n}\n\n// ---- social spy ---------------------------------------------------------------------------\n\n/**\n * Sends a copy of a private message to online staff who turned socialspy on and still hold PM_SPY.\n * Never throws: spying is best effort and must not block the message itself.\n */\nexport async function spyCopy(gameServerId, moduleId, cfg, excludeIds, line) {\n  if (!cfg.socialSpy) return;\n  try {\n    const vars = await takaro.variable.variableControllerSearch({\n      filters: { key: [KEYS.spy], gameServerId: [gameServerId], moduleId: [moduleId] },\n      limit: 100,\n    });\n    const ids = vars.data.data.map((v) => v.playerId).filter((id) => id && !excludeIds.includes(id));\n    if (!ids.length) return;\n    const pogs = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({\n      filters: { gameServerId: [gameServerId], playerId: ids, online: [true] },\n      limit: 100,\n    });\n    for (const pog of pogs.data.data) {\n      if (!checkPermission(pog, 'PM_SPY')) continue;\n      await sendTo(gameServerId, pog.gameId, renderTemplate(cfg.spyFormat, { message: line }));\n    }\n  } catch (err) {\n    console.error(`private-messages: socialspy copy failed: ${err}`);\n  }\n}\n\n// ---- name lookup --------------------------------------------------------------------------\n\n/**\n * Finds one player on this game server by (partial) name, like Takaro's own `player` argument.\n * An exact, case-insensitive name match wins when the search returns several players.\n */\nexport async function resolvePlayerByName(gameServerId, input) {\n  const search = await takaro.player.playerControllerSearch({ search: { name: [input] }, limit: 50 });\n  const candidates = search.data.data;\n  if (!candidates.length) return { error: `No player found with the name \"${input}\".` };\n\n  const pogs = await takaro.playerOnGameserver.playerOnGameServerControllerSearch({\n    filters: { gameServerId: [gameServerId], playerId: candidates.map((p) => p.id) },\n    limit: 50,\n  });\n  const onServer = new Set(pogs.data.data.map((p) => p.playerId));\n  const here = candidates.filter((p) => onServer.has(p.id));\n  if (!here.length) return { error: `No player found with the name \"${input}\" on this server.` };\n\n  const exact = here.filter((p) => String(p.name).toLowerCase() === input.toLowerCase());\n  if (exact.length === 1) return { playerId: exact[0].id, name: exact[0].name };\n  if (here.length === 1) return { playerId: here[0].id, name: here[0].name };\n  return { error: `Several players match \"${input}\". Please type more of the name.` };\n}\n\n/**\n * The shared delivery path for msg and r: checks the target is online and not ignoring the sender,\n * applies the cooldown, delivers both sides, records the reply target and copies to socialspy.\n * Returns a user-facing error string, or null on success.\n */\nexport async function deliverPrivate({ gameServerId, moduleId, cfg, senderPog, senderName, target, text, prefix, now }) {\n  if (target.playerId === senderPog.playerId) return 'You cannot message yourself.';\n\n  const targetPog = await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(gameServerId, target.playerId);\n  const tPog = targetPog.data.data;\n  if (!tPog.online) {\n    return `${target.name} is offline. Use ${prefix}mail ${target.name} <text> to leave a message.`;\n  }\n  if (await isIgnoredBy(gameServerId, moduleId, target.playerId, senderPog)) {\n    return `${target.name} is not accepting your messages.`;\n  }\n\n  const cooldown = await checkCooldown(gameServerId, moduleId, senderPog.playerId, cfg.cooldownSeconds, now);\n  if (cooldown && cooldown.wait) return `Slow down: wait ${cooldown.wait}s before sending another message.`;\n\n  const values = { sender: senderName, receiver: target.name, message: text, prefix };\n  await sendTo(gameServerId, tPog.gameId, renderTemplate(cfg.incomingFormat, values));\n  await sendTo(gameServerId, senderPog.gameId, renderTemplate(cfg.outgoingFormat, values));\n\n  const reply = await readVar(gameServerId, moduleId, target.playerId, KEYS.replyTo, null);\n  await writeVar(gameServerId, moduleId, target.playerId, KEYS.replyTo, reply.id, {\n    playerId: senderPog.playerId,\n    name: senderName,\n  });\n  await stampCooldown(gameServerId, moduleId, senderPog.playerId, cooldown, now);\n  await spyCopy(gameServerId, moduleId, cfg, [senderPog.playerId, target.playerId], `${senderName} -> ${target.name}: ${text}`);\n  return null;\n}\n\nexport async function getPlayerName(playerId, fallback = 'Unknown player') {\n  try {\n    const res = await takaro.player.playerControllerGetOne(playerId);\n    return res.data.data.name || fallback;\n  } catch {\n    return fallback;\n  }\n}\n"
+        }
+      ],
+      "permissions": [
+        {
+          "permission": "PM_SPY",
+          "friendlyName": "Social spy",
+          "description": "Allows staff to turn on socialspy and see copies of private messages and mail (only when the socialSpy setting is on)",
+          "canHaveCount": false
+        },
+        {
+          "permission": "PM_IGNORE_EXEMPT",
+          "friendlyName": "Cannot be ignored",
+          "description": "Messages and mail from this player reach others even if they ignore them (for staff)",
+          "canHaveCount": false
+        }
+      ]
+    }
+  ]
+}

@@ -333,6 +333,23 @@
       ]
     },
     {
+      "name": "private-messages",
+      "description": "Private messages for players: msg and reply to online players, leave mail for offline players (delivered when they join), check when someone was last seen, and ignore players who bother you. Anti-spam cooldown and optional, off-by-default staff social spy.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "2ad879fdd4a82d839eec751e5e0e45d13306425aa3478f5fbc2aabc6316c3574",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "referral-program",
       "description": "Players invite others via a referral code; referrers earn currency or items when their referees hit a playtime threshold, with daily/lifetime caps and VIP tiering.",
       "latestVersion": "1.0.0",
