@@ -1,0 +1,169 @@
+{
+  "name": "warn-system",
+  "author": "Takaro",
+  "description": "Warn System — staff warn players with a reason; warnings are stored with date and staff name, expire after a set number of days, and escalate automatically (by default 3 warnings = kick, 5 = 24-hour ban, 7 = permanent ban). Players can check their own warnings, staff can check and remove anyone's. Optional public broadcast and Discord log.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "warningExpiryDays": {
+        "type": "number",
+        "default": 30,
+        "minimum": 0,
+        "description": "Days until a warning expires and stops counting towards escalation. 0 = warnings never expire."
+      },
+      "escalation": {
+        "type": "array",
+        "description": "What happens when a player reaches a number of active warnings. Each step runs once, when the count is reached exactly.",
+        "default": [
+          { "warnings": 3, "action": "kick" },
+          { "warnings": 5, "action": "tempban", "durationHours": 24 },
+          { "warnings": 7, "action": "ban" }
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "warnings": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of active warnings that triggers this step"
+            },
+            "action": {
+              "type": "string",
+              "enum": ["kick", "tempban", "ban"],
+              "description": "kick, tempban (ban for durationHours) or ban (permanent)"
+            },
+            "durationHours": {
+              "type": "number",
+              "minimum": 1,
+              "default": 24,
+              "description": "Ban length in hours (only for tempban)"
+            }
+          },
+          "required": ["warnings", "action"],
+          "additionalProperties": false
+        }
+      },
+      "warnMessage": {
+        "type": "string",
+        "default": "You have been warned by {staff}: {reason}. Active warnings: {count}. Type {prefix}warnings to see them.",
+        "description": "Private message to the warned player. Placeholders: {player}, {staff}, {reason}, {count}, {id}, {prefix}"
+      },
+      "broadcastWarnings": {
+        "type": "boolean",
+        "default": false,
+        "description": "Also announce every warning in public chat"
+      },
+      "broadcastMessage": {
+        "type": "string",
+        "default": "{player} was warned: {reason}",
+        "description": "Public message when broadcastWarnings is on. Placeholders: {player}, {staff}, {reason}, {count}"
+      },
+      "notifyOnJoin": {
+        "type": "boolean",
+        "default": true,
+        "description": "Tell a player about warnings they got while offline when they next join"
+      },
+      "discordChannelId": {
+        "type": "string",
+        "default": "",
+        "description": "Discord channel ID for a warning log. Leave empty to turn the Discord log off."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "WARN_ISSUE",
+      "friendlyName": "Issue warnings",
+      "description": "Allows a player to warn other players and to view anyone's warnings",
+      "canHaveCount": false
+    },
+    {
+      "permission": "WARN_MANAGE",
+      "friendlyName": "Manage warnings",
+      "description": "Allows a player to remove warnings (unwarn) and to view anyone's warnings",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "warn": {
+      "trigger": "warn",
+      "description": "Warn a player",
+      "helpText": "Usage: warn <player> <reason> — warns a player. Repeated warnings escalate to kick and ban. Needs WARN_ISSUE.",
+      "function": "src/commands/warn/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to warn",
+          "position": 0
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "Why the player is warned (the rest of the line)",
+          "position": 1
+        }
+      ]
+    },
+    "warnings": {
+      "trigger": "warnings",
+      "description": "Show active warnings",
+      "helpText": "Usage: warnings [player] — shows your own warnings. Staff can add a player name to see theirs.",
+      "function": "src/commands/warnings/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "defaultValue": "me",
+          "helpText": "Player name (staff only). Leave empty for your own warnings.",
+          "position": 0
+        }
+      ]
+    },
+    "unwarn": {
+      "trigger": "unwarn",
+      "description": "Remove a warning",
+      "helpText": "Usage: unwarn <player> <id> — removes one warning. See the id with the warnings command. Needs WARN_MANAGE.",
+      "function": "src/commands/unwarn/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player whose warning to remove",
+          "position": 0
+        },
+        {
+          "name": "id",
+          "type": "number",
+          "defaultValue": null,
+          "helpText": "The warning id (shown by the warnings command)",
+          "position": 1
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "notify-on-join": {
+      "eventType": "player-connected",
+      "description": "Tells a player about warnings they received while offline",
+      "function": "src/hooks/notify-on-join/index.js"
+    }
+  },
+  "cronJobs": {},
+  "functions": {
+    "warn-helpers": {
+      "function": "src/functions/warn-helpers.js"
+    }
+  }
+}
