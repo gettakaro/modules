@@ -1,0 +1,179 @@
+{
+  "name": "teleport-requests",
+  "author": "Takaro",
+  "description": "Teleport Requests (/tpa): players ask to teleport to another online player (tpa) or ask someone to come to them (tpahere). The other player gets a private message and answers with tpaccept or tpdeny. Requests expire after a set time, and each player can have one open request (tpcancel withdraws it). Optional cooldown, currency cost (charged only after a successful teleport) and height offset. Players can block others with tpblock. For a warmup, set a delay on the tpaccept command in the module's command settings. Needs a game that supports teleporting players.",
+  "summary": "Teleport Requests (/tpa): ask to teleport to an online player (tpa) or ask them to come to you (tpahere). They answer with tpaccept or tpdeny. Requests expire, one open request per player (tpcancel). Optional cooldown, currency cost (charged only after a successful teleport) and height offset. Players can block others with tpblock. Needs a game that supports teleporting players.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestTimeout": {
+        "title": "Request timeout",
+        "description": "How long a request stays open before it expires.",
+        "x-component": "duration",
+        "type": "number",
+        "minimum": 5000,
+        "default": 60000
+      },
+      "cooldown": {
+        "title": "Cooldown",
+        "description": "Time a player has to wait after a successful teleport before sending a new request. Players with TPA_BYPASS_COOLDOWN skip it.",
+        "x-component": "duration",
+        "type": "number",
+        "minimum": 0,
+        "default": 60000
+      },
+      "cost": {
+        "title": "Cost",
+        "description": "Currency the requesting player pays, charged only after a successful teleport. 0 is free.",
+        "type": "number",
+        "minimum": 0,
+        "default": 0
+      },
+      "teleportYOffset": {
+        "title": "Teleport height offset",
+        "description": "Added to the height (Y) of the destination. Raise it on games that place players inside the ground.",
+        "type": "number",
+        "default": 0
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "requestTimeout": {
+      "ui:widget": "duration"
+    },
+    "cooldown": {
+      "ui:widget": "duration"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "TPA_USE",
+      "friendlyName": "Send teleport requests",
+      "description": "Allows a player to send requests with tpa and tpahere. Answering requests needs no permission.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "TPA_BYPASS_COOLDOWN",
+      "friendlyName": "Skip the teleport request cooldown",
+      "description": "The player's teleports do not start a cooldown, for example for VIPs.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "tpa": {
+      "trigger": "tpa",
+      "description": "Ask to teleport to another player",
+      "helpText": "Asks an online player if you may teleport to them.",
+      "function": "src/commands/tpa/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to teleport to.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TPA_USE"
+      ]
+    },
+    "tpahere": {
+      "trigger": "tpahere",
+      "description": "Ask another player to teleport to you",
+      "helpText": "Asks an online player to teleport to you.",
+      "function": "src/commands/tpahere/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to bring to you.",
+          "position": 0
+        }
+      ],
+      "requiredPermissions": [
+        "TPA_USE"
+      ]
+    },
+    "tpaccept": {
+      "trigger": "tpaccept",
+      "description": "Accept a teleport request",
+      "helpText": "Accepts a teleport request. Without a name it accepts the oldest one.",
+      "function": "src/commands/tpaccept/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "defaultValue": "*",
+          "helpText": "Name of the player whose request to accept (optional).",
+          "position": 0
+        }
+      ]
+    },
+    "tpdeny": {
+      "trigger": "tpdeny",
+      "description": "Deny a teleport request",
+      "helpText": "Denies a teleport request. Without a name it denies the oldest one.",
+      "function": "src/commands/tpdeny/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "defaultValue": "*",
+          "helpText": "Name of the player whose request to deny (optional).",
+          "position": 0
+        }
+      ]
+    },
+    "tpcancel": {
+      "trigger": "tpcancel",
+      "description": "Cancel your open teleport request",
+      "helpText": "Withdraws the teleport request you sent.",
+      "function": "src/commands/tpcancel/index.js",
+      "arguments": []
+    },
+    "tpblock": {
+      "trigger": "tpblock",
+      "description": "Block teleport requests from a player",
+      "helpText": "Stops a player from sending you teleport requests.",
+      "function": "src/commands/tpblock/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to block.",
+          "position": 0
+        }
+      ]
+    },
+    "tpunblock": {
+      "trigger": "tpunblock",
+      "description": "Unblock a player",
+      "helpText": "Lets a blocked player send you teleport requests again.",
+      "function": "src/commands/tpunblock/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to unblock.",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "functions": {
+    "tpa": {
+      "function": "src/functions/tpa.js"
+    }
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "teleport-requests",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Teleport Requests (/tpa): players ask to teleport to another online player (tpa) or ask someone to come to them (tpahere). The other player gets a private message and answers with tpaccept or tpdeny. Requests expire after a set time, and each player can have one open request (tpcancel withdraws it). Optional cooldown, currency cost (charged only after a successful teleport) and height offset. Players can block others with tpblock. For a warmup, set a delay on the tpaccept command in the module's command settings. Needs a game that supports teleporting players.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"requestTimeout\":{\"title\":\"Request timeout\",\"description\":\"How long a request stays open before it expires.\",\"x-component\":\"duration\",\"type\":\"number\",\"minimum\":5000,\"default\":60000},\"cooldown\":{\"title\":\"Cooldown\",\"description\":\"Time a player has to wait after a successful teleport before sending a new request. Players with TPA_BYPASS_COOLDOWN skip it.\",\"x-component\":\"duration\",\"type\":\"number\",\"minimum\":0,\"default\":60000},\"cost\":{\"title\":\"Cost\",\"description\":\"Currency the requesting player pays, charged only after a successful teleport. 0 is free.\",\"type\":\"number\",\"minimum\":0,\"default\":0},\"teleportYOffset\":{\"title\":\"Teleport height offset\",\"description\":\"Added to the height (Y) of the destination. Raise it on games that place players inside the ground.\",\"type\":\"number\",\"default\":0}},\"required\":[],\"additionalProperties\":false}",
+      "uiSchema": "{\"requestTimeout\":{\"ui:widget\":\"duration\"},\"cooldown\":{\"ui:widget\":\"duration\"}}",
+      "commands": [
+        {
+          "name": "tpa",
+          "trigger": "tpa",
+          "description": "Ask to teleport to another player",
+          "helpText": "Asks an online player if you may teleport to them.",
+          "function": "import { sendRequest } from './tpa.js';\n\nawait sendRequest('to');\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to teleport to.",
+              "position": 0
+            }
+          ],
+          "requiredPermissions": [
+            "TPA_USE"
+          ]
+        },
+        {
+          "name": "tpahere",
+          "trigger": "tpahere",
+          "description": "Ask another player to teleport to you",
+          "helpText": "Asks an online player to teleport to you.",
+          "function": "import { sendRequest } from './tpa.js';\n\nawait sendRequest('here');\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to bring to you.",
+              "position": 0
+            }
+          ],
+          "requiredPermissions": [
+            "TPA_USE"
+          ]
+        },
+        {
+          "name": "tpaccept",
+          "trigger": "tpaccept",
+          "description": "Accept a teleport request",
+          "helpText": "Accepts a teleport request. Without a name it accepts the oldest one.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { incomingRequests, pickRequest, deleteRequest, fulfil, prefix } from './tpa.js';\n\nasync function main() {\n  const { pog, arguments: args } = data;\n  const requests = await incomingRequests(pog.playerId);\n  if (requests.length === 0) {\n    throw new TakaroUserError('You have no pending teleport requests.');\n  }\n  const request = pickRequest(requests, args.player);\n\n  // Consume the request first, so a double tpaccept cannot teleport twice.\n  await deleteRequest(request);\n  await fulfil(request);\n\n  const left = requests.length - 1;\n  if (left > 0) {\n    const p = await prefix();\n    await data.player.pm(`You have ${left} more request(s). Type ${p}tpaccept <name> or ${p}tpdeny <name>.`);\n  }\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "string",
+              "defaultValue": "*",
+              "helpText": "Name of the player whose request to accept (optional).",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "tpdeny",
+          "trigger": "tpdeny",
+          "description": "Deny a teleport request",
+          "helpText": "Denies a teleport request. Without a name it denies the oldest one.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { incomingRequests, pickRequest, deleteRequest, freshPog, tell } from './tpa.js';\n\nasync function main() {\n  const { pog, player, arguments: args } = data;\n  const requests = await incomingRequests(pog.playerId);\n  if (requests.length === 0) {\n    throw new TakaroUserError('You have no pending teleport requests.');\n  }\n  const request = pickRequest(requests, args.player);\n  await deleteRequest(request);\n\n  const requester = await freshPog(request.requesterId);\n  if (requester.online) {\n    await tell(requester.gameId, `${player.name} denied your teleport request.`);\n  }\n  await data.player.pm(`Denied the request from ${request.requesterName}.`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "string",
+              "defaultValue": "*",
+              "helpText": "Name of the player whose request to deny (optional).",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "tpcancel",
+          "trigger": "tpcancel",
+          "description": "Cancel your open teleport request",
+          "helpText": "Withdraws the teleport request you sent.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { outgoingRequest, deleteRequest, freshPog, tell } from './tpa.js';\n\nasync function main() {\n  const { pog, player } = data;\n  const request = await outgoingRequest(pog.playerId);\n  if (!request) {\n    throw new TakaroUserError('You have no open teleport request.');\n  }\n  await deleteRequest(request);\n\n  const target = await freshPog(request.targetId);\n  if (target.online) {\n    await tell(target.gameId, `${player.name} cancelled their teleport request.`);\n  }\n  await data.player.pm(`Cancelled your request to ${request.targetName}.`);\n}\n\nawait main();\n",
+          "arguments": []
+        },
+        {
+          "name": "tpblock",
+          "trigger": "tpblock",
+          "description": "Block teleport requests from a player",
+          "helpText": "Stops a player from sending you teleport requests.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { readBlocks, writeBlocks, incomingRequests, deleteRequest, playerName } from './tpa.js';\n\nconst MAX_BLOCKS = 100;\n\nasync function main() {\n  const { pog, arguments: args } = data;\n  const other = args.player;\n  if (other.playerId === pog.playerId) {\n    throw new TakaroUserError('You cannot block yourself.');\n  }\n  const name = await playerName(other.playerId);\n  const { row, list } = await readBlocks(pog.playerId);\n  if (list.some((b) => b.id === other.playerId)) {\n    throw new TakaroUserError(`${name} is already blocked.`);\n  }\n  if (list.length >= MAX_BLOCKS) {\n    throw new TakaroUserError(`You can block at most ${MAX_BLOCKS} players.`);\n  }\n  await writeBlocks(pog.playerId, row, [...list, { id: other.playerId, name }]);\n\n  // Drop a request this player already sent.\n  const pending = (await incomingRequests(pog.playerId)).filter((r) => r.requesterId === other.playerId);\n  await Promise.all(pending.map(deleteRequest));\n\n  await data.player.pm(`Blocked teleport requests from ${name}.`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to block.",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "name": "tpunblock",
+          "trigger": "tpunblock",
+          "description": "Unblock a player",
+          "helpText": "Lets a blocked player send you teleport requests again.",
+          "function": "import { data, TakaroUserError } from '@takaro/helpers';\nimport { readBlocks, writeBlocks, playerName } from './tpa.js';\n\nasync function main() {\n  const { pog, arguments: args } = data;\n  const other = args.player;\n  const { row, list } = await readBlocks(pog.playerId);\n  const name = list.find((b) => b.id === other.playerId)?.name ?? (await playerName(other.playerId));\n  if (!list.some((b) => b.id === other.playerId)) {\n    throw new TakaroUserError(`${name} is not blocked.`);\n  }\n  await writeBlocks(pog.playerId, row, list.filter((b) => b.id !== other.playerId));\n  await data.player.pm(`${name} can send you teleport requests again.`);\n}\n\nawait main();\n",
+          "arguments": [
+            {
+              "name": "player",
+              "type": "player",
+              "defaultValue": null,
+              "helpText": "The player to unblock.",
+              "position": 0
+            }
+          ]
+        }
+      ],
+      "hooks": [],
+      "cronJobs": [],
+      "functions": [
+        {
+          "name": "tpa",
+          "function": "import { takaro, data, checkPermission, TakaroUserError } from '@takaro/helpers';\n\nexport const USE_PERMISSION = 'TPA_USE';\nexport const BYPASS_COOLDOWN_PERMISSION = 'TPA_BYPASS_COOLDOWN';\n\nconst REQUEST_PREFIX = 'tpa_req_';\nconst COOLDOWN_KEY = 'tpa_cooldown';\nconst BLOCKS_KEY = 'tpa_blocks';\n// A player-argument default that no real name can collide with: \"pick the oldest request\".\nexport const ANY_PLAYER = '*';\n\n/** One request row: key names the target, playerId is the requester, so each pair has one row. */\nconst requestKey = (targetId) => `${REQUEST_PREFIX}${targetId}`;\n\nfunction scope() {\n  return { gameServerId: data.gameServerId, moduleId: data.module.moduleId };\n}\n\nexport function requireUse() {\n  if (!checkPermission(data.pog, USE_PERMISSION)) {\n    throw new TakaroUserError('You do not have permission to send teleport requests.');\n  }\n}\n\nexport function formatDuration(ms) {\n  const seconds = Math.max(1, Math.ceil(ms / 1000));\n  if (seconds <= 60) {\n    return `${seconds}s`;\n  }\n  const minutes = Math.floor(seconds / 60);\n  const rest = seconds % 60;\n  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;\n}\n\nexport async function prefix() {\n  const res = await takaro.settings.settingsControllerGetOne('commandPrefix', data.gameServerId);\n  return res.data.data.value;\n}\n\nexport async function playerName(playerId) {\n  try {\n    return (await takaro.player.playerControllerGetOne(playerId)).data.data.name;\n  } catch {\n    return 'Someone';\n  }\n}\n\nexport async function freshPog(playerId) {\n  return (await takaro.playerOnGameserver.playerOnGameServerControllerGetOne(data.gameServerId, playerId)).data.data;\n}\n\n/** Private message to any player. Without a recipient Takaro would broadcast, so the gameId is required. */\nexport async function tell(gameId, message) {\n  await takaro.gameserver.gameServerControllerSendMessage(data.gameServerId, {\n    message,\n    opts: { recipient: { gameId } },\n  });\n}\n\nfunction parseRequest(row) {\n  try {\n    return { row, ...JSON.parse(row.value) };\n  } catch {\n    console.log(`Request ${row.key} holds unreadable JSON, ignoring it`);\n    return null;\n  }\n}\n\nfunction isLive(request, now) {\n  return request && new Date(request.expiresAt).getTime() > now.getTime();\n}\n\n/** The requests other players sent to `targetId`, oldest first. Expired rows are hidden by Takaro. */\nexport async function incomingRequests(targetId) {\n  const res = await takaro.variable.variableControllerSearch({\n    filters: { key: [requestKey(targetId)], ...wrap(scope()) },\n    limit: 100,\n  });\n  const now = new Date();\n  return res.data.data\n    .map(parseRequest)\n    .filter((request) => isLive(request, now))\n    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());\n}\n\n/** The one request `requesterId` has open, if any. */\nexport async function outgoingRequest(requesterId) {\n  const res = await takaro.variable.variableControllerSearch({\n    filters: { playerId: [requesterId], ...wrap(scope()) },\n    search: { key: [REQUEST_PREFIX] },\n    limit: 100,\n  });\n  const now = new Date();\n  return (\n    res.data.data\n      .filter((row) => row.key.startsWith(REQUEST_PREFIX))\n      .map(parseRequest)\n      .find((request) => isLive(request, now)) ?? null\n  );\n}\n\nfunction wrap(values) {\n  return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, [v]]));\n}\n\nexport async function createRequest(request) {\n  await takaro.variable.variableControllerCreate({\n    key: requestKey(request.targetId),\n    value: JSON.stringify(request),\n    playerId: request.requesterId,\n    expiresAt: request.expiresAt,\n    ...scope(),\n  });\n}\n\nexport async function deleteRequest(request) {\n  try {\n    await takaro.variable.variableControllerDelete(request.row.id);\n  } catch (error) {\n    // Already gone (expired or a double accept); the caller treats it as consumed.\n    console.log(`Request ${request.row.key} was already removed: ${error?.message ?? error}`);\n  }\n}\n\n/**\n * Picks one of `requests` by requester name: exact match first, then a unique name prefix.\n * `ANY_PLAYER` picks the oldest.\n */\nexport function pickRequest(requests, wanted) {\n  if (!wanted || wanted === ANY_PLAYER) {\n    return requests[0];\n  }\n  const needle = wanted.toLowerCase();\n  const exact = requests.find((r) => r.requesterName.toLowerCase() === needle);\n  if (exact) {\n    return exact;\n  }\n  const partial = requests.filter((r) => r.requesterName.toLowerCase().startsWith(needle));\n  if (partial.length === 1) {\n    return partial[0];\n  }\n  if (partial.length > 1) {\n    throw new TakaroUserError(\n      `Several requests match \"${wanted}\": ${partial.map((r) => r.requesterName).join(', ')}. Type more of the name.`,\n    );\n  }\n  throw new TakaroUserError(`You have no teleport request from \"${wanted}\".`);\n}\n\nasync function findPlayerVariable(key, playerId) {\n  const res = await takaro.variable.variableControllerSearch({\n    filters: { key: [key], playerId: [playerId], ...wrap(scope()) },\n  });\n  return res.data.data[0];\n}\n\n/** Milliseconds left on `playerId`'s cooldown, 0 when none. */\nexport async function cooldownLeft(playerId) {\n  const row = await findPlayerVariable(COOLDOWN_KEY, playerId);\n  if (!row?.expiresAt) {\n    return 0;\n  }\n  return Math.max(0, new Date(row.expiresAt).getTime() - Date.now());\n}\n\nexport async function startCooldown(playerId, ms) {\n  if (!(ms > 0)) {\n    return;\n  }\n  const now = new Date();\n  const expiresAt = new Date(now.getTime() + ms).toISOString();\n  const value = JSON.stringify({ usedAt: now.toISOString() });\n  const existing = await findPlayerVariable(COOLDOWN_KEY, playerId);\n  if (existing) {\n    await takaro.variable.variableControllerUpdate(existing.id, { value, expiresAt });\n    return;\n  }\n  await takaro.variable.variableControllerCreate({ key: COOLDOWN_KEY, value, playerId, expiresAt, ...scope() });\n}\n\n/** The players `playerId` blocked, as `[{ id, name }]`. */\nexport async function readBlocks(playerId) {\n  const row = await findPlayerVariable(BLOCKS_KEY, playerId);\n  if (!row) {\n    return { row: null, list: [] };\n  }\n  try {\n    const list = JSON.parse(row.value);\n    return { row, list: Array.isArray(list) ? list : [] };\n  } catch {\n    return { row, list: [] };\n  }\n}\n\nexport async function writeBlocks(playerId, row, list) {\n  const value = JSON.stringify(list);\n  if (row) {\n    await takaro.variable.variableControllerUpdate(row.id, { value });\n    return;\n  }\n  await takaro.variable.variableControllerCreate({ key: BLOCKS_KEY, value, playerId, ...scope() });\n}\n\nfunction positionOf(pog) {\n  if (pog.positionX === undefined || pog.positionX === null) {\n    return null;\n  }\n  return {\n    x: pog.positionX,\n    y: pog.positionY,\n    z: pog.positionZ,\n    ...(pog.dimension ? { dimension: pog.dimension } : {}),\n  };\n}\n\n/**\n * Carries out an accepted request. The acting player (`data.pog`) is the target.\n * `tpa` moves the requester to the target, `tpahere` moves the target to the requester.\n * The requester pays and gets the cooldown, both only after the teleport worked.\n */\nexport async function fulfil(request) {\n  const config = data.module.userConfig;\n  const cost = config.cost ?? 0;\n\n  const [requester, target] = await Promise.all([freshPog(request.requesterId), freshPog(data.pog.playerId)]);\n  if (!requester.online) {\n    throw new TakaroUserError(`${request.requesterName} is no longer online.`);\n  }\n\n  if (cost > 0 && (requester.currency ?? 0) < cost) {\n    await tell(requester.gameId, `${request.targetName} accepted, but you need ${cost} to teleport and have ${requester.currency ?? 0}.`);\n    throw new TakaroUserError(`${request.requesterName} can no longer pay for the teleport.`);\n  }\n\n  const here = request.mode === 'here';\n  const mover = here ? target : requester;\n  const anchor = here ? requester : target;\n  const anchorName = here ? request.requesterName : request.targetName;\n  const destination = positionOf(anchor);\n  if (!destination) {\n    throw new TakaroUserError(`The server does not know where ${anchorName} is yet. Try again in a moment.`);\n  }\n\n  try {\n    await takaro.gameserver.gameServerControllerTeleportPlayer(data.gameServerId, mover.playerId, {\n      ...destination,\n      y: destination.y + (config.teleportYOffset ?? 0),\n    });\n  } catch (error) {\n    console.log(`Teleport failed: ${error?.message ?? error}`);\n    const body = error?.response?.data;\n    const reason = body?.meta?.error?.message ?? body?.error?.message;\n    const text = reason\n      ? `Teleport failed: ${reason}. Nobody was charged.`\n      : 'Teleport failed. This server may not support teleporting players. Nobody was charged.';\n    await tell(requester.gameId, text);\n    throw new TakaroUserError(text);\n  }\n\n  if (cost > 0) {\n    await takaro.playerOnGameserver.playerOnGameServerControllerDeductCurrency(data.gameServerId, request.requesterId, {\n      currency: cost,\n    });\n  }\n  if (!request.bypassCooldown) {\n    await startCooldown(request.requesterId, config.cooldown ?? 0);\n  }\n\n  const paid = cost > 0 ? ` (-${cost})` : '';\n  if (here) {\n    await tell(requester.gameId, `${request.targetName} accepted and was teleported to you${paid}.`);\n    await data.player.pm(`Teleported to ${request.requesterName}.`);\n  } else {\n    await tell(requester.gameId, `${request.targetName} accepted. Teleported to ${request.targetName}${paid}.`);\n    await data.player.pm(`Accepted. ${request.requesterName} was teleported to you.`);\n  }\n}\n\n/** Shared body of tpa and tpahere. `mode` is 'to' or 'here'. */\nexport async function sendRequest(mode) {\n  requireUse();\n  const { pog, player, arguments: args } = data;\n  const config = data.module.userConfig;\n  const targetPog = args.player;\n\n  if (targetPog.playerId === pog.playerId) {\n    throw new TakaroUserError('You cannot send a teleport request to yourself.');\n  }\n  const targetName = await playerName(targetPog.playerId);\n  if (!targetPog.online) {\n    throw new TakaroUserError(`${targetName} is not online.`);\n  }\n\n  const [blocks, existing, p] = await Promise.all([readBlocks(targetPog.playerId), outgoingRequest(pog.playerId), prefix()]);\n  if (blocks.list.some((b) => b.id === pog.playerId)) {\n    throw new TakaroUserError(`${targetName} is not accepting teleport requests from you.`);\n  }\n  if (existing) {\n    throw new TakaroUserError(\n      `You already have a request open to ${existing.targetName}. Wait for it, or type ${p}tpcancel first.`,\n    );\n  }\n\n  const bypassCooldown = Boolean(checkPermission(pog, BYPASS_COOLDOWN_PERMISSION));\n  if (!bypassCooldown) {\n    const left = await cooldownLeft(pog.playerId);\n    if (left > 0) {\n      throw new TakaroUserError(`You can send a teleport request again in ${formatDuration(left)}.`);\n    }\n  }\n\n  const cost = config.cost ?? 0;\n  if (cost > 0) {\n    const balance = (await freshPog(pog.playerId)).currency ?? 0;\n    if (balance < cost) {\n      throw new TakaroUserError(`A teleport costs ${cost} and you have ${balance}.`);\n    }\n  }\n\n  const timeoutMs = config.requestTimeout ?? 60000;\n  const now = new Date();\n  await createRequest({\n    mode,\n    requesterId: pog.playerId,\n    requesterName: player.name,\n    targetId: targetPog.playerId,\n    targetName,\n    bypassCooldown,\n    createdAt: now.toISOString(),\n    expiresAt: new Date(now.getTime() + timeoutMs).toISOString(),\n  });\n\n  const expires = formatDuration(timeoutMs);\n  const ask = mode === 'here' ? 'wants you to teleport to them' : 'wants to teleport to you';\n  await tell(\n    targetPog.gameId,\n    `${player.name} ${ask}. Type ${p}tpaccept or ${p}tpdeny (expires in ${expires}).`,\n  );\n  const costNote = cost > 0 ? ` It costs you ${cost} if accepted.` : '';\n  await data.player.pm(`Request sent to ${targetName}. It expires in ${expires}.${costNote}`);\n}\n"
+        }
+      ],
+      "permissions": [
+        {
+          "permission": "TPA_USE",
+          "friendlyName": "Send teleport requests",
+          "description": "Allows a player to send requests with tpa and tpahere. Answering requests needs no permission.",
+          "canHaveCount": false
+        },
+        {
+          "permission": "TPA_BYPASS_COOLDOWN",
+          "friendlyName": "Skip the teleport request cooldown",
+          "description": "The player's teleports do not start a cooldown, for example for VIPs.",
+          "canHaveCount": false
+        }
+      ]
+    }
+  ]
+}

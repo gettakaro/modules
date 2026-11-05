@@ -337,6 +337,24 @@
       ]
     },
     {
+      "name": "teleport-requests",
+      "description": "Teleport Requests (/tpa): ask to teleport to an online player (tpa) or ask them to come to you (tpahere). They answer with tpaccept or tpdeny. Requests expire, one open request per player (tpcancel). Optional cooldown, currency cost (charged only after a successful teleport) and height offset. Players can block others with tpblock. Needs a game that supports teleporting players.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "889139f08e786e1c6e6f11a6265701548b7d3bf38fd968b55257bc21e46c0ba2",
+          "requiredCapabilities": [
+            "chat.send",
+            "players.teleport"
+          ]
+        }
+      ]
+    },
+    {
       "name": "teleports",
       "description": "A set of commands to allow players to set their own teleport points and teleport to them.",
       "latestVersion": "1.0.1",
