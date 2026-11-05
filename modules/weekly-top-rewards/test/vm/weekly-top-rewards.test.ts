@@ -1,0 +1,316 @@
+import { expect } from '../../../../test/support/expect.ts';
+import { describe } from 'node:test';
+import { createModuleTest, paginated } from '@takaro/module-test';
+
+const MODULE = new URL('../../', import.meta.url);
+const group = 'weekly-top-rewards suite (module-VM)';
+
+const NOW = new Date('2026-11-08T20:00:00.000Z');
+const PERIOD_START = '2026-11-01T20:00:00.000Z';
+const OLD = '2026-01-01T00:00:00.000Z';
+const OTHER_MODULE_ID = '5c1f0a2e-7d43-4b8a-9e61-2f3a4b5c6d7e';
+const ROLE_ID = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+const SWORD = { item: 'sword-id', amount: 2, quality: '' };
+
+type Pogish = { playerId: string; online?: boolean };
+type Ctx = {
+  pog: Pogish;
+  otherPlayers: Array<{ pog: Pogish }>;
+  gameServerId: string;
+  moduleId: string;
+  client: { stubs: any };
+};
+
+/** Pog search with lifetime playtime; the fake can't answer `greaterThan`, so it is stubbed. */
+function stubPogs(t: Ctx, playtime: Record<number, number>, createdAt: Record<number, string> = {}) {
+  const all = [t.pog, ...t.otherPlayers.map((o) => o.pog)];
+  t.client.stubs.playerOnGameserver.playerOnGameServerControllerSearch?.callsFake(async () =>
+    paginated(
+      all.map((p, i) => ({
+        ...p,
+        playtimeSeconds: playtime[i] ?? 0,
+        createdAt: createdAt[i] ?? OLD,
+      })),
+    ),
+  );
+}
+
+/** Kill counts per player id (fallback path: analytics is not in the fake), and currency-added events. */
+function stubEvents(t: Ctx, kills: Record<string, number>, currencyEvents: unknown[]) {
+  t.client.stubs.event.eventControllerSearch?.callsFake(async (query: any) => {
+    const name = query.filters.eventName[0];
+    if (name === 'entity-killed') {
+      const count = kills[query.filters.playerId[0]] ?? 0;
+      return paginated([], { total: count });
+    }
+    if (name === 'currency-added') return paginated(query.page === 0 ? currencyEvents : []);
+    throw new Error(`unexpected event query ${name}`);
+  });
+}
+
+function seedState(t: Ctx & { variables: any }, playtime: Record<string, number>) {
+  t.variables.insert({
+    key: 'wtr_state',
+    value: JSON.stringify({ periodStart: PERIOD_START, playtime }),
+    gameServerId: t.gameServerId,
+    moduleId: t.moduleId,
+  });
+}
+
+function stateRow(t: { variables: any; moduleId: string }) {
+  return t.variables.all.find((r: any) => r.key === 'wtr_state' && r.moduleId === t.moduleId);
+}
+
+const players = [{ name: 'Bravo' }, { name: 'Charlie', online: false }, { name: 'Delta' }];
+
+const tests = [
+  createModuleTest({
+    name: 'First /weeklytop starts tracking and stores a playtime baseline',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    setup: function () {
+      stubPogs(this as unknown as Ctx, { 0: 3600, 1: 0, 2: 7200 });
+    },
+    test: async function () {
+      const result = await this.runCommand('weeklytop');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.pms()).to.deep.equal(['Weekly Top tracking just started. Play, and check back later!']);
+      const state = JSON.parse(stateRow(this).value);
+      expect(state.periodStart).to.equal(NOW.toISOString());
+      // Only players with playtime are stored.
+      expect(state.playtime).to.deep.equal({
+        [this.pog.playerId]: 3600,
+        [this.otherPlayers[1].pog.playerId]: 7200,
+      });
+    },
+  }),
+
+  createModuleTest({
+    name: '/weeklytop shows top 3 per category and the caller rank',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    userConfig: { minimumPlaytimeMinutes: 10 },
+    setup: function () {
+      const t = this as unknown as Ctx;
+      const [b, c, d] = t.otherPlayers.map((o) => o.pog.playerId);
+      seedState(this as any, { [t.pog.playerId]: 1000, [b]: 0, [d]: 50000 });
+      // Gains: me 600s (10m), Bravo 7200s, Charlie new this week 3600s, Delta 1800s.
+      stubPogs(t, { 0: 1600, 1: 7200, 2: 3600, 3: 51800 }, { 2: '2026-11-03T00:00:00.000Z' });
+      stubEvents(t, { [t.pog.playerId]: 4, [b]: 10, [c]: 0, [d]: 25 }, [
+        { playerId: c, actingModuleId: OTHER_MODULE_ID, meta: { amount: 300 } },
+        { playerId: c, actingModuleId: OTHER_MODULE_ID, meta: { amount: 200 } },
+        { playerId: t.pog.playerId, actingModuleId: OTHER_MODULE_ID, meta: { amount: 50 } },
+        // Own payouts and manual grants are ignored by default.
+        { playerId: b, actingModuleId: t.moduleId, meta: { amount: 9999 } },
+        { playerId: d, actingModuleId: null, actingUserId: 'admin', meta: { amount: 8888 } },
+      ]);
+    },
+    test: async function () {
+      const result = await this.runCommand('weeklytop');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      const pms = this.pms();
+      expect(pms[0]).to.equal('Weekly Top since Sun 2026-11-01 20:00 UTC:');
+      expect(pms[1]).to.equal('Playtime: 1. Bravo (2h)  2. Charlie (1h)  3. Delta (30m) | You: #4 (10m)');
+      expect(pms[2]).to.equal('Kills: 1. Delta (25 kills)  2. Bravo (10 kills)  3. Test player (4 kills) | You: #3 (4 kills)');
+      expect(pms[3]).to.equal('Earned: 1. Charlie (500 test coin)  2. Test player (50 test coin) | You: #2 (50 test coin)');
+      expect(pms).to.have.length(4);
+    },
+  }),
+
+  createModuleTest({
+    name: '/weeklytop with an unknown category explains the options',
+    module: MODULE,
+    now: NOW,
+    test: async function () {
+      const result = await this.runCommand('weeklytop', { category: 'deaths' });
+      expect(result.success).to.be.false;
+      expect(this.userError(result)).to.equal(
+        'Unknown category "deaths". Try: /weeklytop playtime | /weeklytop kills | /weeklytop currency | /weeklytop last',
+      );
+    },
+  }),
+
+  createModuleTest({
+    name: '/weeklytop for a disabled category is refused',
+    module: MODULE,
+    now: NOW,
+    userConfig: { categories: ['playtime'] },
+    test: async function () {
+      const result = await this.runCommand('weeklytop', { category: 'kills' });
+      expect(result.success).to.be.false;
+      expect(this.userError(result)).to.contain('Unknown category "kills"');
+    },
+  }),
+
+  createModuleTest({
+    name: 'First cron run only starts the week and pays nobody',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    setup: function () {
+      stubPogs(this as unknown as Ctx, { 0: 100 });
+    },
+    test: async function () {
+      const result = await this.runCronJob('award-weekly');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.messages.map((m) => m.message)).to.deep.equal([
+        "Weekly Top has started! Type /weeklytop to see this week's standings.",
+      ]);
+      expect(JSON.parse(stateRow(this).value).periodStart).to.equal(NOW.toISOString());
+      expect(this.client.stubs.playerOnGameserver.playerOnGameServerControllerAddCurrency).to.not.have.been.called;
+    },
+  }),
+
+  createModuleTest({
+    name: 'Cron pays the top 3, queues items for offline winners, grants the role and starts a new week',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    userConfig: {
+      categories: ['playtime'],
+      minimumPlaytimeMinutes: 0,
+      currencyRewards: [500, 250, 100],
+      firstPlaceItems: [SWORD],
+      secondPlaceItems: [SWORD],
+      rewardRoleId: ROLE_ID,
+      rewardRoleDays: 7,
+      discordChannelId: '123456789',
+    },
+    setup: function () {
+      const t = this as unknown as Ctx;
+      const [b, c, d] = t.otherPlayers.map((o) => o.pog.playerId);
+      seedState(this as any, { [t.pog.playerId]: 0, [b]: 0, [c]: 0, [d]: 0 });
+      // Charlie (offline) 1st, Delta 2nd, me 3rd, Bravo 4th.
+      stubPogs(t, { 0: 600, 1: 300, 2: 3600, 3: 1800 });
+    },
+    test: async function () {
+      const [b, c, d] = this.otherPlayers.map((o) => o.pog.playerId);
+      const result = await this.runCronJob('award-weekly');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+
+      expect(this.currency.balanceOf(c)).to.equal(500);
+      expect(this.currency.balanceOf(d)).to.equal(250);
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(100);
+      expect(this.currency.balanceOf(b)).to.equal(0);
+
+      // Delta is online: item given now. Charlie is offline: item queued.
+      const give = this.client.stubs.gameserver.gameServerControllerGiveItem!;
+      expect(give).to.have.been.calledOnce;
+      expect(give.firstCall.args[1]).to.equal(d);
+      const pending = this.variables.all.find((r) => r.key === 'wtr_pending_items');
+      expect(pending?.playerId).to.equal(c);
+      expect(JSON.parse(pending!.value)).to.deep.equal([SWORD]);
+
+      const assign = this.client.stubs.player.playerControllerAssignRole!;
+      expect(assign.callCount).to.equal(3);
+      expect(assign.firstCall.args).to.deep.equal([
+        c,
+        ROLE_ID,
+        { gameServerId: this.gameServerId, expiresAt: '2026-11-15T20:00:00.000Z' },
+      ]);
+
+      expect(this.messages.map((m) => m.message)).to.deep.equal([
+        'Weekly Top results are in!',
+        'Playtime: 1. Charlie (1h)  2. Delta (30m)  3. Test player (10m)',
+        'Prizes: 500 / 250 / 100 test coin for places 1-3.',
+        'A new week has started. Type /weeklytop to see the standings.',
+      ]);
+
+      const discord = this.client.stubs.discord.discordControllerSendMessage!;
+      expect(discord).to.have.been.calledOnce;
+      expect(discord.firstCall.args[0]).to.equal('123456789');
+      expect(discord.firstCall.args[1]?.message).to.contain('**Weekly Top results**');
+
+      const state = JSON.parse(stateRow(this).value);
+      expect(state.periodStart).to.equal(NOW.toISOString());
+      expect(state.playtime[c]).to.equal(3600);
+
+      const last = JSON.parse(this.variables.all.find((r) => r.key === 'wtr_last_results')!.value);
+      expect(last.periodStart).to.equal(PERIOD_START);
+      expect(last.categories.playtime.map((w: any) => w.name)).to.deep.equal(['Charlie', 'Delta', 'Test player']);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Cron with broadcasts off and nobody qualifying stays quiet and pays nothing',
+    module: MODULE,
+    now: NOW,
+    otherPlayers: players,
+    userConfig: { categories: ['playtime'], broadcastResults: false, minimumPlaytimeMinutes: 60 },
+    setup: function () {
+      const t = this as unknown as Ctx;
+      seedState(this as any, { [t.pog.playerId]: 0 });
+      stubPogs(t, { 0: 600 });
+    },
+    test: async function () {
+      const result = await this.runCronJob('award-weekly');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.messages).to.have.length(0);
+      expect(this.client.stubs.playerOnGameserver.playerOnGameServerControllerAddCurrency).to.not.have.been.called;
+      expect(this.client.stubs.discord.discordControllerSendMessage).to.not.have.been.called;
+    },
+  }),
+
+  createModuleTest({
+    name: '/weeklytop last shows the previous winners',
+    module: MODULE,
+    now: NOW,
+    setup: function () {
+      this.variables.insert({
+        key: 'wtr_last_results',
+        value: JSON.stringify({
+          periodStart: PERIOD_START,
+          periodEnd: NOW.toISOString(),
+          categories: { kills: [{ place: 1, playerId: 'x', name: 'Alpha', value: 42 }], currency: [] },
+        }),
+        gameServerId: this.gameServerId,
+        moduleId: this.moduleId,
+      });
+    },
+    test: async function () {
+      const result = await this.runCommand('weeklytop', { category: 'last' });
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.pms()).to.deep.equal([
+        "Last week's winners (Sun 2026-11-01 20:00 UTC - Sun 2026-11-08 20:00 UTC):",
+        'Kills: 1. Alpha (42 kills)',
+        'Earned: no qualifying players',
+      ]);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Login hook delivers queued item prizes once',
+    module: MODULE,
+    now: NOW,
+    setup: function () {
+      this.variables.insert({
+        key: 'wtr_pending_items',
+        value: JSON.stringify([SWORD]),
+        gameServerId: this.gameServerId,
+        moduleId: this.moduleId,
+        playerId: this.pog.playerId,
+      });
+    },
+    test: async function () {
+      const result = await this.runHook('deliver-pending');
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      const give = this.client.stubs.gameserver.gameServerControllerGiveItem!;
+      expect(give).to.have.been.calledOnce;
+      expect(give.firstCall.args[2]).to.deep.equal({ name: 'sword-id', amount: 2, quality: '' });
+      expect(this.pms()).to.deep.equal(['Your Weekly Top prize is here: 1 item reward delivered.']);
+      expect(this.variables.all.filter((r) => r.key === 'wtr_pending_items')).to.have.length(0);
+
+      const again = await this.runHook('deliver-pending');
+      expect(again.success).to.be.true;
+      expect(give).to.have.been.calledOnce;
+    },
+  }),
+];
+
+describe(group, function () {
+  tests.forEach((test) => {
+    test.run();
+  });
+});
