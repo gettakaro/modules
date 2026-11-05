@@ -1,0 +1,120 @@
+{
+  "name": "bank",
+  "author": "Takaro",
+  "description": "A savings bank that gives currency a reason to be saved. Players move currency between their wallet and a separate bank balance with bank deposit and bank withdraw. Bank balances earn interest on a schedule (daily by default), with a configurable rate, a cap per payout and a minimum balance. VIP roles can earn a higher rate. An optional withdraw fee and balance cap keep the economy in check. Admins see totals and top savers with bankstats.",
+  "summary": "A savings bank: players deposit and withdraw currency to a separate bank balance that earns daily interest (rate, cap, minimum balance, VIP rate via permission count). Optional withdraw fee and balance cap. Admin bankstats shows total held and top savers.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "interestRatePercent": {
+        "title": "Interest rate (%)",
+        "type": "number",
+        "description": "Interest paid on a bank balance at each payout, in percent. The payout runs daily by default (change the payInterest cron job to change how often). Set to 0 to turn interest off.",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 100
+      },
+      "maxInterestPerPayout": {
+        "title": "Max interest per payout",
+        "type": "integer",
+        "description": "The most interest one player can earn in a single payout (daily by default). Set to 0 for no cap.",
+        "default": 500,
+        "minimum": 0
+      },
+      "minimumBalanceForInterest": {
+        "title": "Minimum balance for interest",
+        "type": "integer",
+        "description": "A bank balance must be at least this high to earn interest.",
+        "default": 100,
+        "minimum": 0
+      },
+      "withdrawFeePercent": {
+        "title": "Withdraw fee (%)",
+        "type": "number",
+        "description": "Percentage of each withdrawal kept by the bank as a fee (rounded down). Set to 0 for no fee.",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 100
+      },
+      "maxBankBalance": {
+        "title": "Max bank balance",
+        "type": "integer",
+        "description": "The most a player can hold in the bank. Deposits and interest stop at this amount. Set to 0 for no limit.",
+        "default": 0,
+        "minimum": 0
+      },
+      "topSaversCount": {
+        "title": "Top savers shown",
+        "type": "integer",
+        "description": "How many top savers the bankstats command lists.",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "BANK_VIP_RATE",
+      "friendlyName": "Bank VIP interest rate",
+      "description": "Earn a higher interest rate in the bank. The count is the interest rate in percent (for example 3 = 3%). It is only used when it is higher than the normal rate.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "BANK_MANAGE",
+      "friendlyName": "Bank admin",
+      "description": "Allows using the bankstats command to see the total held in the bank and the top savers.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "bank": {
+      "trigger": "bank",
+      "description": "Check your bank balance, or deposit and withdraw currency.",
+      "helpText": "bank: show your bank balance and next interest. bank deposit <amount|all>: move currency from your wallet into the bank. bank withdraw <amount|all>: move currency from the bank to your wallet.",
+      "function": "src/commands/bank/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "defaultValue": "balance",
+          "helpText": "balance, deposit or withdraw",
+          "position": 0
+        },
+        {
+          "name": "amount",
+          "type": "string",
+          "defaultValue": "0",
+          "helpText": "A whole number, or all",
+          "position": 1
+        }
+      ]
+    },
+    "bankstats": {
+      "trigger": "bankstats",
+      "description": "Admin: show the total held in the bank and the top savers.",
+      "helpText": "Shows the number of bank accounts, the total held, the interest paid so far and the top savers.",
+      "function": "src/commands/bankstats/index.js",
+      "arguments": []
+    }
+  },
+  "cronJobs": {
+    "payInterest": {
+      "temporalValue": "0 0 * * *",
+      "description": "Pays interest on every bank balance that meets the minimum.",
+      "function": "src/cronjobs/payInterest/index.js"
+    }
+  },
+  "functions": {
+    "bank-helpers": {
+      "function": "src/functions/bank-helpers.js"
+    }
+  }
+}
