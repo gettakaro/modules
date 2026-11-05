@@ -107,6 +107,15 @@
     "required": [],
     "additionalProperties": false
   },
+  "uiSchema": {
+    "ranks": {
+      "items": {
+        "roleId": {
+          "ui:widget": "role"
+        }
+      }
+    }
+  },
   "permissions": [
     {
       "permission": "PLAYTIME_RANKS_ADMIN",
