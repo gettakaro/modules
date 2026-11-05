@@ -1,0 +1,266 @@
+{
+  "name": "weekly-top-rewards",
+  "author": "Takaro",
+  "description": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned, using data Takaro already records. A cron job (default Sunday 20:00 UTC, change it in the cron job settings) pays the top 3 of each category with currency, optional items and an optional expiring role, broadcasts the winners and can post them to Discord, including a live leaderboard message that keeps updating. Players see live standings with the weeklytop command (add playtime, kills, currency or last). Items for offline winners are delivered at their next login.",
+  "summary": "Weekly Top Rewards ranks players every week on playtime, kills and currency earned. A cron job pays the top 3 per category (currency, optional items, optional expiring role), broadcasts the winners and can post them to Discord, including a live Discord leaderboard that keeps updating. Players check live standings with /weeklytop.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "categories": {
+        "type": "array",
+        "title": "Categories",
+        "description": "What players are ranked on. playtime = time online this week (from connect and disconnect events, live for online players), kills = entity kills, currency = currency earned from modules this week.",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "enum": [
+            "playtime",
+            "kills",
+            "currency"
+          ]
+        },
+        "default": [
+          "playtime",
+          "kills",
+          "currency"
+        ]
+      },
+      "currencyRewards": {
+        "type": "array",
+        "title": "Currency per place",
+        "description": "Currency for 1st, 2nd and 3rd place in each category. Use 0 for no currency.",
+        "maxItems": 3,
+        "items": {
+          "type": "number",
+          "minimum": 0
+        },
+        "default": [
+          500,
+          250,
+          100
+        ]
+      },
+      "firstPlaceItems": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Items for 1st place",
+        "description": "Optional items for 1st place, given once per category won (a player who wins 2 categories gets them twice). Offline winners get them at their next login.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "secondPlaceItems": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Items for 2nd place",
+        "description": "Optional items for 2nd place, given once per category.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "thirdPlaceItems": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Items for 3rd place",
+        "description": "Optional items for 3rd place, given once per category.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "rewardRoleId": {
+        "type": "string",
+        "x-component": "role",
+        "title": "Winner role",
+        "description": "Optional role every top-3 player gets for a limited time. Leave empty for no role.",
+        "default": ""
+      },
+      "rewardRoleDays": {
+        "type": "number",
+        "title": "Winner role days",
+        "description": "How many days the winner role lasts before it expires.",
+        "minimum": 1,
+        "default": 7
+      },
+      "minimumPlaytimeMinutes": {
+        "type": "number",
+        "title": "Minimum playtime (minutes)",
+        "description": "Players with less playtime this week are not ranked for playtime.",
+        "minimum": 0,
+        "default": 30
+      },
+      "countManualCurrencyGrants": {
+        "type": "boolean",
+        "title": "Count admin currency grants",
+        "description": "Also count currency an admin added by hand in the dashboard. Off: only currency earned through modules counts. This module's own prizes never count.",
+        "default": false
+      },
+      "maxCurrencyEventPages": {
+        "type": "number",
+        "title": "Max currency event pages",
+        "description": "Upper limit of 1000-event pages read to rank currency earned. Raise it on very busy servers.",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 10
+      },
+      "liveListSize": {
+        "type": "number",
+        "title": "Live list size",
+        "description": "How many players the weeklytop command shows when one category is asked for.",
+        "minimum": 3,
+        "maximum": 10,
+        "default": 5
+      },
+      "broadcastResults": {
+        "type": "boolean",
+        "title": "Broadcast winners in game",
+        "default": true
+      },
+      "discordChannelId": {
+        "type": "string",
+        "title": "Discord results channel ID",
+        "description": "Optional. Post a short text message with the weekly winners to this Discord channel. Leave empty to turn it off.",
+        "default": ""
+      },
+      "discordLiveChannelId": {
+        "type": "string",
+        "title": "Discord live leaderboard channel ID",
+        "description": "Optional. Keep one leaderboard message in this Discord channel that is edited on the update-discord-leaderboard schedule (default every 15 minutes) and shows the final results when the week closes. Leave empty to turn it off.",
+        "default": ""
+      },
+      "discordLiveSize": {
+        "type": "number",
+        "title": "Discord live leaderboard size",
+        "description": "How many players per category the Discord leaderboard shows.",
+        "minimum": 3,
+        "maximum": 10,
+        "default": 5
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "firstPlaceItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "secondPlaceItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "thirdPlaceItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "rewardRoleId": {
+      "ui:widget": "role"
+    }
+  },
+  "permissions": [],
+  "commands": {
+    "weeklytop": {
+      "trigger": "weeklytop",
+      "description": "Show this week's live standings",
+      "helpText": "Shows this week's top players. Add playtime, kills or currency to see one category, or last to see last week's winners.",
+      "function": "src/commands/weeklytop/index.js",
+      "arguments": [
+        {
+          "name": "category",
+          "type": "string",
+          "helpText": "all, playtime, kills, currency or last",
+          "defaultValue": "all",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "deliver-pending": {
+      "eventType": "player-connected",
+      "description": "Gives item prizes to winners who were offline when the week closed",
+      "function": "src/hooks/deliver-pending/index.js"
+    }
+  },
+  "cronJobs": {
+    "award-weekly": {
+      "temporalValue": "0 20 * * 0",
+      "description": "Closes the week, pays the top 3 per category and starts a new week",
+      "function": "src/cronjobs/award-weekly/index.js"
+    },
+    "update-discord-leaderboard": {
+      "temporalValue": "*/15 * * * *",
+      "description": "Edits the live Discord leaderboard message (does nothing unless discordLiveChannelId is set)",
+      "function": "src/cronjobs/update-discord-leaderboard/index.js"
+    }
+  },
+  "functions": {
+    "wtr-helpers": {
+      "function": "src/functions/wtr-helpers.js"
+    }
+  }
+}
