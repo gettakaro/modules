@@ -80,7 +80,7 @@ const tests = [
       const result = await this.runCronJob('dropTick');
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
       expect(this.currency.balanceOf(this.player.id)).to.equal(200);
-      expect(broadcasts(this)).to.deep.equal(['🎁 Limon got a Rare lucky drop: 200 test coin!']);
+      expect(broadcasts(this)).to.deep.equal(['Limon got a Rare lucky drop: 200 test coin!']);
       const history = read(this, 'lucky_drop_history');
       expect(history.total).to.equal(1);
       expect(history.byRarity).to.deep.equal({ Rare: 1 });
@@ -157,7 +157,7 @@ const tests = [
     test: async function () {
       const result = await this.runCronJob('dropTick');
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
-      expect(broadcasts(this)).to.deep.equal(['🎁 Active got a Rare lucky drop: 200 test coin!']);
+      expect(broadcasts(this)).to.deep.equal(['Active got a Rare lucky drop: 200 test coin!']);
       expect(this.currency.balanceOf(this.otherPlayers[2].player.id)).to.equal(200);
       // New positions are stored for the next tick.
       expect(read(this, 'lucky_drop_positions')[this.otherPlayers[2].player.id]).to.deep.equal({ x: 50, y: 0, z: 50 });
@@ -202,7 +202,7 @@ const tests = [
       test: async function () {
         const result = await this.runCronJob('dropTick');
         expect(result.success, JSON.stringify(result.logs)).to.be.true;
-        expect(broadcasts(this)).to.deep.equal(['🎁 Vip got a Rare lucky drop: 200 test coin!']);
+        expect(broadcasts(this)).to.deep.equal(['Vip got a Rare lucky drop: 200 test coin!']);
       },
     }),
   ),
@@ -254,7 +254,7 @@ const tests = [
         { name: 'item-1', amount: 2, quality: '6' },
       );
       // Economy off: the currency part is dropped, items still go out.
-      expect(broadcasts(this)).to.deep.equal(['🎁 Limon got a Legendary lucky drop: 2x Auger!']);
+      expect(broadcasts(this)).to.deep.equal(['Limon got a Legendary lucky drop: 2x Auger!']);
       expect(this.currency.balanceOf(this.player.id)).to.equal(0);
     },
   }),
@@ -298,13 +298,13 @@ const tests = [
     test: async function () {
       const tick = await this.runCronJob('dropTick');
       expect(tick.success, JSON.stringify(tick.logs)).to.be.true;
-      expect(broadcasts(this)).to.deep.equal(['🎁 A Rare lucky drop appeared! Type /grab within 30 s to claim it!']);
+      expect(broadcasts(this)).to.deep.equal(['A Rare lucky drop appeared! Type /grab within 30 s to claim it!']);
       expect(this.currency.balanceOf(this.player.id)).to.equal(0);
 
       const grab = await this.runCommand('grab');
       expect(grab.success, JSON.stringify(grab.logs)).to.be.true;
       expect(this.currency.balanceOf(this.player.id)).to.equal(200);
-      expect(broadcasts(this)[1]).to.equal('🎁 Fast got a Rare lucky drop: 200 test coin!');
+      expect(broadcasts(this)[1]).to.equal('Fast got a Rare lucky drop: 200 test coin!');
       expect(read(this, 'lucky_drop_race')).to.be.undefined;
       expect(read(this, 'lucky_drop_history').recent[0].mode).to.equal('claimRace');
 
@@ -496,7 +496,7 @@ const tests = [
       const result = await this.runCommand('luckydropnow');
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
       expect(this.currency.balanceOf(this.player.id)).to.equal(200);
-      expect(broadcasts(this)).to.deep.equal(['🎁 Limon got a Rare lucky drop: 200 test coin!']);
+      expect(broadcasts(this)).to.deep.equal(['Limon got a Rare lucky drop: 200 test coin!']);
       expect(this.pms()).to.deep.equal(['Lucky drop: Limon won Rare: 200 test coin. Next drop in about 30 min.']);
     },
   }),
