@@ -300,6 +300,7 @@ const tests = [
       const clan = readClan(this, 'Wolves');
       expect(clan.members.map((m: Member) => m.name)).to.deep.equal(['Bob', 'Alice', 'Carol']);
       expect(memberships(this)).to.not.include(this.otherPlayers[2].player.id);
+      expect(this.client.pmsTo(this.otherPlayers[2].pog.gameId)).to.deep.equal(['[WLF] Dave was kicked by Test player.']);
 
       const unknown = await this.runCommand('clan', { action: 'kick', arg1: 'Zed' });
       expect(this.userError(unknown)).to.equal('No member of your clan matches "Zed".');

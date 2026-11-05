@@ -65,7 +65,7 @@
       "versionDetails": [
         {
           "version": "1.0.0",
-          "sha256": "d8169d42d994d544ced99bfd5521952ae86fec70cff64a4260b77246f7242c0f",
+          "sha256": "b318a171b7ba67672806fbf1664f6e6c91316cd9b01543d21db4f8591cb95eb6",
           "requiredCapabilities": [
             "chat.send"
           ]

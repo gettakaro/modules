@@ -221,7 +221,9 @@ async function kick() {
   clan.members = clan.members.filter((m) => m.id !== target.id);
   await saveClan(gameServerId, moduleId, clan);
   await clearMembership(gameServerId, moduleId, target.id);
-  await pmClan(gameServerId, clan, `[${clan.tag}] ${target.name} was kicked by ${player.name}.`, player.id);
+  // The kicked player is no longer a member, so add them back for this one notice.
+  const notify = { ...clan, members: [...clan.members, target] };
+  await pmClan(gameServerId, notify, `[${clan.tag}] ${target.name} was kicked by ${player.name}.`, player.id);
   await player.pm(`${target.name} was kicked from the clan.`);
 }
 
