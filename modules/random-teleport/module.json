@@ -1,0 +1,201 @@
+{
+  "name": "random-teleport",
+  "author": "Takaro",
+  "description": "Random Teleport (/rtp): players teleport to a random spot inside an area you set, either a ring around a centre point (min and max radius) or a rectangle. Blocked zones (circles or rectangles, for example trader areas or spawn) are never picked. Optional cooldown (RTP_BYPASS_COOLDOWN skips it, for example for VIPs) and currency cost, charged only after a successful teleport. Height: 7 Days to Die and DayZ move the player to ground level, so the default Y of 0 works there. Other games teleport to exactly the configured Y, so set it to a safe height for your map. For a warmup, set a delay on the rtp command in the module's command settings. Needs a game that supports teleporting players.",
+  "summary": "Random Teleport (/rtp): teleport to a random spot inside a ring around a centre point or a rectangle. Blocked zones (trader areas, spawn) are skipped. Optional cooldown (VIPs can skip it) and currency cost, charged only after a successful teleport. Configurable height: 7 Days to Die and DayZ place the player on the ground, other games use the configured Y. Warmup via the command delay setting. Needs a game that supports teleporting players.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "areaShape": {
+        "title": "Area shape",
+        "description": "circle: a ring around the centre, between the minimum and maximum radius. rectangle: anywhere between the min and max X/Z bounds.",
+        "type": "string",
+        "enum": [
+          "circle",
+          "rectangle"
+        ],
+        "default": "circle"
+      },
+      "centerX": {
+        "title": "Centre X",
+        "description": "Circle area: X coordinate of the centre.",
+        "type": "number",
+        "default": 0
+      },
+      "centerZ": {
+        "title": "Centre Z",
+        "description": "Circle area: Z coordinate of the centre (the second map axis; some games call it Y on the map).",
+        "type": "number",
+        "default": 0
+      },
+      "minRadius": {
+        "title": "Minimum radius",
+        "description": "Circle area: players land at least this far from the centre. Keeps them out of the spawn area.",
+        "type": "number",
+        "minimum": 0,
+        "default": 500
+      },
+      "maxRadius": {
+        "title": "Maximum radius",
+        "description": "Circle area: players land at most this far from the centre. Keep it inside your map.",
+        "type": "number",
+        "minimum": 1,
+        "default": 2000
+      },
+      "minX": {
+        "title": "Rectangle min X",
+        "description": "Rectangle area: lowest X.",
+        "type": "number",
+        "default": -2000
+      },
+      "maxX": {
+        "title": "Rectangle max X",
+        "description": "Rectangle area: highest X.",
+        "type": "number",
+        "default": 2000
+      },
+      "minZ": {
+        "title": "Rectangle min Z",
+        "description": "Rectangle area: lowest Z.",
+        "type": "number",
+        "default": -2000
+      },
+      "maxZ": {
+        "title": "Rectangle max Z",
+        "description": "Rectangle area: highest Z.",
+        "type": "number",
+        "default": 2000
+      },
+      "y": {
+        "title": "Height (Y)",
+        "description": "Height to teleport to. 7 Days to Die and DayZ move the player to ground level, so 0 works. Other games use this exact height: set a height that is safe on your map, or a height above the terrain if your game or mods prevent fall damage.",
+        "type": "number",
+        "default": 0
+      },
+      "blockedZones": {
+        "title": "Blocked zones",
+        "description": "Areas players never land in, for example trader areas or spawn. Circle: x, z and radius. Rectangle: minX, maxX, minZ and maxZ.",
+        "type": "array",
+        "default": [],
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Only for your own overview."
+            },
+            "shape": {
+              "type": "string",
+              "title": "Shape",
+              "enum": [
+                "circle",
+                "rectangle"
+              ],
+              "default": "circle"
+            },
+            "x": {
+              "type": "number",
+              "title": "Centre X (circle)"
+            },
+            "z": {
+              "type": "number",
+              "title": "Centre Z (circle)"
+            },
+            "radius": {
+              "type": "number",
+              "title": "Radius (circle)",
+              "minimum": 0
+            },
+            "minX": {
+              "type": "number",
+              "title": "Min X (rectangle)"
+            },
+            "maxX": {
+              "type": "number",
+              "title": "Max X (rectangle)"
+            },
+            "minZ": {
+              "type": "number",
+              "title": "Min Z (rectangle)"
+            },
+            "maxZ": {
+              "type": "number",
+              "title": "Max Z (rectangle)"
+            }
+          },
+          "required": [
+            "shape"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "maxAttempts": {
+        "title": "Attempts to find a free spot",
+        "description": "How many random spots are tried before giving up when blocked zones cover them.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200,
+        "default": 30
+      },
+      "cooldown": {
+        "title": "Cooldown",
+        "description": "Time a player has to wait after a successful random teleport. Players with RTP_BYPASS_COOLDOWN skip it.",
+        "x-component": "duration",
+        "type": "number",
+        "minimum": 0,
+        "default": 600000
+      },
+      "cost": {
+        "title": "Cost",
+        "description": "Currency a random teleport costs, charged only after it worked. 0 is free. Needs economy enabled on the server.",
+        "type": "number",
+        "minimum": 0,
+        "default": 0
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "cooldown": {
+      "ui:widget": "duration"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "RTP_USE",
+      "friendlyName": "Use random teleport",
+      "description": "Allows a player to use rtp.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "RTP_BYPASS_COOLDOWN",
+      "friendlyName": "Skip the random teleport cooldown",
+      "description": "The player's random teleports do not start a cooldown, for example for VIPs.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "rtp": {
+      "trigger": "rtp",
+      "description": "Teleport to a random spot",
+      "helpText": "Teleports you to a random spot in the wilderness.",
+      "function": "src/commands/rtp/index.js",
+      "arguments": [],
+      "requiredPermissions": [
+        "RTP_USE"
+      ]
+    }
+  },
+  "functions": {
+    "rtp": {
+      "function": "src/functions/rtp.js"
+    }
+  }
+}
