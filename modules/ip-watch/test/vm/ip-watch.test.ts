@@ -108,6 +108,26 @@ describe('ip-watch (module-VM)', () => {
     }).run();
 
     createModuleTest({
+      name: 'a repeated new-IP event for the same player and IP alerts only once',
+      module: MODULE,
+      permissions: NO_PERMISSIONS,
+      player: { name: 'Neo', ip: NEW_IP },
+      otherPlayers: [ADMIN, { name: 'AltBob', gameId: 'bob-1', ip: NEW_IP, online: false }],
+      setup: function () {
+        stubPogSearch(this);
+      },
+      test: async function () {
+        const first = await this.runHook('new-ip', { eventData: ipDetected(NEW_IP) });
+        const second = await this.runHook('new-ip', { eventData: ipDetected(NEW_IP) });
+
+        expect(first.success, JSON.stringify(first.logs)).to.be.true;
+        expect(second.success, JSON.stringify(second.logs)).to.be.true;
+        expect(adminPms(this)).to.deep.equal(['[IP Watch] Neo: shares IP 203.0.x.x with AltBob']);
+        expect(JSON.stringify(second.logs)).to.include('repeated new-IP event');
+      },
+    }).run();
+
+    createModuleTest({
       name: 'shared IP is found through the module index of earlier sightings',
       module: MODULE,
       permissions: NO_PERMISSIONS,
@@ -376,6 +396,7 @@ describe('ip-watch (module-VM)', () => {
           eventData: {
             keptPlayerId: this.player.id,
             steamId: '76561198000000000',
+            epicOnlineServicesId: '0002e76bc18c4ef4a7e3323771b22a26',
             matchedPlayers: [
               { playerId: this.player.id, matchedOn: ['epicOnlineServicesId'] },
               { playerId: twin.id, matchedOn: ['steamId'] },
@@ -387,6 +408,38 @@ describe('ip-watch (module-VM)', () => {
         expect(adminPms(this)).to.deep.equal([
           '[IP Watch] Identity conflict: Neo also matches SteamTwin (on steamId). Possible alt or shared account.',
         ]);
+      },
+    }).run();
+
+    createModuleTest({
+      name: 'a conflict that only matches on a placeholder id like <unknown/none> is not alerted',
+      module: MODULE,
+      permissions: NO_PERMISSIONS,
+      player: { name: 'Neo' },
+      otherPlayers: [ADMIN, { name: 'NoEosPlayer' }],
+      setup: function () {
+        stubPogSearch(this);
+      },
+      test: async function () {
+        const other = this.otherPlayers[1]!.player;
+        // Shape of a real prod event (2026-11-05): the second match is only on the placeholder EOS id.
+        const result = await this.runHook('identity-conflict', {
+          eventData: {
+            keptPlayerId: this.player.id,
+            gameId: '<unknown/none>',
+            steamId: '76561198140695477',
+            epicOnlineServicesId: '<unknown/none>',
+            unwrittenIdentifiers: ['epicOnlineServicesId'],
+            matchedPlayers: [
+              { playerId: this.player.id, matchedOn: ['steamId'] },
+              { playerId: other.id, matchedOn: ['epicOnlineServicesId'] },
+            ],
+          },
+        });
+
+        expect(result.success, JSON.stringify(result.logs)).to.be.true;
+        expect(adminPms(this)).to.deep.equal([]);
+        expect(JSON.stringify(result.logs)).to.include('placeholder ids');
       },
     }).run();
 

@@ -1,5 +1,5 @@
 import { takaro, data } from '@takaro/helpers';
-import { isExempt, sendAlert } from './ip-watch-helpers.js';
+import { isExempt, realMatches, sendAlert } from './ip-watch-helpers.js';
 
 async function playerName(playerId) {
   try {
@@ -25,6 +25,10 @@ async function main() {
 
   const keptId = (eventData && eventData.keptPlayerId) || (player && player.id);
   const matched = Array.isArray(eventData && eventData.matchedPlayers) ? eventData.matchedPlayers : [];
+  if (matched.length > 0 && realMatches(eventData).length < 2) {
+    console.log('ip-watch: identity conflict only on placeholder ids (like <unknown/none>), not an alt; no alert');
+    return;
+  }
   const others = matched.filter((m) => m && m.playerId && m.playerId !== keptId);
 
   const keptName = player && player.id === keptId ? player.name : keptId ? await playerName(keptId) : 'unknown player';

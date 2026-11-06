@@ -6,6 +6,7 @@ import {
   findPlayersOnIp,
   addToIpIndex,
   readLastCountry,
+  isRepeatEvent,
   writeLastCountry,
   previousCountryFromHistory,
   checkVpn,
@@ -29,6 +30,11 @@ async function main() {
 
   if (isExempt(player, pog, config)) {
     console.log(`ip-watch: ${player.name} is exempt, skipping`);
+    return;
+  }
+
+  if (!isPrivateIp(ip) && (await isRepeatEvent(moduleId, ip, player.id, Date.now()))) {
+    console.log(`ip-watch: repeated new-IP event for ${player.name}, already checked, skipping`);
     return;
   }
 

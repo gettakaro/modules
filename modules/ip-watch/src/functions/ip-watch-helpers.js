@@ -7,6 +7,8 @@ export const PERM_EXEMPT = 'IP_WATCH_EXEMPT';
 const IP_INDEX_PREFIX = 'ipw_ip:';
 const LAST_COUNTRY_KEY = 'ipw_last_country';
 const MAX_INDEX_ENTRIES = 25;
+// Takaro sometimes sends the same new-IP event 2-3 times for one connection.
+export const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
 
 const DEFAULT_VPN_URLS = {
   proxycheck: 'https://proxycheck.io/v2/{ip}?vpn=1&risk=1&key={key}',
@@ -45,6 +47,29 @@ export function isPrivateIp(ip) {
   if (a === 169 && b === 254) return true;
   if (a === 100 && b >= 64 && b <= 127) return true;
   return false;
+}
+
+// ── Identity conflicts ────────────────────────────────────────────────────────
+
+const PLACEHOLDER_IDS = ['0', 'unknown', 'n/a', 'null', 'undefined', 'none'];
+
+/** Junk platform ids games send for "no id", e.g. "<unknown/none>", "Unknown", "0". */
+export function isPlaceholderId(value) {
+  if (typeof value !== 'string') return true;
+  const v = value.trim().toLowerCase();
+  if (v.length === 0 || PLACEHOLDER_IDS.includes(v)) return true;
+  return v.startsWith('<') && v.endsWith('>');
+}
+
+/**
+ * Matched players that share a real id with the connection. Takaro can match a player on a
+ * placeholder id (seen on prod: epicOnlineServicesId "<unknown/none>"); such a match is noise.
+ */
+export function realMatches(eventData) {
+  const matched = Array.isArray(eventData && eventData.matchedPlayers) ? eventData.matchedPlayers : [];
+  return matched.filter(
+    (m) => m && m.playerId && Array.isArray(m.matchedOn) && m.matchedOn.some((col) => !isPlaceholderId(eventData[col])),
+  );
 }
 
 // ── Exemption ─────────────────────────────────────────────────────────────────
@@ -105,8 +130,14 @@ export async function readIpIndex(moduleId, ip) {
 export async function addToIpIndex(moduleId, ip, player) {
   const list = await readIpIndex(moduleId, ip);
   const rest = list.filter((entry) => entry.id !== player.id);
-  const next = [{ id: player.id, name: player.name }, ...rest].slice(0, MAX_INDEX_ENTRIES);
+  const next = [{ id: player.id, name: player.name, at: Date.now() }, ...rest].slice(0, MAX_INDEX_ENTRIES);
   await writeVariable(moduleId, `${IP_INDEX_PREFIX}${ip}`, next);
+}
+
+/** True when this player was already recorded on this IP moments ago: a repeated event, not a new connection. */
+export async function isRepeatEvent(moduleId, ip, playerId, nowMs) {
+  const own = (await readIpIndex(moduleId, ip)).find((entry) => entry && entry.id === playerId);
+  return Boolean(own && Number(own.at) && nowMs - Number(own.at) < DUPLICATE_WINDOW_MS);
 }
 
 export async function readLastCountry(moduleId, playerId) {
