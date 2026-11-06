@@ -26,7 +26,12 @@ type InventoryItem = { itemId: string; code?: string; name?: string; quantity: n
  */
 function addControllers(
   test: ModuleTest,
-  opts: { inventory?: InventoryItem[] | null; roles?: { id: string; name: string }[]; legacyHistory?: unknown[] },
+  opts: {
+    inventory?: InventoryItem[] | null;
+    roles?: { id: string; name: string }[];
+    legacyHistory?: unknown[];
+    axios?: { post: sinon.SinonStub };
+  },
 ) {
   const tracking: Record<string, sinon.SinonStub> = opts.legacyHistory
     ? { trackingControllerGetPlayerInventoryHistory: sinon.stub().resolves(paginated(opts.legacyHistory)) }
@@ -53,6 +58,7 @@ function addControllers(
     get(target, property) {
       if (property === 'tracking') return tracking;
       if (property === 'role') return role;
+      if (property === 'axios') return opts.axios;
       return Reflect.get(target, property);
     },
   });
@@ -121,6 +127,70 @@ const tests = [
       expect(adminPms(this)).to.have.length(1);
       expect(adminPms(this)[0]).to.contain('FLAGGED: Wood x800 (max 500)');
       expect(adminPms(this)[0]).to.not.contain('Cheat Gun');
+    },
+  }),
+
+  createModuleTest({
+    name: 'Runner with an older API client: inventory-at is called directly, the removed history endpoint is not',
+    module: MODULE,
+    now: FIRST_JOIN,
+    permissions: [],
+    player: { name: 'Stale' },
+    otherPlayers: [ADMIN],
+    userConfig: { forbiddenItems: [{ item: 'cheatGun' }] },
+    setup: function () {
+      const post = sinon.stub().callsFake(async (url: string, body: { at: string }) => ({
+        data: {
+          data: {
+            at: body.at,
+            snapshotTime: body.at,
+            changesApplied: 0,
+            truncated: false,
+            items: [{ itemId: ITEM_CHEAT, code: 'cheatGun', name: 'Cheat Gun', quantity: 1 }],
+          },
+        },
+      }));
+      const { tracking } = addControllers(this, { legacyHistory: [], axios: { post } });
+      (this as unknown as { stalePost: sinon.SinonStub; staleTracking: typeof tracking }).stalePost = post;
+      (this as unknown as { staleTracking: typeof tracking }).staleTracking = tracking;
+    },
+    test: async function () {
+      const result = await this.runHook(HOOK);
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      const self = this as unknown as { stalePost: sinon.SinonStub; staleTracking: Record<string, sinon.SinonStub> };
+      expect(self.stalePost).to.have.been.calledOnce;
+      expect(self.stalePost.firstCall.args[0]).to.equal('/tracking/inventory/at');
+      expect(self.stalePost.firstCall.args[1]).to.include({ gameServerId: this.gameServerId, playerId: this.player.id });
+      expect(self.staleTracking.trackingControllerGetPlayerInventoryHistory).to.not.have.been.called;
+      expect(adminPms(this)).to.deep.equal([
+        '[New player check] Stale: 1 item stacks - FLAGGED: forbidden item Cheat Gun x1. Action: alert only.',
+      ]);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Older API without inventory-at (404): falls back to the inventory history',
+    module: MODULE,
+    now: FIRST_JOIN,
+    permissions: [],
+    player: { name: 'Ancient' },
+    otherPlayers: [ADMIN],
+    userConfig: { forbiddenItems: [{ item: ITEM_CHEAT }] },
+    setup: function () {
+      const post = sinon.stub().rejects(Object.assign(new Error('Request failed with status code 404'), { response: { status: 404 } }));
+      addControllers(this, {
+        axios: { post },
+        legacyHistory: [
+          { itemId: ITEM_CHEAT, itemCode: 'cheatGun', itemName: 'Cheat Gun', quantity: 1, createdAt: '2024-01-01T00:01:00.000Z' },
+        ],
+      });
+    },
+    test: async function () {
+      const result = await this.runHook(HOOK);
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(adminPms(this)).to.deep.equal([
+        '[New player check] Ancient: 1 item stacks - FLAGGED: forbidden item Cheat Gun x1. Action: alert only.',
+      ]);
     },
   }),
 

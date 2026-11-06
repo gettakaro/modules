@@ -58,17 +58,30 @@ export async function readLevel(gameServerId, pog, cfg) {
   return { level: null, source: null };
 }
 
+function fromInventoryAt(inv) {
+  if (!inv || !inv.snapshotTime) return { known: false, items: [] };
+  return { known: true, items: inv.items || [] };
+}
+
 /** The player's current inventory from Takaro's tracking history. known=false when there is no snapshot yet. */
 export async function readInventory(gameServerId, playerId) {
-  const tracking = takaro.tracking;
+  const tracking = takaro.tracking || {};
+  // A couple of seconds back: the API refuses a moment in the future, and clocks drift.
+  const at = new Date(Date.now() - 2000).toISOString();
   try {
     if (typeof tracking.trackingControllerGetInventoryAt === 'function') {
-      // A couple of seconds back: the API refuses a moment in the future, and clocks drift.
-      const at = new Date(Date.now() - 2000).toISOString();
-      const res = await tracking.trackingControllerGetInventoryAt({ gameServerId, playerId, at });
-      const inv = res.data.data;
-      if (!inv || !inv.snapshotTime) return { known: false, items: [] };
-      return { known: true, items: inv.items || [] };
+      return fromInventoryAt((await tracking.trackingControllerGetInventoryAt({ gameServerId, playerId, at })).data.data);
+    }
+    // A module runner can bundle an older API client than the API it talks to (seen on staging
+    // 2026-11-06): the method is missing, but POST /tracking/inventory/at exists.
+    if (takaro.axios && typeof takaro.axios.post === 'function') {
+      try {
+        const res = await takaro.axios.post('/tracking/inventory/at', { gameServerId, playerId, at });
+        return fromInventoryAt(res.data && res.data.data);
+      } catch (err) {
+        if (!(err && err.response && err.response.status === 404)) throw err;
+        // An older API without inventory-at: try the inventory history below.
+      }
     }
     if (typeof tracking.trackingControllerGetPlayerInventoryHistory === 'function') {
       // Older Takaro: inventory history rows. The newest row per item is its current amount.
