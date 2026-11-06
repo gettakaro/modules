@@ -5,6 +5,7 @@ import {
   NEW_PLAYER_GRACE_MS,
   daysBetween,
   fill,
+  formatAway,
   findVariable,
   getSetting,
   parseJson,
@@ -26,7 +27,8 @@ async function giveItems(gameServerId, playerId, items, multiplier) {
       await takaro.gameserver.gameServerControllerGiveItem(gameServerId, playerId, {
         name: entry.item,
         amount,
-        ...(entry.quality ? { quality: entry.quality } : {}),
+        // The API requires quality; '' means the game's default.
+        quality: entry.quality || '',
       });
       let name = entry.item;
       try {
@@ -58,9 +60,13 @@ async function main() {
     return;
   }
 
+  // Exact (fractional) days for the rules, so minDaysAway 0.5 means 12 hours; whole days for texts and stats.
+  const awayMs = nowMs - lastSeenMs;
+  const awayDays = awayMs / DAY_MS;
   const days = daysBetween(lastSeenMs, nowMs);
-  if (days < minDays) {
-    console.log(`welcome-back: ${player.name} was away ${days} days (< ${minDays}), nothing to do`);
+  const away = formatAway(awayMs);
+  if (awayDays < minDays) {
+    console.log(`welcome-back: ${player.name} was away ${away} (< ${minDays} days), nothing to do`);
     return;
   }
 
@@ -100,7 +106,7 @@ async function main() {
 
   if (claim) {
     const multiplier = claim.count > 1 ? claim.count : 1;
-    const tier = pickTier(config.tiers, days) || { currency: 0, itemMultiplier: 1 };
+    const tier = pickTier(config.tiers, awayDays) || { currency: 0, itemMultiplier: 1 };
 
     const baseCurrency = Math.max(0, Math.round(Number(tier.currency || 0)));
     if (baseCurrency > 0) {
@@ -109,7 +115,7 @@ async function main() {
         paidCurrency = baseCurrency * multiplier;
         await takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(gameServerId, pog.playerId, {
           currency: paidCurrency,
-          reason: `Welcome back after ${days} days`,
+          reason: `Welcome back after ${away}`,
         });
         parts.push(`${paidCurrency} ${currencyName}`);
       } else {
@@ -125,7 +131,7 @@ async function main() {
     }
   }
 
-  const values = { player: player.name, days, currency: currencyName, prefix };
+  const values = { player: player.name, days, away, currency: currencyName, prefix };
   if (parts.length > 0) {
     await pog.pm(fill(config.message, { ...values, reward: parts.join(' + ') }));
   } else if (config.messageNoReward) {
@@ -143,7 +149,7 @@ async function main() {
 
   await recordReturn(gameServerId, moduleId, nowMs, parts.length > 0, paidCurrency);
   console.log(
-    `welcome-back: ${player.name} returned after ${days} days, reward=${parts.join(' + ') || 'none'}`,
+    `welcome-back: ${player.name} returned after ${away}, reward=${parts.join(' + ') || 'none'}`,
   );
 }
 

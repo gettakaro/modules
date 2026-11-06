@@ -28,6 +28,55 @@ function variable(t: { variables: { all: Array<{ key: string; value: string }> }
 
 const hookTests = [
   createModuleTest({
+    name: 'Decimal minDaysAway: 0.5 days (12 hours) away pays and says the hours',
+    module: MODULE,
+    now: NOW,
+    settings: ECONOMY_ON,
+    userConfig: { minDaysAway: 0.5, tiers: [{ minDays: 0.5, currency: 20 }, { minDays: 2, currency: 50 }] },
+    setup: returning(0.6),
+    test: async function () {
+      const result = await this.runHook('welcome-back', { eventType: 'player-connected' });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(20);
+      expect(this.pms()).to.deep.equal(['Welcome back Test player! You were away 14 hours. Here\'s 20 coins.']);
+      expect(variable(this, 'welcome_back_last')).to.deep.include({ days: 0 });
+    },
+  }),
+
+  createModuleTest({
+    name: 'Decimal minDaysAway: under 0.5 days away does nothing',
+    module: MODULE,
+    now: NOW,
+    settings: ECONOMY_ON,
+    userConfig: { minDaysAway: 0.5 },
+    setup: returning(0.4),
+    test: async function () {
+      const result = await this.runHook('welcome-back', { eventType: 'player-connected' });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(0);
+      expect(this.pms()).to.deep.equal([]);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Decimal tiers: minutes-scale tiers pick the highest reached tier',
+    module: MODULE,
+    now: NOW,
+    settings: ECONOMY_ON,
+    userConfig: { minDaysAway: 0.001, tiers: [{ minDays: 0.001, currency: 10 }, { minDays: 0.003, currency: 30 }] },
+    setup: returning(0.004),
+    test: async function () {
+      const result = await this.runHook('welcome-back', { eventType: 'player-connected' });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(30);
+      expect(this.pms()).to.deep.equal(['Welcome back Test player! You were away 5 minutes. Here\'s 30 coins.']);
+    },
+  }),
+
+  createModuleTest({
     name: 'Rewards the lowest tier after 10 days away, PMs, and records stats',
     module: MODULE,
     now: NOW,
@@ -211,6 +260,25 @@ const hookTests = [
         { name: ITEM_ID, amount: 6, quality: '3' },
       );
       expect(this.pms()).to.deep.equal(['Welcome back Test player! You were away 95 days. Here\'s 6x Medkit.']);
+    },
+  }),
+
+  createModuleTest({
+    name: 'An item without quality is sent with quality "" (the API requires the field)',
+    module: MODULE,
+    now: NOW,
+    settings: ECONOMY_OFF,
+    userConfig: { items: [{ item: ITEM_ID, amount: 1 }] },
+    setup: returning(10),
+    test: async function () {
+      const result = await this.runHook('welcome-back', { eventType: 'player-connected' });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.client.stubs.gameserver.gameServerControllerGiveItem).to.have.been.calledOnceWith(
+        this.gameServerId,
+        this.pog.playerId,
+        { name: ITEM_ID, amount: 1, quality: '' },
+      );
     },
   }),
 

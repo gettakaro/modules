@@ -14,21 +14,21 @@
       "minDaysAway": {
         "type": "number",
         "title": "Minimum days away",
-        "description": "A player must have been away at least this many days to get a welcome-back reward.",
+        "description": "A player must have been away at least this many days to get a welcome-back reward. Decimals work: 0.5 = 12 hours.",
         "default": 7,
-        "minimum": 1
+        "exclusiveMinimum": 0
       },
       "tiers": {
         "type": "array",
         "title": "Reward tiers",
-        "description": "Rewards by days away. The tier with the highest minDays the player reached is used. A player who reached minDaysAway but no tier gets the lowest tier. itemMultiplier multiplies the amount of every configured item (0 = no items for that tier).",
+        "description": "Rewards by days away (decimals work, 0.5 = 12 hours). The tier with the highest minDays the player reached is used. A player who reached minDaysAway but no tier gets the lowest tier. itemMultiplier multiplies the amount of every configured item (0 = no items for that tier).",
         "items": {
           "type": "object",
           "properties": {
             "minDays": {
               "type": "number",
               "title": "Minimum days away",
-              "minimum": 1
+              "minimum": 0
             },
             "currency": {
               "type": "number",
@@ -96,16 +96,16 @@
       "message": {
         "type": "string",
         "title": "Reward message",
-        "description": "Private message with the reward. Placeholders: {player}, {days}, {reward}, {currency} (currency name), {prefix} (command prefix).",
-        "default": "Welcome back {player}! You were away {days} days. Here's {reward}.",
+        "description": "Private message with the reward. Placeholders: {player}, {away} (e.g. \"3 days\" or \"5 hours\"), {days} (whole days), {reward}, {currency} (currency name), {prefix} (command prefix).",
+        "default": "Welcome back {player}! You were away {away}. Here's {reward}.",
         "minLength": 1,
         "maxLength": 300
       },
       "messageNoReward": {
         "type": "string",
         "title": "Message without reward",
-        "description": "Private message when the player qualifies but gets nothing (no WELCOME_BACK_CLAIM permission, or nothing to give). Leave empty to send nothing. Placeholders: {player}, {days}, {prefix}.",
-        "default": "Welcome back {player}! You were away {days} days.",
+        "description": "Private message when the player qualifies but gets nothing (no WELCOME_BACK_CLAIM permission, or nothing to give). Leave empty to send nothing. Placeholders: {player}, {away}, {days}, {prefix}.",
+        "default": "Welcome back {player}! You were away {away}.",
         "maxLength": 300
       },
       "broadcast": {
@@ -117,8 +117,8 @@
       "broadcastMessage": {
         "type": "string",
         "title": "Broadcast message",
-        "description": "Server-wide message when broadcast is on. Placeholders: {player}, {days}.",
-        "default": "{player} is back after {days} days away. Welcome back!",
+        "description": "Server-wide message when broadcast is on. Placeholders: {player}, {away}, {days}.",
+        "default": "{player} is back after {away} away. Welcome back!",
         "minLength": 1,
         "maxLength": 300
       }

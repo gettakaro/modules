@@ -18,7 +18,15 @@ export function daysBetween(fromMs, toMs) {
   return Math.floor((toMs - fromMs) / DAY_MS);
 }
 
-/** Highest tier the player reached; the lowest tier when they only reached minDaysAway. */
+/** Time away as short text: "3 days", "5 hours", "12 minutes". */
+export function formatAway(ms) {
+  const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  if (ms >= DAY_MS) return plural(Math.floor(ms / DAY_MS), 'day');
+  if (ms >= 60 * 60 * 1000) return plural(Math.floor(ms / (60 * 60 * 1000)), 'hour');
+  return plural(Math.max(1, Math.floor(ms / 60000)), 'minute');
+}
+
+/** Highest tier the player reached; the lowest tier when they only reached minDaysAway. `days` may be fractional. */
 export function pickTier(tiers, days) {
   const sorted = (Array.isArray(tiers) ? tiers : [])
     .filter((t) => t && Number.isFinite(Number(t.minDays)))
@@ -92,7 +100,8 @@ export async function takeLock(gameServerId, moduleId, playerId, nowMs) {
       gameServerId,
       moduleId,
       playerId,
-      expiresAt: new Date(nowMs + 5 * 60 * 1000).toISOString(),
+      // Short: it only has to outlive a burst of duplicate events, not block a real quick return.
+      expiresAt: new Date(nowMs + 60 * 1000).toISOString(),
     });
     return true;
   } catch (err) {
