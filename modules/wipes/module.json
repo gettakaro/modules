@@ -1,0 +1,98 @@
+{
+  "name": "wipes",
+  "author": "Takaro",
+  "description": "Tells players about server wipes: a /wipe command with the last and next wipe, reminders before a scheduled wipe, and an announcement when the server is wiped.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "reminders": {
+        "type": "array",
+        "title": "Reminders",
+        "description": "Broadcast before a scheduled wipe. Each reminder is sent once per wipe. Placeholders: {timeLeft}, {time}, {wipeType}. Reminders are checked every 5 minutes by default, so one can be up to 5 minutes late, and one set less than 5 minutes before the wipe can be missed.",
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "properties": {
+            "minutesBefore": {
+              "type": "integer",
+              "title": "Minutes before the wipe",
+              "minimum": 1,
+              "maximum": 43200
+            },
+            "message": {
+              "type": "string",
+              "title": "Message",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "minutesBefore",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        "default": [
+          {
+            "minutesBefore": 1440,
+            "message": "The next server wipe is in {timeLeft} ({time})."
+          },
+          {
+            "minutesBefore": 60,
+            "message": "The next server wipe is in {timeLeft} ({time})."
+          },
+          {
+            "minutesBefore": 10,
+            "message": "The server wipes in {timeLeft}!"
+          }
+        ]
+      },
+      "announcementMessage": {
+        "type": "string",
+        "title": "Announcement",
+        "description": "Broadcast when the server is wiped. Placeholders: {wipeType}, {note}.",
+        "minLength": 1,
+        "maxLength": 1024,
+        "default": "The server has been wiped. A new cycle starts now, good luck!"
+      }
+    },
+    "required": [
+      "reminders",
+      "announcementMessage"
+    ],
+    "additionalProperties": false
+  },
+  "commands": {
+    "wipe": {
+      "trigger": "wipe",
+      "description": null,
+      "helpText": "Shows when the last wipe was and when the next one is",
+      "function": "src/commands/wipe/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "wipeAnnouncement": {
+      "eventType": "server-wiped",
+      "description": "Broadcasts the announcement when the server is wiped",
+      "function": "src/hooks/wipeAnnouncement/index.js"
+    }
+  },
+  "cronJobs": {
+    "wipeReminder": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Broadcasts the configured reminders before the next scheduled wipe",
+      "function": "src/cronjobs/wipeReminder/index.js"
+    }
+  },
+  "functions": {
+    "wipeUtils": {
+      "function": "src/functions/wipeUtils.js"
+    }
+  }
+}
