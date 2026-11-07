@@ -1,0 +1,50 @@
+{
+  "takaroVersion": "0.0.0",
+  "name": "wipes",
+  "author": "Takaro",
+  "supportedGames": [
+    "all"
+  ],
+  "versions": [
+    {
+      "tag": "1.0.0",
+      "description": "Tells players about server wipes: a /wipe command with the last and next wipe, reminders before a scheduled wipe, and an announcement when the server is wiped.",
+      "configSchema": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"reminders\":{\"type\":\"array\",\"title\":\"Reminders\",\"description\":\"Broadcast before a scheduled wipe. Each reminder is sent once per wipe. Placeholders: {timeLeft}, {time}, {wipeType}. Reminders are checked every 5 minutes by default, so one can be up to 5 minutes late, and one set less than 5 minutes before the wipe can be missed.\",\"maxItems\":10,\"items\":{\"type\":\"object\",\"properties\":{\"minutesBefore\":{\"type\":\"integer\",\"title\":\"Minutes before the wipe\",\"minimum\":1,\"maximum\":43200},\"message\":{\"type\":\"string\",\"title\":\"Message\",\"minLength\":1,\"maxLength\":1024}},\"required\":[\"minutesBefore\",\"message\"],\"additionalProperties\":false},\"default\":[{\"minutesBefore\":1440,\"message\":\"The next server wipe is in {timeLeft} ({time}).\"},{\"minutesBefore\":60,\"message\":\"The next server wipe is in {timeLeft} ({time}).\"},{\"minutesBefore\":10,\"message\":\"The server wipes in {timeLeft}!\"}]},\"announcementMessage\":{\"type\":\"string\",\"title\":\"Announcement\",\"description\":\"Broadcast when the server is wiped. Placeholders: {wipeType}, {note}.\",\"minLength\":1,\"maxLength\":1024,\"default\":\"The server has been wiped. A new cycle starts now, good luck!\"}},\"required\":[\"reminders\",\"announcementMessage\"],\"additionalProperties\":false}",
+      "uiSchema": "{}",
+      "commands": [
+        {
+          "name": "wipe",
+          "trigger": "wipe",
+          "description": null,
+          "helpText": "Shows when the last wipe was and when the next one is",
+          "function": "import { data } from '@takaro/helpers';\nimport { formatDuration, formatWipeTime, getSummary } from './wipeUtils.js';\n\nasync function main() {\n  const { lastWipe, nextWipe } = await getSummary(data.gameServerId);\n  const now = Date.now();\n\n  if (lastWipe) {\n    const since = now - Date.parse(lastWipe.completedAt ?? lastWipe.createdAt);\n    const type = lastWipe.wipeTypeName ? ` (${lastWipe.wipeTypeName})` : '';\n    await data.player.pm(`Last wipe: ${formatDuration(since)} ago${type}.`);\n  } else {\n    await data.player.pm('No wipe has been recorded on this server yet.');\n  }\n\n  if (!nextWipe) {\n    await data.player.pm('No wipe is scheduled.');\n    return;\n  }\n  const at = Date.parse(nextWipe.at);\n  if (at > now) {\n    await data.player.pm(\n      `Next wipe: in ${formatDuration(at - now)}, ${formatWipeTime(nextWipe.at, nextWipe.timezone)} (${nextWipe.wipeTypeName}).`,\n    );\n  } else {\n    await data.player.pm(`Next wipe: due now (${nextWipe.wipeTypeName}).`);\n  }\n}\n\nawait main();\n",
+          "arguments": []
+        }
+      ],
+      "hooks": [
+        {
+          "name": "wipeAnnouncement",
+          "eventType": "server-wiped",
+          "description": "Broadcasts the announcement when the server is wiped",
+          "regex": null,
+          "function": "import { data, takaro } from '@takaro/helpers';\nimport { renderTemplate } from './wipeUtils.js';\n\nasync function main() {\n  const { wipeTypeName, note } = data.eventData;\n  const message = renderTemplate(data.module.userConfig.announcementMessage, {\n    wipeType: wipeTypeName ?? '',\n    note: note ?? '',\n  });\n  if (!message) {\n    return;\n  }\n  await takaro.gameserver.gameServerControllerSendMessage(data.gameServerId, { message });\n}\n\nawait main();\n"
+        }
+      ],
+      "cronJobs": [
+        {
+          "name": "wipeReminder",
+          "temporalValue": "*/5 * * * *",
+          "description": "Broadcasts the configured reminders before the next scheduled wipe",
+          "function": "import { data, takaro } from '@takaro/helpers';\nimport { formatDuration, formatWipeTime, getSummary, renderTemplate } from './wipeUtils.js';\n\nconst STATE_KEY = 'wipeReminders';\n\nfunction parseState(row) {\n  if (!row) {\n    return null;\n  }\n  try {\n    return JSON.parse(row.value);\n  } catch {\n    return null;\n  }\n}\n\nasync function loadState(nextWipe) {\n  const row = (\n    await takaro.variable.variableControllerSearch({\n      filters: { key: [STATE_KEY], moduleId: [data.module.moduleId], gameServerId: [data.gameServerId] },\n    })\n  ).data.data[0];\n\n  const stored = parseState(row);\n  const isCurrent = stored && stored.at === nextWipe.at && Array.isArray(stored.sent);\n  return { row, state: isCurrent ? stored : { at: nextWipe.at, sent: [] } };\n}\n\nasync function saveState(row, state) {\n  const value = JSON.stringify(state);\n  if (row) {\n    await takaro.variable.variableControllerUpdate(row.id, { value });\n  } else {\n    await takaro.variable.variableControllerCreate({\n      key: STATE_KEY,\n      value,\n      moduleId: data.module.moduleId,\n      gameServerId: data.gameServerId,\n    });\n  }\n}\n\nasync function main() {\n  const { nextWipe } = await getSummary(data.gameServerId);\n  if (!nextWipe) {\n    return;\n  }\n  const remainingMs = Date.parse(nextWipe.at) - Date.now();\n  if (remainingMs <= 0) {\n    return;\n  }\n\n  const { row, state } = await loadState(nextWipe);\n  const due = data.module.userConfig.reminders.filter(\n    (reminder) => reminder.minutesBefore * 60000 >= remainingMs && !state.sent.includes(reminder.minutesBefore),\n  );\n  if (due.length === 0) {\n    return;\n  }\n\n  // One message for all crossed offsets (late install): the closest one has the right wording.\n  const closest = due.reduce((best, reminder) => (reminder.minutesBefore < best.minutesBefore ? reminder : best));\n  const message = renderTemplate(closest.message, {\n    timeLeft: formatDuration(remainingMs),\n    time: formatWipeTime(nextWipe.at, nextWipe.timezone),\n    wipeType: nextWipe.wipeTypeName,\n  });\n  if (message) {\n    await takaro.gameserver.gameServerControllerSendMessage(data.gameServerId, { message });\n  }\n\n  state.sent = [...new Set([...state.sent, ...due.map((reminder) => reminder.minutesBefore)])];\n  await saveState(row, state);\n}\n\nawait main();\n"
+        }
+      ],
+      "functions": [
+        {
+          "name": "wipeUtils",
+          "function": "import { takaro } from '@takaro/helpers';\n\nfunction plural(count, unit) {\n  return `${count} ${unit}${count === 1 ? '' : 's'}`;\n}\n\nexport function formatDuration(ms) {\n  const totalMinutes = Math.round(ms / 60000);\n  if (totalMinutes <= 0) {\n    return 'less than a minute';\n  }\n  const units = [\n    [Math.floor(totalMinutes / 1440), 'day'],\n    [Math.floor((totalMinutes % 1440) / 60), 'hour'],\n    [totalMinutes % 60, 'minute'],\n  ];\n  const first = units.findIndex(([count]) => count > 0);\n  const parts = [units[first]];\n  const next = units[first + 1];\n  if (next && next[0] > 0) {\n    parts.push(next);\n  }\n  return parts.map(([count, unit]) => plural(count, unit)).join(' ');\n}\n\nexport function formatWipeTime(iso, timezone) {\n  const options = {\n    weekday: 'short',\n    day: 'numeric',\n    month: 'short',\n    hour: '2-digit',\n    minute: '2-digit',\n    timeZoneName: 'short',\n  };\n  try {\n    return new Date(iso).toLocaleString('en-GB', { ...options, timeZone: timezone });\n  } catch {\n    return new Date(iso).toLocaleString('en-GB', { ...options, timeZone: 'UTC' });\n  }\n}\n\nexport function renderTemplate(template, values) {\n  let text = template;\n  for (const [key, value] of Object.entries(values)) {\n    text = text.replaceAll(`{${key}}`, () => value ?? '');\n  }\n  return text.replace(/\\s+/g, ' ').trim();\n}\n\nexport async function getSummary(gameServerId) {\n  return (await takaro.wipe.wipeControllerSummary(gameServerId)).data.data;\n}\n"
+        }
+      ],
+      "permissions": []
+    }
+  ]
+}

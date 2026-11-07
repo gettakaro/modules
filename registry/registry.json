@@ -397,6 +397,23 @@
       ]
     },
     {
+      "name": "wipes",
+      "description": "Tells players about server wipes: a /wipe command with the last and next wipe, reminders before a scheduled wipe, and an announcement when the server is wiped.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "f43f558c8d3ad5c44df62417b1aeb74fedaddc0157f0a1b518d1efff4fdbe573",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "zombie-racing",
       "description": "Zombie Racing lets players bet on a configurable virtual race, locks betting when a race starts, broadcasts live race commentary while the race is running, then finishes the race through delayed hooks after the configured duration.",
       "latestVersion": "1.0.0",

@@ -72,9 +72,9 @@ claude
 In Takaro, subscribe a domain to `https://gettakaro.github.io/modules` and install modules from there. A custom
 domain, `registry.takaro.io`, will follow.
 
-The modules Takaro used to bundle are published here under their existing camelCase names. Each `1.0.0` holds the
-same content as the last version Takaro bundled, except that teleports' `teleportwaypoint` finds the teleports module
-by name instead of the built-in flag:
+The modules Takaro used to bundle are published here under their existing names. Each `1.0.0` holds the same content
+as the last version Takaro bundled, except that teleports' `teleportwaypoint` finds the teleports module by name instead
+of the built-in flag:
 
 - `chatBridge`
 - `dailyRewards`
@@ -89,6 +89,7 @@ by name instead of the built-in flag:
 - `teleports`
 - `timedShutdown`
 - `utils`
+- `wipes`
 
 The other published modules are:
 
