@@ -14,7 +14,8 @@
     "geoBlock",
     "timedShutdown",
     "dailyRewards",
-    "shopActions"
+    "shopActions",
+    "voteRewards"
   ],
   "unlisted": {
     "hello-world": "Example module for module authors",

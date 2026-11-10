@@ -14,7 +14,7 @@ const group = 'Geo Block (module-VM)';
 const NO_PERMISSIONS: PermissionFixture = [];
 
 /** The fields `TakaroEventPlayerNewIpDetected` carries; only `country` is read by the hook. */
-function ipDetected(country: string) {
+function ipDetected(country: string | null) {
   return { city: 'nowhere', country, latitude: '0', longitude: '0', ip: '198.51.100.7' };
 }
 
@@ -86,6 +86,20 @@ const tests = [
 
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
       expect(logMessages(result)).to.deep.equal(['Allowed country detected, no action']);
+      expectNoAction(this);
+    },
+  }),
+
+  createModuleTest({
+    name: 'UNKNOWN COUNTRY: ALLOW MODE takes no action when GeoIP has no country (gettakaro/takaro#5431)',
+    module: MODULE,
+    permissions: NO_PERMISSIONS,
+    userConfig: { mode: 'allow', countries: ['RU'], ban: true, message: 'Custom message' },
+    test: async function () {
+      const result = await this.runHook('IPDetected', { eventData: ipDetected(null) });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(logMessages(result)).to.deep.equal(['Country unknown, no action']);
       expectNoAction(this);
     },
   }),

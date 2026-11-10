@@ -1,0 +1,105 @@
+{
+  "name": "voteRewards",
+  "author": "Takaro",
+  "description": "Rewards players who vote for this game server on the Takaro Server List. List the server publicly on its Public page first. Only verified votes are rewarded: the voter signed in with a Takaro account linked to their player, or with a linked Steam account. In-game items and commands for an offline player wait until they next join, or until they run the claimvote command.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "currency": {
+        "type": "integer",
+        "title": "Currency",
+        "description": "Currency given per vote. Skipped when the economy is disabled on this server.",
+        "minimum": 0,
+        "default": 100
+      },
+      "itemSet": {
+        "type": "string",
+        "title": "Item set",
+        "description": "The item set given in game per vote.",
+        "x-component": "itemSet"
+      },
+      "role": {
+        "type": "string",
+        "title": "Role",
+        "description": "A role assigned to the voter.",
+        "x-component": "role"
+      },
+      "roleDurationHours": {
+        "type": "integer",
+        "title": "Role duration (hours)",
+        "description": "How long the role lasts. 0 makes it permanent.",
+        "minimum": 0,
+        "default": 24
+      },
+      "commands": {
+        "type": "array",
+        "title": "Console commands",
+        "description": "Console commands run per vote. Placeholders: {gameId} and {steamId}. A vote matched without Steam (for example on Minecraft) has no {steamId}, and a command using it is skipped.",
+        "maxItems": 5,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "default": []
+      },
+      "pendingClaimDays": {
+        "type": "integer",
+        "title": "Days an offline reward waits",
+        "description": "How long in-game items and commands wait for an offline voter.",
+        "minimum": 1,
+        "maximum": 90,
+        "default": 30
+      },
+      "thanksMessage": {
+        "type": "string",
+        "title": "Thanks message",
+        "description": "Sent to the player after the in-game reward is delivered.",
+        "minLength": 1,
+        "maxLength": 256,
+        "default": "Thanks for voting for this server! Your reward has been delivered."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "itemSet": {
+      "ui:widget": "itemSet"
+    },
+    "role": {
+      "ui:widget": "role"
+    }
+  },
+  "commands": {
+    "claimvote": {
+      "trigger": "claimvote",
+      "description": null,
+      "helpText": "Claim vote rewards that are waiting for you.",
+      "function": "src/commands/claimvote/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "voteCast": {
+      "eventType": "vote-cast",
+      "description": "Rewards the voter.",
+      "function": "src/hooks/voteCast/index.js"
+    },
+    "deliverPendingOnConnect": {
+      "eventType": "player-connected",
+      "description": "Delivers vote rewards that waited for the player to join.",
+      "function": "src/hooks/deliverPendingOnConnect/index.js"
+    }
+  },
+  "functions": {
+    "rewards": {
+      "function": "src/functions/rewards.js"
+    }
+  }
+}

@@ -9,6 +9,22 @@ async function main() {
     throw new TakaroUserError('You must buy at least 1 ticket.');
   }
 
+  const ticketCost = mod.systemConfig.commands.buyTicket.cost;
+  const ticketPrice = args.amount * ticketCost;
+
+  if (pog.currency < ticketPrice) {
+    throw new TakaroUserError(`You cannot afford ${args.amount} tickets, they cost ${ticketPrice}.`);
+  }
+
+  // GH #3315: the command execution charges one ticketCost itself, so only the rest is deducted here.
+  const remainingPrice = ticketPrice - ticketCost;
+  if (remainingPrice > 0) {
+    await takaro.playerOnGameserver.playerOnGameServerControllerDeductCurrency(gameServerId, pog.playerId, {
+      currency: remainingPrice,
+      reason: 'Lottery ticket purchase',
+    });
+  }
+
   const tickets = (
     await takaro.variable.variableControllerSearch({
       filters: {
@@ -44,16 +60,6 @@ async function main() {
       gameServerId,
       moduleId: mod.moduleId,
       playerId: pog.playerId,
-    });
-  }
-
-  const ticketPrice = args.amount * mod.systemConfig.commands.buyTicket.cost;
-
-  // The price of the first ticket is deducted by the command execution itself.
-  if (args.amount > 1) {
-    await takaro.playerOnGameserver.playerOnGameServerControllerDeductCurrency(gameServerId, pog.playerId, {
-      currency: ticketPrice - 1,
-      reason: 'Lottery ticket purchase',
     });
   }
 

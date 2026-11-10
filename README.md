@@ -74,7 +74,7 @@ domain, `registry.takaro.io`, will follow.
 
 The modules Takaro used to bundle are published here under their existing names. Each `1.0.0` holds the same content
 as the last version Takaro bundled, except that teleports' `teleportwaypoint` finds the teleports module by name instead
-of the built-in flag:
+of the built-in flag. Fixes made after that ship as new versions, such as `geoBlock` and `lottery` `1.0.1`:
 
 - `chatBridge`
 - `dailyRewards`
@@ -89,6 +89,7 @@ of the built-in flag:
 - `teleports`
 - `timedShutdown`
 - `utils`
+- `voteRewards`
 - `wipes`
 
 The other published modules are:

@@ -2,7 +2,7 @@
   "name": "lottery",
   "author": "Takaro",
   "description": "Players can buy tickets for a lottery, and the winner is chosen at random.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "supportedGames": [
     "all"
   ],

@@ -2,7 +2,7 @@
   "name": "geoBlock",
   "author": "Takaro",
   "description": "Block players from certain countries from joining the server.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "supportedGames": [
     "all"
   ],
