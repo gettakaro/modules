@@ -15,7 +15,51 @@ const OTHER_MODULE_ID = 'b7c3e9a1-4f28-4d6b-9a05-2e8c7d1f3b60';
 const OTHER_GAME_SERVER_ID = '3a9f5d84-6c17-4e2a-8b13-5f0d9c4a7e21';
 const OTHER_KEY = 'lottery_tickets_refunded';
 
+const PURCHASES = [
+  { cost: 0, amount: 1 },
+  { cost: 0, amount: 3 },
+  { cost: 1, amount: 1 },
+  { cost: 1, amount: 3 },
+  { cost: 5, amount: 1 },
+  { cost: 5, amount: 3 },
+];
+
+const purchaseTests = PURCHASES.map(({ cost, amount }) =>
+  createModuleTest({
+    name: `Buying ${amount} ticket(s) at cost ${cost} charges amount x cost in total (gettakaro/takaro#3315)`,
+    module: MODULE,
+    permissions: 'ROOT',
+    systemConfig: { commands: { buyTicket: { cost } } },
+    currency: 1000,
+    test: async function () {
+      const result = await this.runCommand('buyTicket', { amount });
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      const chargedByModule = 1000 - this.currency.balanceOf(this.pog.playerId);
+      // The command execution itself charges one `cost` outside the VM.
+      expect(chargedByModule + cost).to.equal(amount * cost);
+    },
+  }),
+);
+
 const tests = [
+  ...purchaseTests,
+  createModuleTest({
+    name: 'Cannot buy more tickets than the player can afford',
+    module: MODULE,
+    permissions: 'ROOT',
+    systemConfig: { commands: { buyTicket: { cost: TICKET_COST } } },
+    currency: TICKET_COST * 2,
+    test: async function () {
+      const result = await this.runCommand('buyTicket', { amount: 3 });
+
+      expect(result.success).to.be.false;
+      expect(this.userError(result)).to.equal(`You cannot afford 3 tickets, they cost ${3 * TICKET_COST}.`);
+      expect(this.variables.all).to.have.length(0);
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(TICKET_COST * 2);
+    },
+  }),
+
   createModuleTest({
     name: 'Cannot buy 0 lottery tickets',
     module: MODULE,
@@ -97,8 +141,8 @@ const tests = [
       expect(view.success, JSON.stringify(view.logs)).to.be.true;
       expect(this.pms()).to.deep.equal([boughtMessage, `You have bought ${wantAmount} tickets.`]);
 
-      // Pins `buyTicket.js`'s `price - 1` deduction — a real overcharge (gettakaro/takaro#3315) atop the outside-VM cost charge.
-      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(1000 - (wantAmount * TICKET_COST - 1));
+      // The harness skips the outside-VM command cost, which charges one ticket; the module pays the rest (gettakaro/takaro#3315).
+      expect(this.currency.balanceOf(this.pog.playerId)).to.equal(1000 - (wantAmount - 1) * TICKET_COST);
     },
   }),
 

@@ -109,14 +109,22 @@
     {
       "name": "geoBlock",
       "description": "Block players from certain countries from joining the server.",
-      "latestVersion": "1.0.0",
+      "latestVersion": "1.0.1",
       "versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
       "versionDetails": [
         {
           "version": "1.0.0",
           "sha256": "3686f653bd4480907c1c7d944228c491e06fa2079da44b54440cb4e2adbdfbbf",
+          "requiredCapabilities": [
+            "moderation.kick"
+          ]
+        },
+        {
+          "version": "1.0.1",
+          "sha256": "21ae82be7c7af40afacab75b38faa82c9bf11d1ffcb58eeedbf1a9516c20f808",
           "requiredCapabilities": [
             "moderation.kick"
           ]
@@ -180,14 +188,22 @@
     {
       "name": "lottery",
       "description": "Players can buy tickets for a lottery, and the winner is chosen at random.",
-      "latestVersion": "1.0.0",
+      "latestVersion": "1.0.1",
       "versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.0.1"
       ],
       "versionDetails": [
         {
           "version": "1.0.0",
           "sha256": "422b1dea96d8698346e9f68dfc45cdf078ad23638727556287b9351a2e685104",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        },
+        {
+          "version": "1.0.1",
+          "sha256": "602ff5909c886680c1139bb89e59fc29870368212bd66805857adc4329001bf1",
           "requiredCapabilities": [
             "chat.send"
           ]
@@ -392,6 +408,24 @@
           "requiredCapabilities": [
             "chat.send",
             "console.execute"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "voteRewards",
+      "description": "Rewards players who vote for this game server on the Takaro Server List. List the server publicly on its Public page first. Only verified votes are rewarded: the voter signed in with a Takaro account linked to their player, or with a linked Steam account. In-game items and commands for an offline player wait until they next join, or until they run the claimvote command.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "0a960e506ca2fd1f1ad1a8ecab418bf504b03a267892d603f965e9810d30b7f4",
+          "requiredCapabilities": [
+            "console.execute",
+            "items.give"
           ]
         }
       ]

@@ -28,6 +28,11 @@ async function main() {
     return;
   }
 
+  if (!country) {
+    console.log('Country unknown, no action');
+    return;
+  }
+
   if (mode === 'allow') {
     if (countries.includes(country)) {
       console.log('Allowed country detected, no action');
