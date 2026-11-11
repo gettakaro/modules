@@ -588,6 +588,24 @@
       ]
     },
     {
+      "name": "welcome-back",
+      "description": "One-time welcome-back reward (currency + optional items, scaled by days away) and a PM when a player returns after being away. Once per absence, skips brand-new players, VIP multiplier via permission count, and a weekly 'players returned' stats command for admins.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "c68fcec692de58b97f177a6330b3e9b3a154d4f61663954162355a280106ea59",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "wipes",
       "description": "Tells players about server wipes: a /wipe command with the last and next wipe, reminders before a scheduled wipe, and an announcement when the server is wiped.",
       "latestVersion": "1.0.0",
