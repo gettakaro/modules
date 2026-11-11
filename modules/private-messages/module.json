@@ -1,0 +1,224 @@
+{
+  "name": "private-messages",
+  "author": "Takaro",
+  "summary": "Private messages for players: msg and reply to online players, leave mail for offline players (delivered when they join), check when someone was last seen, and ignore players who bother you. Anti-spam cooldown and optional, off-by-default staff social spy.",
+  "description": "Private Messages — players talk one-to-one without spamming global chat. msg <player> <text> sends a private message to an online player, r <text> replies to whoever messaged you last. mail <player> <text> leaves a message for a player who is offline; it is shown when they next join (mailbox to read again, mailclear to empty it). seen <player> shows when someone was last online. ignore <player> blocks someone's messages and mail (ignore alone lists them, unignore to undo). A shared cooldown stops spam. Optional staff social spy (off by default): staff with PM_SPY can turn on socialspy to get copies of private messages — tell your players if you enable it. Note: the command line itself goes through game chat; use a command prefix your game hides from public chat if privacy matters.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "cooldownSeconds": {
+        "type": "number",
+        "default": 3,
+        "minimum": 0,
+        "description": "Seconds a player must wait between private messages or mails (shared by msg, r and mail). 0 = no cooldown."
+      },
+      "maxMessageLength": {
+        "type": "integer",
+        "default": 200,
+        "minimum": 10,
+        "maximum": 500,
+        "description": "Longer messages are cut to this many characters."
+      },
+      "mailboxSize": {
+        "type": "integer",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 50,
+        "description": "Mails kept per player. When full, the oldest read mail makes room; a box full of unread mail refuses new mail."
+      },
+      "mailExpiryDays": {
+        "type": "number",
+        "default": 30,
+        "minimum": 0,
+        "description": "Days until a mail is deleted automatically. 0 = mails never expire."
+      },
+      "incomingFormat": {
+        "type": "string",
+        "default": "[PM from {sender}] {message}",
+        "description": "What the receiver sees. Placeholders: {sender}, {receiver}, {message}, {prefix}"
+      },
+      "outgoingFormat": {
+        "type": "string",
+        "default": "[PM to {receiver}] {message}",
+        "description": "Confirmation the sender sees. Placeholders: {sender}, {receiver}, {message}, {prefix}"
+      },
+      "newMailNotice": {
+        "type": "string",
+        "default": "New mail from {sender}. You have {count} unread. Type {prefix}mailbox to read it.",
+        "description": "Sent to an online player who just got mail. Placeholders: {sender}, {count}, {prefix}"
+      },
+      "socialSpy": {
+        "type": "boolean",
+        "default": false,
+        "description": "Allow staff with the PM_SPY permission to see copies of private messages and mail via the socialspy command. Off by default. If you turn this on, tell your players (e.g. in your rules) that staff can read private messages."
+      },
+      "spyFormat": {
+        "type": "string",
+        "default": "[Spy] {message}",
+        "description": "How a social spy copy looks. Placeholder: {message} (sender -> receiver: text)"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "PM_SPY",
+      "friendlyName": "Social spy",
+      "description": "Allows staff to turn on socialspy and see copies of private messages and mail (only when the socialSpy setting is on)",
+      "canHaveCount": false
+    },
+    {
+      "permission": "PM_IGNORE_EXEMPT",
+      "friendlyName": "Cannot be ignored",
+      "description": "Messages and mail from this player reach others even if they ignore them (for staff)",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "msg": {
+      "trigger": "msg",
+      "description": "Send a private message",
+      "helpText": "Usage: msg <player> <text> — sends a private message to an online player.",
+      "function": "src/commands/msg/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The online player to message",
+          "position": 0
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "Your message (the rest of the line)",
+          "position": 1
+        }
+      ]
+    },
+    "r": {
+      "trigger": "r",
+      "description": "Reply to your last private message",
+      "helpText": "Usage: r <text> — replies to the last player who messaged you.",
+      "function": "src/commands/r/index.js",
+      "arguments": [
+        {
+          "name": "message",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "Your reply (the rest of the line)",
+          "position": 0
+        }
+      ]
+    },
+    "mail": {
+      "trigger": "mail",
+      "description": "Leave mail for a player",
+      "helpText": "Usage: mail <player> <text> — stores a message; the player gets it when they next join (or now, if online).",
+      "function": "src/commands/mail/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to mail",
+          "position": 0
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "Your message (the rest of the line)",
+          "position": 1
+        }
+      ]
+    },
+    "mailbox": {
+      "trigger": "mailbox",
+      "description": "Read your mail",
+      "helpText": "Usage: mailbox — shows the mail in your mailbox.",
+      "function": "src/commands/mailbox/index.js",
+      "arguments": []
+    },
+    "mailclear": {
+      "trigger": "mailclear",
+      "description": "Empty your mailbox",
+      "helpText": "Usage: mailclear — deletes all mail in your mailbox.",
+      "function": "src/commands/mailclear/index.js",
+      "arguments": []
+    },
+    "seen": {
+      "trigger": "seen",
+      "description": "When was a player last online",
+      "helpText": "Usage: seen <player> — shows when a player was last seen on this server.",
+      "function": "src/commands/seen/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to look up",
+          "position": 0
+        }
+      ]
+    },
+    "ignore": {
+      "trigger": "ignore",
+      "description": "Block a player's messages",
+      "helpText": "Usage: ignore <player> — blocks their private messages and mail. Without a name (or with \"list\") it shows who you ignore.",
+      "function": "src/commands/ignore/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "defaultValue": "list",
+          "helpText": "Player name. Leave empty (or type list) to see your ignore list.",
+          "position": 0
+        }
+      ]
+    },
+    "unignore": {
+      "trigger": "unignore",
+      "description": "Unblock a player",
+      "helpText": "Usage: unignore <player|all> — allows their messages again.",
+      "function": "src/commands/unignore/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "defaultValue": null,
+          "helpText": "Player name from your ignore list, or all",
+          "position": 0
+        }
+      ]
+    },
+    "socialspy": {
+      "trigger": "socialspy",
+      "description": "Toggle social spy (staff)",
+      "helpText": "Usage: socialspy — turns copies of private messages on or off. Needs PM_SPY and the socialSpy setting.",
+      "function": "src/commands/socialspy/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "deliver-mail": {
+      "eventType": "player-connected",
+      "description": "Shows new mail to a player when they join",
+      "function": "src/hooks/deliver-mail/index.js"
+    }
+  },
+  "cronJobs": {},
+  "functions": {
+    "pm-helpers": {
+      "function": "src/functions/pm-helpers.js"
+    }
+  }
+}
