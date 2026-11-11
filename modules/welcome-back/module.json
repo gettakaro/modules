@@ -1,0 +1,184 @@
+{
+  "name": "welcome-back",
+  "author": "Takaro",
+  "description": "Win back players who were away. When a player connects after being away for at least minDaysAway days (from Takaro's last-seen time), they get a one-time welcome-back reward: currency and optional items, scaled by how long they were gone (tiers such as 7, 30 and 90 days). They get a private message, and optionally the server sees a broadcast. Each absence pays out once. Brand-new players are skipped, the first join belongs to onboarding. The WELCOME_BACK_CLAIM permission gates the reward; its count multiplies the currency for VIPs. Admins run welcomebackstats to see how many players came back each week.",
+  "summary": "One-time welcome-back reward (currency + optional items, scaled by days away) and a PM when a player returns after being away. Once per absence, skips brand-new players, VIP multiplier via permission count, and a weekly 'players returned' stats command for admins.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "minDaysAway": {
+        "type": "number",
+        "title": "Minimum days away",
+        "description": "A player must have been away at least this many days to get a welcome-back reward. Decimals work: 0.5 = 12 hours.",
+        "default": 7,
+        "exclusiveMinimum": 0
+      },
+      "tiers": {
+        "type": "array",
+        "title": "Reward tiers",
+        "description": "Rewards by days away (decimals work, 0.5 = 12 hours). The tier with the highest minDays the player reached is used. A player who reached minDaysAway but no tier gets the lowest tier. itemMultiplier multiplies the amount of every configured item (0 = no items for that tier).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "minDays": {
+              "type": "number",
+              "title": "Minimum days away",
+              "minimum": 0
+            },
+            "currency": {
+              "type": "number",
+              "title": "Currency",
+              "minimum": 0,
+              "default": 0
+            },
+            "itemMultiplier": {
+              "type": "number",
+              "title": "Item multiplier",
+              "minimum": 0,
+              "default": 1
+            }
+          },
+          "required": [
+            "minDays"
+          ]
+        },
+        "default": [
+          {
+            "minDays": 7,
+            "currency": 100,
+            "itemMultiplier": 1
+          },
+          {
+            "minDays": 30,
+            "currency": 300,
+            "itemMultiplier": 2
+          },
+          {
+            "minDays": 90,
+            "currency": 750,
+            "itemMultiplier": 3
+          }
+        ]
+      },
+      "items": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Reward items",
+        "description": "Optional items given on return. The amount is multiplied by the tier's item multiplier. Leave empty for currency only.",
+        "uniqueItems": true,
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount",
+              "minimum": 1,
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        },
+        "default": []
+      },
+      "message": {
+        "type": "string",
+        "title": "Reward message",
+        "description": "Private message with the reward. Placeholders: {player}, {away} (e.g. \"3 days\" or \"5 hours\"), {days} (whole days), {reward}, {currency} (currency name), {prefix} (command prefix).",
+        "default": "Welcome back {player}! You were away {away}. Here's {reward}.",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "messageNoReward": {
+        "type": "string",
+        "title": "Message without reward",
+        "description": "Private message when the player qualifies but gets nothing (no WELCOME_BACK_CLAIM permission, or nothing to give). Leave empty to send nothing. Placeholders: {player}, {away}, {days}, {prefix}.",
+        "default": "Welcome back {player}! You were away {away}.",
+        "maxLength": 300
+      },
+      "broadcast": {
+        "type": "boolean",
+        "title": "Broadcast returns",
+        "description": "Tell the whole server when a player comes back.",
+        "default": false
+      },
+      "broadcastMessage": {
+        "type": "string",
+        "title": "Broadcast message",
+        "description": "Server-wide message when broadcast is on. Placeholders: {player}, {away}, {days}.",
+        "default": "{player} is back after {away} away. Welcome back!",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "items": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "WELCOME_BACK_CLAIM",
+      "friendlyName": "Receive welcome-back reward",
+      "description": "Player gets the welcome-back reward after being away. The count multiplies the currency reward (e.g. 2 for VIP doubles it). Give it to the Player role for everyone.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "WELCOME_BACK_STATS",
+      "friendlyName": "View welcome-back stats",
+      "description": "Allows an admin to see how many players returned per week.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "welcomebackstats": {
+      "trigger": "welcomebackstats",
+      "description": "Show how many players came back after being away, per week.",
+      "helpText": "Shows how many players returned (and got a reward) per week. Optional: number of weeks to show (1-26).",
+      "function": "src/commands/welcomebackstats/index.js",
+      "requiredPermissions": [
+        "WELCOME_BACK_STATS"
+      ],
+      "arguments": [
+        {
+          "name": "weeks",
+          "type": "number",
+          "helpText": "How many weeks to show (1-26)",
+          "defaultValue": "4",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "welcome-back": {
+      "eventType": "player-connected",
+      "description": "Gives the welcome-back reward when a player returns after being away.",
+      "function": "src/hooks/welcome-back/index.js"
+    }
+  },
+  "functions": {
+    "welcome-back-helpers": {
+      "function": "src/functions/welcome-back-helpers.js"
+    }
+  }
+}
