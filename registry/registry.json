@@ -326,6 +326,24 @@
       ]
     },
     {
+      "name": "loot-crates",
+      "description": "Key-based loot crates with weighted reward tables (currency and/or items, with rarities). Players get keys by buying them with currency, from a Takaro shop listing (giveCrateKey shop action) or from an admin, then open crates in chat. Rare drops are broadcast; odds are shown in-game.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "681786c5feefd9eea3f532ec34b2e5b62d09de16fab4e4ec6dc970aba39712fe",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "lottery",
       "description": "Players can buy tickets for a lottery, and the winner is chosen at random.",
       "latestVersion": "1.0.1",
