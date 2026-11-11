@@ -56,6 +56,23 @@
       ]
     },
     {
+      "name": "chat-faq-bot",
+      "description": "Answers common player questions in chat automatically. Match FAQ entries by keywords (any/all words) or regex, reply privately or publicly, with server and per-player cooldowns so it never spams. Placeholders {player} {prefix} {currency} plus your own. Players type faq to see topics; admins use faqlist and faqtest.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "c578406f3bbcbde055ae1f06fdcd9e76e40391e135243fd41a98b2de9fdea12f",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "chatBridge",
       "description": "Connect chat to other services like Discord.",
       "latestVersion": "1.0.0",

@@ -1,0 +1,337 @@
+{
+  "name": "chat-faq-bot",
+  "author": "Takaro",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "summary": "Answers common player questions in chat automatically. Match FAQ entries by keywords (any/all words) or regex, reply privately or publicly, with server and per-player cooldowns so it never spams. Placeholders {player} {prefix} {currency} plus your own. Players type faq to see topics; admins use faqlist and faqtest.",
+  "description": "Chat FAQ bot: answers the questions players ask over and over (how do I get money, discord, rules, next wipe) without staff typing it again.\n\n- **Hook on chat messages**: the first enabled FAQ entry that matches answers.\n- **Matching**: `any` (one word or phrase), `all` (every word of a keyword set, any order) or `regex`; case and punctuation are ignored; `word*` is a prefix match.\n- **No spam**: per entry a server-wide cooldown and a per-player cooldown; messages shorter than the minimum length and commands (Takaro prefix plus configured prefixes like `/`) are ignored.\n- **Reply mode** per entry: PM to the asker or public. If a game cannot whisper, it falls back to public (configurable).\n- **Placeholders**: `{player}`, `{prefix}`, `{currency}` and your own (`{discord}`, `{rules}`, `{wipe}` by default).\n- **Commands**: `faq` lists topics, `faq <topic>` shows one answer; `faqlist` (admin) shows all entries, modes, cooldowns and broken regexes; `faqtest <message>` (admin) shows which entry would answer.\n\nShips with a default FAQ set (money, discord, rules, wipe, commands, admin). Edit the placeholders and answers for your server.",
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+      "entries": {
+        "type": "array",
+        "title": "FAQ entries",
+        "description": "Checked top to bottom; the first matching entry answers.",
+        "items": {
+          "type": "object",
+          "title": "FAQ entry",
+          "required": [
+            "topic",
+            "triggers",
+            "answer"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "topic": {
+              "type": "string",
+              "title": "Topic",
+              "description": "Short name players see in the faq list, e.g. money. Also the cooldown id, so keep it unique.",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "match": {
+              "type": "string",
+              "title": "Match mode",
+              "enum": [
+                "any",
+                "all",
+                "regex"
+              ],
+              "default": "any",
+              "description": "any = one trigger word/phrase appears. all = every word of one trigger appears, any order. regex = a trigger is a regular expression (case-insensitive). Add * to the end of a word for a prefix match (wip* = wipe, wiped)."
+            },
+            "triggers": {
+              "type": "array",
+              "title": "Triggers",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "description": "Keyword sets / phrases / regexes. One match is enough. Matching ignores case and punctuation."
+            },
+            "answer": {
+              "type": "string",
+              "title": "Answer",
+              "description": "Reply text. Each line is sent as its own message. Placeholders: {player} {prefix} {currency} plus your own from Placeholders."
+            },
+            "reply": {
+              "type": "string",
+              "title": "Reply mode",
+              "enum": [
+                "pm",
+                "public"
+              ],
+              "default": "pm",
+              "description": "pm = only the asker sees it. public = everyone sees it."
+            },
+            "cooldownSeconds": {
+              "type": "number",
+              "title": "Server cooldown (seconds)",
+              "minimum": 0,
+              "default": 60,
+              "description": "After answering, nobody gets this answer again for this long. Best for public answers."
+            },
+            "playerCooldownSeconds": {
+              "type": "number",
+              "title": "Player cooldown (seconds)",
+              "minimum": 0,
+              "default": 300,
+              "description": "After answering, the same player does not get this answer again for this long."
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "Enabled",
+              "default": true
+            }
+          }
+        },
+        "default": [
+          {
+            "topic": "money",
+            "match": "all",
+            "triggers": [
+              "how money",
+              "get money",
+              "earn money",
+              "make money",
+              "how coins",
+              "get coins",
+              "earn coins",
+              "how currency",
+              "get currency",
+              "earn currency"
+            ],
+            "answer": "{player}, you earn {currency} by playing: kill zombies and enemies, and stay online.\nClaim free {currency} with {prefix}daily and {prefix}vote. Check your balance with {prefix}balance and spend it in {prefix}shop.",
+            "reply": "pm",
+            "cooldownSeconds": 0,
+            "playerCooldownSeconds": 300,
+            "enabled": true
+          },
+          {
+            "topic": "discord",
+            "match": "any",
+            "triggers": [
+              "discord",
+              "dc link",
+              "dc invite"
+            ],
+            "answer": "Join our Discord: {discord}",
+            "reply": "public",
+            "cooldownSeconds": 120,
+            "playerCooldownSeconds": 300,
+            "enabled": true
+          },
+          {
+            "topic": "rules",
+            "match": "any",
+            "triggers": [
+              "rules",
+              "server rules",
+              "what are the rules",
+              "is it allowed"
+            ],
+            "answer": "Server rules: {rules}",
+            "reply": "pm",
+            "cooldownSeconds": 0,
+            "playerCooldownSeconds": 300,
+            "enabled": true
+          },
+          {
+            "topic": "wipe",
+            "match": "any",
+            "triggers": [
+              "wipe",
+              "wiped",
+              "wiping",
+              "next wipe",
+              "next reset",
+              "when reset"
+            ],
+            "answer": "Next wipe: {wipe}",
+            "reply": "public",
+            "cooldownSeconds": 300,
+            "playerCooldownSeconds": 600,
+            "enabled": true
+          },
+          {
+            "topic": "commands",
+            "match": "all",
+            "triggers": [
+              "what commands",
+              "which commands",
+              "list commands",
+              "how commands",
+              "any commands"
+            ],
+            "answer": "Type {prefix}help to see every command, or {prefix}faq for the FAQ topics.",
+            "reply": "pm",
+            "cooldownSeconds": 0,
+            "playerCooldownSeconds": 300,
+            "enabled": true
+          },
+          {
+            "topic": "admin",
+            "match": "any",
+            "triggers": [
+              "need admin",
+              "need an admin",
+              "admin help",
+              "call admin",
+              "any admin",
+              "admins online",
+              "admin online",
+              "need staff"
+            ],
+            "answer": "Staff can't always see chat. Ask for help on Discord: {discord}",
+            "reply": "pm",
+            "cooldownSeconds": 0,
+            "playerCooldownSeconds": 600,
+            "enabled": true
+          }
+        ]
+      },
+      "placeholders": {
+        "type": "array",
+        "title": "Placeholders",
+        "description": "Your own {name} values, used in answers. Change these for your server.",
+        "items": {
+          "type": "object",
+          "required": [
+            "name",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "pattern": "^[a-zA-Z0-9_]+$",
+              "description": "Use it as {name} in an answer."
+            },
+            "value": {
+              "type": "string",
+              "title": "Value"
+            }
+          }
+        },
+        "default": [
+          {
+            "name": "discord",
+            "value": "discord.gg/your-invite (set this in the chat-faq-bot config)"
+          },
+          {
+            "name": "rules",
+            "value": "be respectful, no cheating, no exploiting, no griefing."
+          },
+          {
+            "name": "wipe",
+            "value": "not scheduled yet. Watch Discord for the date."
+          }
+        ]
+      },
+      "minMessageLength": {
+        "type": "number",
+        "title": "Minimum message length",
+        "minimum": 0,
+        "default": 4,
+        "description": "Shorter chat messages are ignored."
+      },
+      "ignorePrefixes": {
+        "type": "array",
+        "title": "Ignore messages starting with",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "/"
+        ],
+        "description": "The Takaro command prefix is always ignored. Add game command prefixes here."
+      },
+      "messagePrefix": {
+        "type": "string",
+        "title": "Message prefix",
+        "default": "[FAQ] ",
+        "description": "Put in front of every automatic answer."
+      },
+      "fallbackToPublic": {
+        "type": "boolean",
+        "title": "Public fallback",
+        "default": true,
+        "description": "If a private message fails (game cannot whisper), answer in public chat instead."
+      }
+    }
+  },
+  "uiSchema": {
+    "entries": {
+      "items": {
+        "answer": {
+          "ui:widget": "textarea"
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "FAQ_BOT_MANAGE",
+      "friendlyName": "Manage FAQ bot",
+      "description": "Use faqlist and faqtest to inspect and test the FAQ entries.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "faq": {
+      "trigger": "faq",
+      "description": "List FAQ topics or show one answer",
+      "helpText": "faq lists the topics. faq <topic or question> shows the answer privately.",
+      "function": "src/commands/faq/index.js",
+      "arguments": [
+        {
+          "name": "topic",
+          "type": "string",
+          "defaultValue": "list",
+          "helpText": "Topic name or question (default: list all topics)",
+          "position": 0
+        }
+      ]
+    },
+    "faqlist": {
+      "trigger": "faqlist",
+      "description": "Admin: list all FAQ entries",
+      "helpText": "Shows every FAQ entry with match mode, reply mode, cooldowns and triggers. Needs FAQ_BOT_MANAGE.",
+      "function": "src/commands/faqlist/index.js",
+      "arguments": []
+    },
+    "faqtest": {
+      "trigger": "faqtest",
+      "description": "Admin: test which FAQ entry answers a message",
+      "helpText": "faqtest <message> shows which entry would answer and previews it. Needs FAQ_BOT_MANAGE.",
+      "function": "src/commands/faqtest/index.js",
+      "arguments": [
+        {
+          "name": "message",
+          "type": "string",
+          "defaultValue": "",
+          "helpText": "A sample chat message",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "faq-responder": {
+      "eventType": "chat-message",
+      "description": "Answers chat messages that match an FAQ entry",
+      "function": "src/hooks/faq-responder/index.js"
+    }
+  },
+  "functions": {
+    "faq-utils": {
+      "function": "src/functions/faq-utils.js"
+    }
+  }
+}
