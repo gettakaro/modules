@@ -369,6 +369,24 @@
       ]
     },
     {
+      "name": "lucky-drop",
+      "description": "Surprise rewards that keep players online. Every ~45 minutes (with random jitter) a random eligible online player wins a lucky drop rolled from a weighted rarity table (Common/Rare/Legendary): currency, items or both, announced to the server. Optional claim race: first player to type grab wins. Min online players, min session time, AFK exclusion, VIP odds via permission count, admin stats.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "2993f3b4bd31d3ef343ab45d88f3d21e7c31b9e97fa724bdcbc4a25db69bf469",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "mini-games",
       "description": "Unified mini-games module with daily puzzles (Wordle, Hangman, Hot/Cold) and live chat rounds (Trivia, Scramble, Math race, Reaction race). Skill-based, point-scoring, optional currency rewards, boost tiers, cross-game leaderboards. Trivia rounds fetch questions from the public Open Trivia Database (https://opentdb.com) when `triviaQuestionSource` is `api` (the default), so the module makes outbound HTTPS requests to opentdb.com from Takaro; on failure it falls back to the custom bank.",
       "latestVersion": "1.0.0",
