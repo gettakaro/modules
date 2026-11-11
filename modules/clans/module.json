@@ -1,0 +1,152 @@
+{
+  "name": "clans",
+  "author": "Takaro",
+  "description": "Clans: players form groups with a name and tag. Create a clan (optional currency cost), invite online players, join by invite, leave, and let leaders/officers kick members. Clan chat sends a private message to every online member. Optional shared clan bank (deposit; leader withdraws). Leaderboard ranks clans by total member playtime. All data lives in Takaro variables. Works on every game that supports private messages.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "maxMembers": {
+        "type": "integer",
+        "default": 10,
+        "minimum": 2,
+        "maximum": 100,
+        "description": "Maximum number of members per clan, leader included."
+      },
+      "maxClans": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Maximum number of clans on the server. 0 = no limit."
+      },
+      "createCost": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Currency it costs to create a clan. 0 = free. Needs the economy enabled when above 0."
+      },
+      "nameMinLength": {
+        "type": "integer",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 32,
+        "description": "Minimum clan name length."
+      },
+      "nameMaxLength": {
+        "type": "integer",
+        "default": 16,
+        "minimum": 1,
+        "maximum": 32,
+        "description": "Maximum clan name length. Names use letters, numbers and _ only."
+      },
+      "tagMinLength": {
+        "type": "integer",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 10,
+        "description": "Minimum clan tag length."
+      },
+      "tagMaxLength": {
+        "type": "integer",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 10,
+        "description": "Maximum clan tag length. Tags use letters, numbers and _ only."
+      },
+      "blockedWords": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [],
+        "description": "Words that may not appear in a clan name or tag (case-insensitive)."
+      },
+      "inviteExpiryMinutes": {
+        "type": "integer",
+        "default": 60,
+        "minimum": 1,
+        "description": "How long an invite stays valid, in minutes."
+      },
+      "enableBank": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable the shared clan bank (members deposit, the leader withdraws). Needs the economy enabled."
+      },
+      "chatFormat": {
+        "type": "string",
+        "default": "[{tag}] {player}: {message}",
+        "description": "Format of clan chat messages. Placeholders: {tag}, {player}, {message}."
+      },
+      "listLimit": {
+        "type": "integer",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 25,
+        "description": "How many clans clan list and clan top show."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "CLANS_USE",
+      "friendlyName": "Use clans",
+      "description": "Allows a player to join, leave, chat in and view clans. Give this to the Player role.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "CLANS_CREATE",
+      "friendlyName": "Create clans",
+      "description": "Allows a player to create a clan. Give this to Player (or only VIP) together with CLANS_USE.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "CLANS_ADMIN",
+      "friendlyName": "Manage all clans",
+      "description": "Allows an admin to disband any clan with clan disband <name>.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "clan": {
+      "trigger": "clan",
+      "description": "Clan commands: create, invite, join, leave, kick, promote, demote, disband, info, list, top, chat, bank.",
+      "helpText": "clan create <name> <tag> | invite <player> | join <name> | leave | kick <player> | promote <player> | demote <player> | disband | info [name] | list | top | chat <message> | bank [deposit|withdraw <amount>]",
+      "function": "src/commands/clan/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "defaultValue": "help",
+          "helpText": "What to do: create, invite, join, leave, kick, promote, demote, disband, info, list, top, chat, bank.",
+          "position": 0
+        },
+        {
+          "name": "arg1",
+          "type": "string",
+          "defaultValue": "-",
+          "helpText": "Clan name, player name, message or bank action.",
+          "position": 1
+        },
+        {
+          "name": "arg2",
+          "type": "string",
+          "defaultValue": "-",
+          "helpText": "Clan tag or bank amount.",
+          "position": 2
+        }
+      ]
+    }
+  },
+  "functions": {
+    "clans-helpers": {
+      "function": "src/functions/clans-helpers.js"
+    }
+  }
+}
