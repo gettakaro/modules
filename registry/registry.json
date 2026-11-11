@@ -449,6 +449,24 @@
       ]
     },
     {
+      "name": "warn-system",
+      "description": "Warn System — staff warn players with a reason; warnings are stored with date and staff name, expire after a set number of days, and escalate automatically (by default 3 warnings = kick, 5 = 24-hour ban, 7 = permanent ban). Players can check their own warnings, staff can check and remove anyone's. Optional public broadcast and Discord log.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "df9100a24fa5a4899a4c42be400fb20849912c089c1206a0ee7794a4dae5a232",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
       "name": "wipes",
       "description": "Tells players about server wipes: a /wipe command with the last and next wipe, reminders before a scheduled wipe, and an announcement when the server is wiped.",
       "latestVersion": "1.0.0",
