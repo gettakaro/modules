@@ -1,0 +1,294 @@
+{
+  "name": "happy-hour",
+  "author": "Takaro",
+  "description": "Timed boost events that fill your server at the times you choose. Schedule them with cron expressions in the config (default: Friday 20:00-22:00 UTC) or start one by hand with `happyhour start <minutes> [multiplier]`. While an event runs, players earn bonus currency on kills (base x (multiplier - 1)) and on playtime, can get extra item drops on kills, and the server gets start, reminder and end broadcasts. Players type `happyhour` to see the status and time left. Optional Discord announcements. The module pays its own bonus and never changes other modules' settings.",
+  "summary": "Timed boost events to fill your server: schedule them with cron (default Friday 20:00-22:00 UTC) or start one with happyhour start <minutes> [multiplier]. During the event players get bonus currency on kills and playtime, optional bonus item drops, and start/reminder/end broadcasts. happyhour shows the status. Optional Discord announcements.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "multiplier": {
+        "title": "Default multiplier",
+        "type": "number",
+        "default": 2,
+        "exclusiveMinimum": 1,
+        "maximum": 10,
+        "description": "Boost used when a schedule or the start command gives none. 2 = double: the bonus equals the base reward once more."
+      },
+      "schedules": {
+        "title": "Schedules",
+        "type": "array",
+        "description": "When happy hour starts by itself. Cron format: minute hour day-of-month month day-of-week, in the time zone below. Example: '0 20 * * 5' = Friday 20:00. Leave empty to only start it by command.",
+        "default": [
+          {
+            "cron": "0 20 * * 5",
+            "durationMinutes": 120,
+            "multiplier": 0
+          }
+        ],
+        "items": {
+          "type": "object",
+          "title": "Schedule",
+          "required": [
+            "cron",
+            "durationMinutes"
+          ],
+          "properties": {
+            "cron": {
+              "type": "string",
+              "title": "Start (cron)",
+              "description": "e.g. '0 20 * * 5' (Fri 20:00) or '0 18 * * sat,sun' (weekends 18:00)"
+            },
+            "durationMinutes": {
+              "type": "number",
+              "title": "Duration (minutes)",
+              "minimum": 1,
+              "maximum": 1440
+            },
+            "multiplier": {
+              "type": "number",
+              "title": "Multiplier (0 = default)",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0
+            }
+          }
+        }
+      },
+      "timezone": {
+        "title": "Time zone",
+        "type": "string",
+        "default": "UTC",
+        "description": "IANA time zone for the schedules, e.g. 'Europe/Berlin' or 'America/New_York'. Unknown names fall back to UTC."
+      },
+      "killBaseReward": {
+        "title": "Kill base reward",
+        "type": "number",
+        "default": 1,
+        "minimum": 0,
+        "description": "Base currency per kill. Bonus per kill = base x (multiplier - 1). Set it to what your kill reward (e.g. economyUtils zombie kill reward) pays, so 2x really doubles it. 0 = no kill bonus."
+      },
+      "playtimeBaseReward": {
+        "title": "Playtime base reward",
+        "type": "number",
+        "default": 10,
+        "minimum": 0,
+        "description": "Base currency per playtime interval. Every online player gets base x (multiplier - 1) per interval during happy hour. 0 = no playtime bonus."
+      },
+      "playtimeIntervalMinutes": {
+        "title": "Playtime interval (minutes)",
+        "type": "number",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 120,
+        "description": "How often online players get the playtime bonus during happy hour."
+      },
+      "doubleDropItems": {
+        "x-component": "item",
+        "title": "Bonus drop items",
+        "type": "array",
+        "default": [],
+        "description": "During happy hour a kill can give one random item from this list. Empty = no bonus drops.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount"
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "doubleDropChance": {
+        "title": "Bonus drop chance (%)",
+        "type": "number",
+        "default": 10,
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Chance per kill to get a bonus drop."
+      },
+      "reminderIntervalMinutes": {
+        "title": "Reminder interval (minutes)",
+        "type": "number",
+        "default": 30,
+        "minimum": 0,
+        "description": "Broadcast a reminder this often while happy hour runs. 0 = off."
+      },
+      "preAnnounceMinutes": {
+        "title": "Heads-up before scheduled start (minutes)",
+        "type": "number",
+        "default": 15,
+        "minimum": 0,
+        "maximum": 1440,
+        "description": "Broadcast a warning this many minutes before a scheduled happy hour. 0 = off."
+      },
+      "maxAdminMinutes": {
+        "title": "Max length for manual start (minutes)",
+        "type": "number",
+        "default": 1440,
+        "minimum": 1,
+        "maximum": 10080,
+        "description": "Longest happy hour the start command accepts."
+      },
+      "notifyKillBonus": {
+        "title": "PM kill bonus",
+        "type": "boolean",
+        "default": false,
+        "description": "Send the player a PM for every kill bonus (can be spammy)."
+      },
+      "notifyPlaytimeBonus": {
+        "title": "PM playtime bonus",
+        "type": "boolean",
+        "default": true,
+        "description": "Send the player a PM when the playtime bonus is paid."
+      },
+      "startMessage": {
+        "title": "Start message",
+        "type": "string",
+        "default": "HAPPY HOUR! {multiplier} rewards for the next {timeLeft}. Kill, play and earn bonus {currency}! Type {prefix}happyhour for details.",
+        "description": "Placeholders: {multiplier} {timeLeft} {minutes} {currency} {prefix}"
+      },
+      "updateMessage": {
+        "title": "Update message",
+        "type": "string",
+        "default": "Happy hour changed: {multiplier} rewards for the next {timeLeft}!",
+        "description": "Sent when an admin restarts a running happy hour. Placeholders: {multiplier} {timeLeft} {minutes} {currency} {prefix}"
+      },
+      "reminderMessage": {
+        "title": "Reminder message",
+        "type": "string",
+        "default": "Happy hour is on: {multiplier} rewards, {timeLeft} left!",
+        "description": "Placeholders: {multiplier} {timeLeft} {minutes} {currency} {prefix}"
+      },
+      "endMessage": {
+        "title": "End message",
+        "type": "string",
+        "default": "Happy hour is over. Thanks for playing!",
+        "description": "Placeholders: {multiplier} {currency} {prefix}"
+      },
+      "preAnnounceMessage": {
+        "title": "Heads-up message",
+        "type": "string",
+        "default": "Happy hour starts in {minutes} minutes: {multiplier} rewards! Get online!",
+        "description": "Placeholders: {minutes} {multiplier} {currency} {prefix}"
+      },
+      "killBonusMessage": {
+        "title": "Kill bonus PM",
+        "type": "string",
+        "default": "+{amount} {currency} happy hour kill bonus",
+        "description": "Placeholders: {amount} {currency} {multiplier}"
+      },
+      "playtimeBonusMessage": {
+        "title": "Playtime bonus PM",
+        "type": "string",
+        "default": "+{amount} {currency} happy hour playtime bonus ({multiplier})",
+        "description": "Placeholders: {amount} {currency} {multiplier}"
+      },
+      "dropMessage": {
+        "title": "Bonus drop PM",
+        "type": "string",
+        "default": "Happy hour bonus drop: {amount}x {item}!",
+        "description": "Placeholders: {amount} {item}"
+      },
+      "discordAnnounce": {
+        "title": "Announce on Discord",
+        "type": "boolean",
+        "default": false,
+        "description": "Also post start, end and heads-up messages to a Discord channel."
+      },
+      "discordChannelId": {
+        "title": "Discord channel ID",
+        "type": "string",
+        "default": "",
+        "description": "Channel for the Discord announcements. Takaro's Discord bot must be in your server."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "doubleDropItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "HAPPY_HOUR_MANAGE",
+      "friendlyName": "Manage happy hour",
+      "description": "Start and stop happy hour with the happyhour command.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "HAPPY_HOUR_VIP_BONUS",
+      "friendlyName": "Happy hour VIP bonus",
+      "description": "Count = extra percent on this player's happy hour bonus currency (50 = +50%).",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "happyhour": {
+      "trigger": "happyhour",
+      "description": "Show happy hour status; admins can start or stop it.",
+      "helpText": "happyhour = status and time left. Admins: happyhour start <minutes> [multiplier], happyhour stop.",
+      "function": "src/commands/happyhour/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "helpText": "status (default), start or stop",
+          "position": 0,
+          "defaultValue": "status"
+        },
+        {
+          "name": "minutes",
+          "type": "number",
+          "helpText": "Length in minutes (start only)",
+          "position": 1,
+          "defaultValue": "0"
+        },
+        {
+          "name": "multiplier",
+          "type": "number",
+          "helpText": "Boost, e.g. 2 for double (start only, default from config)",
+          "position": 2,
+          "defaultValue": "0"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "on-kill": {
+      "eventType": "entity-killed",
+      "description": "During happy hour: pay the kill bonus and roll the bonus drop.",
+      "function": "src/hooks/on-kill/index.js"
+    }
+  },
+  "cronJobs": {
+    "tick": {
+      "temporalValue": "* * * * *",
+      "description": "Every minute: start scheduled happy hours, send heads-ups and reminders, pay the playtime bonus, end expired events.",
+      "function": "src/cronjobs/tick/index.js"
+    }
+  },
+  "functions": {
+    "hh-helpers": {
+      "function": "src/functions/hh-helpers.js"
+    }
+  }
+}

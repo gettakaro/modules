@@ -236,6 +236,24 @@
       ]
     },
     {
+      "name": "happy-hour",
+      "description": "Timed boost events to fill your server: schedule them with cron (default Friday 20:00-22:00 UTC) or start one with happyhour start <minutes> [multiplier]. During the event players get bonus currency on kills and playtime, optional bonus item drops, and start/reminder/end broadcasts. happyhour shows the status. Optional Discord announcements.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "1aef011c75d6e79371b5e98c29f9b6eed06205f63ced58fa520463193d9c0492",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "highPingKicker",
       "description": "Automatically kick players with high ping, with warnings and configurable thresholds.",
       "latestVersion": "1.0.0",
