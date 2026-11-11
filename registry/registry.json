@@ -22,6 +22,23 @@
       ]
     },
     {
+      "name": "bounties",
+      "description": "Player bounties for PvP servers: `bounty <player> <amount>` holds currency on a target, the player who kills the target collects the pot. List, cancel (minus a fee), exclusion groups, no self-claims and automatic refunds when a bounty expires. Needs the game to report the killer (player-death attacker, or a log line such as 7 Days to Die's `killed by`).",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "243b031f5b6d99ca73c3bc77efe53fbd842a127929f57bed4c61f26acebce3f9",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "chatBridge",
       "description": "Connect chat to other services like Discord.",
       "latestVersion": "1.0.0",
