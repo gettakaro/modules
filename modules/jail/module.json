@@ -1,0 +1,162 @@
+{
+  "name": "jail",
+  "author": "Takaro",
+  "description": "Staff can jail a player for a set time. Use `setjail` to save the jail spot, then `jail <player> <minutes> <reason>`. The player is teleported to the jail. Every minute a cron job checks their position: if they moved further than the configured radius, they are teleported back. When the time is up they are released automatically, back to where they were or to a release point (`setjail release`). Staff can release early with `unjail <player>` and see everyone in jail with `jailed`. Jailed players check their remaining time with `jailtime`.\n\nOptional: pick a **Jailed role** in the config. It is given on jail and removed on release, so you can see jailed players on the dashboard, link it to a Discord role, or check it in your own modules.\n\n**Limits.** Takaro cannot block commands from other modules, and Takaro roles only add permissions, they never take them away. Anything the default Player role allows (for example teleport commands) still works while jailed; the cron job then pulls the player back within a minute. Only grant escape commands through roles other than Player if you want jail to be strict.\n\nNeeds a game whose connector can teleport players and report their position (for example 7 Days to Die, Rust, Minecraft, Valheim, Conan Exiles, Project Zomboid, Terraria). On other games the `jail` command fails with a clear message and nobody is jailed.",
+  "summary": "Staff jail: save a jail spot, jail a player for N minutes with a reason, keep them inside a radius (checked every minute), auto-release them back to where they were or to a release point. Optional Jailed role while in jail. Commands: setjail, jail, unjail, jailed, jailtime. Works on any game that supports teleporting players.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "radius": {
+        "title": "Jail radius",
+        "type": "number",
+        "minimum": 1,
+        "default": 15,
+        "description": "How far (in game units, measured horizontally) a jailed player may move from the jail spot before being teleported back."
+      },
+      "releaseTo": {
+        "title": "Release to",
+        "type": "string",
+        "enum": [
+          "previous",
+          "releasePoint",
+          "stay"
+        ],
+        "default": "previous",
+        "description": "Where a released player goes: 'previous' = where they were when jailed, 'releasePoint' = the spot saved with 'setjail release', 'stay' = leave them in the jail. Falls back to the other spot when the chosen one is not known."
+      },
+      "maxMinutes": {
+        "title": "Maximum jail time (minutes)",
+        "type": "number",
+        "minimum": 1,
+        "default": 10080,
+        "description": "Longest jail time staff may give. 0 minutes in the jail command means 'until unjailed'."
+      },
+      "jailedRoleId": {
+        "title": "Jailed role (optional)",
+        "type": "string",
+        "x-component": "role",
+        "description": "Role given while a player is jailed and removed on release. Leave empty to not use a role."
+      },
+      "announce": {
+        "title": "Announce to server",
+        "type": "boolean",
+        "default": false,
+        "description": "Broadcast a message to everyone when a player is jailed or released."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "jailedRoleId": {
+      "ui:widget": "role"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "JAIL_MANAGE",
+      "friendlyName": "Manage jail",
+      "description": "Allows staff to set the jail, jail and unjail players, and list jailed players.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "setjail": {
+      "trigger": "setjail",
+      "description": "Save your current position as the jail (or as the release point)",
+      "helpText": "Staff: /setjail saves your position as the jail. /setjail release saves it as the release point.",
+      "function": "src/commands/setjail/index.js",
+      "arguments": [
+        {
+          "name": "point",
+          "type": "string",
+          "helpText": "'jail' (default) or 'release'",
+          "position": 0,
+          "defaultValue": "jail"
+        }
+      ]
+    },
+    "jail": {
+      "trigger": "jail",
+      "description": "Jail a player for a number of minutes",
+      "helpText": "Staff: /jail <player> <minutes> <reason>. 0 minutes = until unjailed.",
+      "function": "src/commands/jail/index.js",
+      "arguments": [
+        {
+          "name": "target",
+          "type": "player",
+          "helpText": "The player to jail",
+          "position": 0,
+          "defaultValue": null
+        },
+        {
+          "name": "minutes",
+          "type": "number",
+          "helpText": "Minutes in jail (0 = until unjailed)",
+          "position": 1,
+          "defaultValue": null
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "helpText": "Why the player is jailed",
+          "position": 2,
+          "defaultValue": "No reason given"
+        }
+      ]
+    },
+    "unjail": {
+      "trigger": "unjail",
+      "description": "Release a player from jail now",
+      "helpText": "Staff: /unjail <player>",
+      "function": "src/commands/unjail/index.js",
+      "arguments": [
+        {
+          "name": "target",
+          "type": "player",
+          "helpText": "The player to release",
+          "position": 0,
+          "defaultValue": null
+        }
+      ]
+    },
+    "jailed": {
+      "trigger": "jailed",
+      "description": "List jailed players",
+      "helpText": "Staff: /jailed lists everyone in jail with time left and reason.",
+      "function": "src/commands/jailed/index.js",
+      "arguments": []
+    },
+    "jailtime": {
+      "trigger": "jailtime",
+      "description": "See how long you are still in jail",
+      "helpText": "Shows your remaining jail time and the reason.",
+      "function": "src/commands/jailtime/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "on-connect": {
+      "eventType": "player-connected",
+      "description": "Put a jailed player back in jail when they reconnect, or finish a release that happened while they were offline",
+      "function": "src/hooks/on-connect/index.js"
+    }
+  },
+  "cronJobs": {
+    "jail-enforcer": {
+      "temporalValue": "* * * * *",
+      "description": "Every minute: teleport jailed players back when they left the radius, and release players whose time is up",
+      "function": "src/cronjobs/jail-enforcer/index.js"
+    }
+  },
+  "functions": {
+    "jail-helpers": {
+      "function": "src/functions/jail-helpers.js"
+    }
+  }
+}

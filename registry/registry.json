@@ -186,6 +186,24 @@
       ]
     },
     {
+      "name": "jail",
+      "description": "Staff jail: save a jail spot, jail a player for N minutes with a reason, keep them inside a radius (checked every minute), auto-release them back to where they were or to a release point. Optional Jailed role while in jail. Commands: setjail, jail, unjail, jailed, jailtime. Works on any game that supports teleporting players.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "a6ff2e10d3909be561f78cc4e7ced312b78a7f1bce55015f1b66932bcd97cd7d",
+          "requiredCapabilities": [
+            "chat.send",
+            "players.teleport"
+          ]
+        }
+      ]
+    },
+    {
       "name": "kill-tracker",
       "description": "Kill/Death Tracker — tracks player kills, deaths, and points with streaks, leaderboards, and seasonal resets.",
       "latestVersion": "1.0.0",
