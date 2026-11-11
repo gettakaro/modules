@@ -403,6 +403,23 @@
       ]
     },
     {
+      "name": "random-teleport",
+      "description": "Random Teleport (/rtp): teleport to a random spot inside a ring around a centre point or a rectangle. Blocked zones (trader areas, spawn) are skipped. Optional cooldown (VIPs can skip it) and currency cost, charged only after a successful teleport. Configurable height: 7 Days to Die and DayZ place the player on the ground, other games use the configured Y. Warmup via the command delay setting. Needs a game that supports teleporting players.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "c548eda6b60262dd3153e6d05ef1febffa7defb6355cb239a65adf4154700359",
+          "requiredCapabilities": [
+            "players.teleport"
+          ]
+        }
+      ]
+    },
+    {
       "name": "referral-program",
       "description": "Players invite others via a referral code; referrers earn currency or items when their referees hit a playtime threshold, with daily/lifetime caps and VIP tiering.",
       "latestVersion": "1.0.0",
