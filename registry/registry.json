@@ -404,6 +404,25 @@
       ]
     },
     {
+      "name": "new-player-check",
+      "description": "Anti-cheat check on a player's first join: level above a limit, forbidden items, too many of an item or a too-full inventory. Alerts admins in-game and on Discord by default; per rule it can also kick, ban or give a role. npcheck <player> checks now, npclear <player> marks reviewed. Level is checked only when the game reports it.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "1a1ed4207acd77e6a03e5b420576395b9506a24b611790ab8769895d6765f565",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
       "name": "player-reports",
       "description": "Players report griefers, cheaters or problems with one command. Each report becomes a numbered ticket with positions and recent chat attached. Online staff get a PM, an optional Discord alert fires, and staff list, view and close tickets in game. The reporter is told when their report is handled. Cooldown and an open-report limit stop spam.",
       "latestVersion": "1.0.0",

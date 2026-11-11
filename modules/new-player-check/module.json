@@ -1,0 +1,228 @@
+{
+  "name": "new-player-check",
+  "author": "Takaro",
+  "description": "New Player Check: an anti-cheat check for players who join this server for the first time. It catches cheated or transferred characters: a level above your limit, forbidden items, too many of an item, or a too-full inventory. By default it only alerts admins (in-game PM to players with the alerts permission, plus an optional Discord channel). Per rule you can also kick, ban or give a role such as Flagged. Admins run npcheck <player> to check someone now and npclear <player> to mark them reviewed. Level is checked only when the game reports it; inventory needs a connector that reports inventories.",
+  "summary": "Anti-cheat check on a player's first join: level above a limit, forbidden items, too many of an item or a too-full inventory. Alerts admins in-game and on Discord by default; per rule it can also kick, ban or give a role. npcheck <player> checks now, npclear <player> marks reviewed. Level is checked only when the game reports it.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "maxLevelOnFirstJoin": {
+        "title": "Max level on first join",
+        "type": "number",
+        "description": "Flag a new player whose character level is above this. 0 turns the level check off. Only works when the game reports a level (player progression, or the level command below).",
+        "minimum": 0,
+        "default": 0
+      },
+      "levelTrackKey": {
+        "title": "Level track",
+        "type": "string",
+        "description": "Which progression track is the character level, for games that report several (for example a skill or class key). Empty uses the highest level the game reports.",
+        "default": ""
+      },
+      "levelCommand": {
+        "title": "Level console command",
+        "type": "string",
+        "description": "Optional fallback for games that do not report progression: a console command that prints a player's level. {gameId} is replaced by the player's game ID. Empty means no command is used.",
+        "default": ""
+      },
+      "levelPattern": {
+        "title": "Level pattern",
+        "type": "string",
+        "description": "Regular expression that finds the level in the output of the level command. The first group is the level.",
+        "default": "level (\\d+)"
+      },
+      "forbiddenItems": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Forbidden items",
+        "description": "Items a new player should not have. Max amount 0 means any amount is flagged; above 0 flags a player who carries more than that many.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "maxAmount": {
+              "type": "number",
+              "title": "Max amount",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          "required": [
+            "item"
+          ]
+        }
+      },
+      "maxTotalItems": {
+        "title": "Max total items",
+        "type": "number",
+        "description": "Flag a new player who carries more items than this in total (all stacks added up). 0 turns this check off.",
+        "minimum": 0,
+        "default": 0
+      },
+      "watchHours": {
+        "title": "Check every join for (hours)",
+        "type": "number",
+        "description": "Also check on every join during this many hours after the first join. 0 checks the first join only.",
+        "minimum": 0,
+        "default": 0
+      },
+      "levelAction": {
+        "title": "Action: level too high",
+        "type": "string",
+        "enum": [
+          "alert",
+          "role",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the level is above the limit. Admins are always alerted."
+      },
+      "itemAction": {
+        "title": "Action: forbidden or too many items",
+        "type": "string",
+        "enum": [
+          "alert",
+          "role",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when a forbidden item, or too many of an item, is found. Admins are always alerted."
+      },
+      "totalItemsAction": {
+        "title": "Action: too many items in total",
+        "type": "string",
+        "enum": [
+          "alert",
+          "role",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the inventory holds more than the max total items. Admins are always alerted."
+      },
+      "flagRoleName": {
+        "title": "Flag role name",
+        "type": "string",
+        "description": "Name of an existing role given to a player by the role action, for example Flagged. npclear removes it again.",
+        "default": "Flagged"
+      },
+      "actionReason": {
+        "title": "Kick / ban reason",
+        "type": "string",
+        "description": "Shown to a kicked or banned player.",
+        "default": "Your character did not pass this server's new player check. Contact an admin."
+      },
+      "banDuration": {
+        "title": "Ban duration",
+        "x-component": "duration",
+        "type": "number",
+        "description": "How long the ban action bans for. 0 bans permanently.",
+        "minimum": 0,
+        "default": 86400000
+      },
+      "discordChannelId": {
+        "title": "Discord channel ID",
+        "type": "string",
+        "description": "Also post alerts in this Discord channel. Leave empty for in-game alerts only.",
+        "default": ""
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "forbiddenItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "banDuration": {
+      "ui:widget": "duration"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "NEW_PLAYER_CHECK_ALERTS",
+      "friendlyName": "New Player Check: get alerts",
+      "description": "Online players with this permission get a PM when a new player fails the check.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "NEW_PLAYER_CHECK_MANAGE",
+      "friendlyName": "New Player Check: manage",
+      "description": "Allows npcheck (check a player now) and npclear (mark a player reviewed).",
+      "canHaveCount": false
+    },
+    {
+      "permission": "NEW_PLAYER_CHECK_EXEMPT",
+      "friendlyName": "New Player Check: exempt",
+      "description": "Players with this permission are never checked automatically.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "npcheck": {
+      "trigger": "npcheck",
+      "description": "Run the new player check on a player now",
+      "helpText": "Usage: npcheck <player>. Shows the player's level and inventory findings. It does not kick, ban or alert others.",
+      "function": "src/commands/npcheck/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to check",
+          "position": 0
+        }
+      ]
+    },
+    "npclear": {
+      "trigger": "npclear",
+      "description": "Mark a player as reviewed by the new player check",
+      "helpText": "Usage: npclear <player>. The player is no longer checked automatically and loses the flag role.",
+      "function": "src/commands/npclear/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to mark as reviewed",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "check-on-join": {
+      "eventType": "player-connected",
+      "description": "Checks a player on their first join on this server (and every join during the watch window).",
+      "function": "src/hooks/check-on-join/index.js"
+    }
+  },
+  "cronJobs": {
+    "recheck-pending": {
+      "temporalValue": "*/5 * * * *",
+      "description": "Retries the check for new players whose inventory was not known yet when they joined.",
+      "function": "src/cronjobs/recheck-pending/index.js"
+    }
+  },
+  "functions": {
+    "npcheck-core": {
+      "function": "src/functions/npcheck-core.js"
+    }
+  }
+}
