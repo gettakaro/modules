@@ -439,6 +439,23 @@
       ]
     },
     {
+      "name": "playtime-ranks",
+      "description": "Playtime Ranks: promotes players up a ladder of Takaro roles by total playtime (e.g. Newbie 0 h, Regular 10 h, Veteran 50 h, Legend 200 h). Each rank can grant a role (so ranks unlock permissions like more teleports), pay a one-time currency reward, send a PM and broadcast. A cron job checks online players; players use 'rank' and 'ranks', admins use 'rankcheck <player>'. Roles are never taken away for a higher rank than the player earned.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "39449fdef93e177b0849317fc869956ba10357e8cbe131fcd685bfdf495b5339",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "private-messages",
       "description": "Private messages for players: msg and reply to online players, leave mail for offline players (delivered when they join), check when someone was last seen, and ignore players who bother you. Anti-spam cooldown and optional, off-by-default staff social spy.",
       "latestVersion": "1.0.0",
