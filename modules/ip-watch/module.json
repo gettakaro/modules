@@ -1,0 +1,207 @@
+{
+  "name": "ip-watch",
+  "author": "Takaro",
+  "description": "IP Watch: an anti-cheat helper. When a player joins from a new IP, it checks if that IP is shared with other players (possible alt or shared account), if the country changed, and optionally if the IP is a VPN or proxy. By default it only alerts admins in game (IP_WATCH_ALERTS) and optionally in a Discord channel; each rule can also kick or ban. Admins can run ipcheck <player>. Raw IPs are masked by default.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "discordChannelId": {
+        "title": "Discord channel id",
+        "description": "Optional. Discord channel id that also receives alerts. Leave empty for in-game alerts only. The domain needs a connected Discord bot with access to this channel.",
+        "type": "string",
+        "default": ""
+      },
+      "sharedIpCheck": {
+        "title": "Check shared IPs",
+        "description": "Alert when a player's new IP was also used by other players on this domain (possible alt or shared account).",
+        "type": "boolean",
+        "default": true
+      },
+      "sharedIpAction": {
+        "title": "Shared IP action",
+        "description": "What to do besides alerting when a shared IP is found.",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert"
+      },
+      "countryChangeCheck": {
+        "title": "Check country changes",
+        "description": "Alert when a player connects from a different country than last time.",
+        "type": "boolean",
+        "default": true
+      },
+      "countryChangeAction": {
+        "title": "Country change action",
+        "description": "What to do besides alerting when the country changed.",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert"
+      },
+      "vpnCheck": {
+        "title": "Check VPN / proxy",
+        "description": "Off by default. Looks up each new IP with an IP reputation API. Takaro Cloud only allows outbound requests to allowlisted hosts: ask Takaro support to allow the API host (for example proxycheck.io) before you turn this on, or the lookup is blocked and skipped.",
+        "type": "boolean",
+        "default": false
+      },
+      "vpnProvider": {
+        "title": "VPN API provider",
+        "description": "Which response format the VPN API uses. proxycheck = proxycheck.io v2 (free tier with an API key). ipapi = ip-api.com (proxy and hosting fields).",
+        "type": "string",
+        "enum": [
+          "proxycheck",
+          "ipapi"
+        ],
+        "default": "proxycheck"
+      },
+      "vpnApiUrl": {
+        "title": "VPN API URL",
+        "description": "Optional. Overrides the provider's default URL. Use {ip} and {key} as placeholders. Empty = provider default.",
+        "type": "string",
+        "default": ""
+      },
+      "vpnApiKey": {
+        "title": "VPN API key",
+        "description": "API key for the VPN provider. Get a free proxycheck.io key at https://proxycheck.io.",
+        "type": "string",
+        "default": ""
+      },
+      "vpnAction": {
+        "title": "VPN action",
+        "description": "What to do besides alerting when the IP is a VPN or proxy.",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert"
+      },
+      "identityConflictAlert": {
+        "title": "Alert on identity conflicts",
+        "description": "Alert when Takaro finds that one connection matches more than one player record (for example the same Steam id on two players).",
+        "type": "boolean",
+        "default": true
+      },
+      "nameChangeAlert": {
+        "title": "Alert on name changes",
+        "description": "Alert when a player connects with a new name.",
+        "type": "boolean",
+        "default": false
+      },
+      "whitelist": {
+        "title": "Whitelist",
+        "description": "Player names, Takaro player ids or platform ids (Steam, Epic, Xbox) that IP Watch ignores.",
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "showFullIp": {
+        "title": "Show full IP in alerts",
+        "description": "When off (default), alerts and ipcheck show a masked IP like 203.0.x.x. Only players with IP_WATCH_ALERTS or IP_WATCH_MANAGE ever see IPs.",
+        "type": "boolean",
+        "default": false
+      },
+      "kickBanReason": {
+        "title": "Kick / ban reason",
+        "description": "Reason shown to the player when a rule kicks or bans them.",
+        "type": "string",
+        "default": "Your connection was flagged by the server's anti-cheat. Contact an admin."
+      },
+      "banDuration": {
+        "title": "Ban duration",
+        "description": "How long a ban lasts when a rule bans.",
+        "type": "number",
+        "x-component": "duration",
+        "minimum": 0,
+        "default": 86400000
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "banDuration": {
+      "ui:widget": "duration"
+    },
+    "vpnApiKey": {
+      "ui:widget": "password"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "IP_WATCH_ALERTS",
+      "friendlyName": "IP Watch: receive alerts",
+      "description": "Online players with this permission get IP Watch alerts as private messages.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "IP_WATCH_MANAGE",
+      "friendlyName": "IP Watch: use ipcheck",
+      "description": "Allows the ipcheck command, which shows a player's known IPs, shared IPs and last country.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "IP_WATCH_EXEMPT",
+      "friendlyName": "IP Watch: exempt",
+      "description": "IP Watch never alerts on, kicks or bans players with this permission.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "ipcheck": {
+      "trigger": "ipcheck",
+      "description": "Show a player's known IP count, players sharing an IP, and last country.",
+      "helpText": "Admins only (IP_WATCH_MANAGE). Usage: ipcheck <player>",
+      "function": "src/commands/ipcheck/index.js",
+      "requiredPermissions": [
+        "IP_WATCH_MANAGE"
+      ],
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "helpText": "The player to check",
+          "position": 0
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "new-ip": {
+      "eventType": "player-new-ip-detected",
+      "description": "Checks a new IP for sharing, country change and (optionally) VPN, then alerts and applies the configured action.",
+      "function": "src/hooks/new-ip/index.js"
+    },
+    "identity-conflict": {
+      "eventType": "player-identity-conflict",
+      "description": "Alerts admins when one connection matches more than one player record.",
+      "function": "src/hooks/identity-conflict/index.js"
+    },
+    "new-name": {
+      "eventType": "player-new-name-detected",
+      "description": "Alerts admins on name changes when nameChangeAlert is on.",
+      "function": "src/hooks/new-name/index.js"
+    }
+  },
+  "functions": {
+    "ip-watch-helpers": {
+      "function": "src/functions/ip-watch-helpers.js"
+    }
+  }
+}

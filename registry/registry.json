@@ -203,6 +203,24 @@
       ]
     },
     {
+      "name": "ip-watch",
+      "description": "IP Watch: an anti-cheat helper. When a player joins from a new IP, it checks if that IP is shared with other players (possible alt or shared account), if the country changed, and optionally if the IP is a VPN or proxy. By default it only alerts admins in game (IP_WATCH_ALERTS) and optionally in a Discord channel; each rule can also kick or ban. Admins can run ipcheck <player>. Raw IPs are masked by default.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "13e32a7ef6b6827b21eb277f5d1a2a8c1f635de354ecad4a6e25988f7ce475c8",
+          "requiredCapabilities": [
+            "chat.send",
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
       "name": "jail",
       "description": "Staff jail: save a jail spot, jail a player for N minutes with a reason, keep them inside a radius (checked every minute), auto-release them back to where they were or to a release point. Optional Jailed role while in jail. Commands: setjail, jail, unjail, jailed, jailtime. Works on any game that supports teleporting players.",
       "latestVersion": "1.0.0",
