@@ -334,6 +334,23 @@
       ]
     },
     {
+      "name": "reserved-slots",
+      "description": "Reserved slots for supporters and staff. Keep the last few slots free: when a supporter joins a full server, the newest (or lowest-playtime, or a random) regular player is kicked with a friendly message. Regular players who join into the reserved zone can be turned away. Staff can be exempt. Admin command shows current slot usage. Games without kick support fail gracefully.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "3b994cbc227da0a3a5fad40bb0f059ed7501b899e519aa53a810b75dbff4a38b",
+          "requiredCapabilities": [
+            "moderation.kick"
+          ]
+        }
+      ]
+    },
+    {
       "name": "server-toolkit",
       "description": "Cross-game utility commands for server info, rules, moderation, and simple economy administration.",
       "latestVersion": "1.0.0",

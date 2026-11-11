@@ -1,0 +1,109 @@
+{
+  "name": "reserved-slots",
+  "author": "Takaro",
+  "summary": "Reserved slots for supporters and staff. Keep the last few slots free: when a supporter joins a full server, the newest (or lowest-playtime, or a random) regular player is kicked with a friendly message. Regular players who join into the reserved zone can be turned away. Staff can be exempt. Admin command shows current slot usage. Games without kick support fail gracefully.",
+  "description": "Reserved Slots keeps the last few player slots free for supporters (VIPs) and staff.\n\nHow it works, on every player join:\n- Set Max players to your server's real player limit (Takaro does not report it). Public slots = Max players - Reserved slots.\n- If more players are online than the public slots and the joining player has RESERVED_SLOT, one regular player is kicked to free a slot (strategy: newest join, lowest playtime, or random). Players with RESERVED_SLOT or RESERVED_SLOT_EXEMPT are never picked.\n- If the joining player has no reserved slot and the server is in the reserved zone, they are kicked with a 'server full' message (can be turned off). Staff with RESERVED_SLOT_EXEMPT are always let in.\n- The admin command `slots` shows online count, public and reserved slots, and who holds a reserved slot.\n\nMessages support {link} (your VIP or donation link), {reserved} (reserved slot count) and {max} (max players).\n\nGame support: the module needs kickPlayer from the game connector. On games where kick is not supported (for example Counter-Strike 2), the kick fails gracefully: the module logs it and keeps running; nobody is removed. With Max players set to 0 (the default) the module does nothing until you configure it.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "maxPlayers": {
+        "type": "number",
+        "title": "Max players",
+        "default": 0,
+        "minimum": 0,
+        "description": "Your server's player limit (Takaro cannot read it from the game). 0 = module is off until you set it."
+      },
+      "reservedSlots": {
+        "type": "number",
+        "title": "Reserved slots",
+        "default": 2,
+        "minimum": 0,
+        "description": "How many of the Max players slots are kept for players with the Reserved slot permission."
+      },
+      "kickStrategy": {
+        "type": "string",
+        "title": "Who gets kicked to free a slot",
+        "enum": [
+          "newest",
+          "lowestPlaytime",
+          "random"
+        ],
+        "default": "newest",
+        "description": "newest = the regular player who joined last; lowestPlaytime = the regular player with the least total playtime on this server; random = any regular player."
+      },
+      "kickNonReservedJoiners": {
+        "type": "boolean",
+        "title": "Turn away regular players in the reserved zone",
+        "default": true,
+        "description": "When on, a player without a reserved slot who joins while all public slots are taken is kicked with the 'server full' message."
+      },
+      "vipLink": {
+        "type": "string",
+        "title": "VIP link",
+        "default": "ask staff on Discord",
+        "description": "Where players can become a supporter. Replaces {link} in the messages."
+      },
+      "freedSlotMessage": {
+        "type": "string",
+        "title": "Kick reason: slot freed for a supporter",
+        "default": "Server full - slot freed for a supporter. Rejoin later or become VIP: {link}",
+        "description": "Kick reason for the regular player removed to make room. Supports {link}, {reserved}, {max}."
+      },
+      "serverFullMessage": {
+        "type": "string",
+        "title": "Kick reason: server full",
+        "default": "Server full - the last {reserved} slots are reserved for supporters. Try again later or become VIP: {link}",
+        "description": "Kick reason for a regular player who joins into the reserved zone. Supports {link}, {reserved}, {max}."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "RESERVED_SLOT",
+      "friendlyName": "Reserved slot",
+      "description": "Player may use a reserved slot. When they join a full server, a regular player is kicked to make room. Never picked to be kicked.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "RESERVED_SLOT_EXEMPT",
+      "friendlyName": "Exempt from reserved slots",
+      "description": "For staff: never kicked by this module and always let in, but does not kick others when joining.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "RESERVED_SLOTS_VIEW",
+      "friendlyName": "View slot usage",
+      "description": "Allows using the slots command to see current slot usage.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "slots": {
+      "trigger": "slots",
+      "description": "Show current slot usage (admin)",
+      "helpText": "Shows online players, public and reserved slots, and who holds a reserved slot.",
+      "function": "src/commands/slots/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "on-player-connected": {
+      "eventType": "player-connected",
+      "description": "Frees a slot for supporters, or turns away regular players in the reserved zone.",
+      "function": "src/hooks/on-player-connected/index.js"
+    }
+  },
+  "functions": {
+    "slot-helpers": {
+      "function": "src/functions/slot-helpers.js"
+    }
+  }
+}
