@@ -22,6 +22,23 @@
       ]
     },
     {
+      "name": "bank",
+      "description": "A savings bank: players deposit and withdraw currency to a separate bank balance that earns daily interest (rate, cap, minimum balance, VIP rate via permission count). Optional withdraw fee and balance cap. Admin bankstats shows total held and top savers.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "c94989700823934bf95cc4cd17904d375a5f2e071546c499e70276f9ba797428",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "bounties",
       "description": "Player bounties for PvP servers: `bounty <player> <amount>` holds currency on a target, the player who kills the target collects the pot. List, cancel (minus a fee), exclusion groups, no self-claims and automatic refunds when a bounty expires. Needs the game to report the killer (player-death attacker, or a log line such as 7 Days to Die's `killed by`).",
       "latestVersion": "1.0.0",
