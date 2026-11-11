@@ -474,6 +474,23 @@
       ]
     },
     {
+      "name": "polls",
+      "description": "In-game polls. Admins start a timed poll with numbered options, players vote with pollvote <n> (one vote each, changeable until the poll closes), anyone can check live results with poll. When the poll ends or an admin closes it early, the results are broadcast, optionally posted to Discord, and voters can get a small currency reward.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "3385982f474dd2f888cf63c96e25517389c50f640c9ab3b8489c268f98a586b2",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "private-messages",
       "description": "Private messages for players: msg and reply to online players, leave mail for offline players (delivered when they join), check when someone was last seen, and ignore players who bother you. Anti-spam cooldown and optional, off-by-default staff social spy.",
       "latestVersion": "1.0.0",
