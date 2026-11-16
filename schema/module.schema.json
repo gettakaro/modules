@@ -68,6 +68,7 @@
       "required": ["function"],
       "properties": {
         "description": { "type": ["string", "null"], "description": "What the shop action does when a player buys a listing that uses it." },
+        "argumentSchema": { "type": "object", "description": "JSON Schema (draft-07, root type object) of the arguments each shop listing supplies for this action. The function reads them as data.shopActionArguments. Properties may use x-component role or itemSet." },
         "function": { "type": "string", "minLength": 1, "description": "Path of the JavaScript file with the shop action code, relative to the module directory." }
       }
     },

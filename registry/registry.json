@@ -616,10 +616,11 @@
     },
     {
       "name": "shopActions",
-      "description": "Built-in shop actions for common use cases like granting roles, sending messages, giving an Item Set, and executing commands. The give-item action gives an Item Set, managed on the server's Item Sets page. Upgrading from 0.0.1 unlinks every shop listing that uses one of these actions; re-link each listing to this version's action afterwards.",
-      "latestVersion": "1.0.0",
+      "description": "Built-in shop actions for common use cases like granting roles, sending messages, giving an Item Set, and executing commands. The role and the Item Set are chosen per shop listing, so one installation can sell several roles or sets. Upgrading from 0.0.1 unlinks every shop listing that uses one of these actions; re-link each listing to this version's action afterwards.",
+      "latestVersion": "1.1.0",
       "versions": [
-        "1.0.0"
+        "1.0.0",
+        "1.1.0"
       ],
       "versionDetails": [
         {
@@ -630,6 +631,16 @@
             "console.execute",
             "items.give"
           ]
+        },
+        {
+          "version": "1.1.0",
+          "sha256": "87754c7531b259dd177405ffd0c6e9bc510f3ddce56d812219e9a0258e7c3459",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute",
+            "items.give"
+          ],
+          "minTakaroVersion": "2.3.0"
         }
       ]
     },

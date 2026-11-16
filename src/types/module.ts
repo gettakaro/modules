@@ -46,6 +46,8 @@ export interface ModuleShopAction {
   name: string;
   description: string | null;
   function: string;
+  /** JSON string of the schema of the arguments each shop listing supplies. Present only when declared. */
+  argumentSchema?: string;
 }
 
 export interface ModulePermission {
@@ -109,6 +111,7 @@ export interface LocalFunctionDef {
 export interface LocalShopActionDef {
   description?: string | null;
   function: string;
+  argumentSchema?: Record<string, unknown>;
 }
 
 export interface LocalModuleJson {

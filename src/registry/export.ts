@@ -153,10 +153,12 @@ export function buildModuleExport(moduleDir: string): TakaroModuleExport {
       if (!def.function) {
         throw new ModuleSourceError(`shopAction '${name}' is missing required field 'function' (path to JS file)`);
       }
+      requirePlainObject(moduleJsonPath, `shopActions.${name}.argumentSchema`, def.argumentSchema);
       return {
         name,
         description: def.description ?? null,
         function: readJsFile(moduleDir, def.function, `shopAction '${name}'`),
+        ...(def.argumentSchema !== undefined ? { argumentSchema: JSON.stringify(def.argumentSchema) } : {}),
       };
     });
   }

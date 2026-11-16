@@ -123,7 +123,10 @@ The URL of a version file is `<base>/<module>/<version>.json`. Module names and 
 `<module>/<version>.json` is Takaro's module export format, with exactly one entry in `versions`. Its `tag` is the
 semantic version, and `defaultSystemConfig` (a JSON string) is present when the module declares one. A command
 carries `requiredPermissions` and the version carries `shopActions` (`name`, `description`, code) only when the module
-declares at least one, so files published before those keys existed keep their bytes.
+declares at least one, so files published before those keys existed keep their bytes. A shop action carries
+`argumentSchema` (`JSON.stringify` of the object declared in `module.json`, after `function`) only when it declares one.
+Takaro stores it on the action; each shop listing supplies the values, and the function reads them as
+`data.shopActionArguments`.
 
 The files are written as `JSON.stringify(value, null, 2)` plus a trailing newline, with keys in a fixed order. A
 change to the serializer or to the export format therefore changes the bytes of a module's current version. That is

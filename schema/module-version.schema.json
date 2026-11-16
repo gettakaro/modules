@@ -72,7 +72,8 @@
       "properties": {
         "name": { "type": "string", "description": "Shop action name." },
         "description": { "type": ["string", "null"], "description": "What the shop action does." },
-        "function": { "type": "string", "description": "The shop action's JavaScript code." }
+        "function": { "type": "string", "description": "The shop action's JavaScript code." },
+        "argumentSchema": { "type": "string", "description": "JSON string of the argument schema. Present only when the action declares one." }
       }
     },
     "permission": {
