@@ -11,8 +11,8 @@ const SWORD = { id: '0d3f1c86-24a1-4b2e-9d4c-6f1b8a5e7c30', name: 'Sword', code:
 const SHIELD = { id: '5b7e2a94-8c31-4f60-a7d2-13c9e6b04a8f', name: 'Shield', code: 'shield' };
 
 const SET_MISSING =
-  'The item set configured for the giveItem shop action no longer exists. Reconfigure the shopActions module.';
-const SET_EMPTY = 'The item set configured for the giveItem shop action has no items.';
+  'The item set on this listing for the giveItem shop action no longer exists. Pick another item set on the listing.';
+const SET_EMPTY = 'The item set on this listing for the giveItem shop action has no items.';
 const NO_PLAYER = 'Player data is not available for this shop action.';
 
 function httpError(status: number, message: string) {
@@ -41,15 +41,13 @@ const defaultLines = [
   { itemId: SHIELD.id, amount: 1, position: 1 },
 ];
 
-const userConfig = { giveItem: { itemSet: SET_ID } };
-const trigger = { triggerEvent: 'orderClaimed' } as const;
+const trigger = { triggerEvent: 'orderClaimed', shopActionArguments: { itemSet: SET_ID } } as const;
 
 const tests = [
   createModuleTest({
     name: 'Gives every line of the item set in one call',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId)));
       this.client.stubs.gameserver.gameServerControllerGiveItems?.callsFake(async () =>
@@ -82,7 +80,6 @@ const tests = [
     name: 'A partly failed give succeeds and lists the failed line',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId)));
       this.client.stubs.gameserver.gameServerControllerGiveItems?.callsFake(async () =>
@@ -103,7 +100,6 @@ const tests = [
     name: 'An unknown line succeeds and is reported as possibly not arrived',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId)));
       this.client.stubs.gameserver.gameServerControllerGiveItems?.callsFake(async () =>
@@ -124,7 +120,6 @@ const tests = [
     name: 'Every line failed tells the buyer and fails the action',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId)));
       this.client.stubs.gameserver.gameServerControllerGiveItems?.callsFake(async () =>
@@ -146,7 +141,6 @@ const tests = [
     name: 'A give rejected with 400 fails with the API message and no PM',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId)));
       this.client.stubs.gameserver.gameServerControllerGiveItems?.callsFake(async () => {
@@ -168,7 +162,6 @@ const tests = [
     name: 'A deleted item set fails the action and gives nothing',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => {
         throw httpError(404, 'Item set not found');
@@ -188,7 +181,6 @@ const tests = [
     name: 'An item set of another game server is treated as missing',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () =>
         single(bonusSet('c4a1e7d2-9b35-4f08-a6c3-2d7e5b19f804')),
@@ -208,7 +200,6 @@ const tests = [
     name: 'An empty item set fails the action and gives nothing',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     setup: function () {
       this.client.stubs.itemSet.itemSetControllerGetOne?.callsFake(async () => single(bonusSet(this.gameServerId, [])));
     },
@@ -223,15 +214,14 @@ const tests = [
   }),
 
   createModuleTest({
-    name: 'Nothing configured fails before any API call',
+    name: 'No item set on the listing fails before any API call',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig: {},
     test: async function () {
-      const result = await this.runShopAction('giveItem', trigger);
+      const result = await this.runShopAction('giveItem', { triggerEvent: 'orderClaimed' });
 
       expect(result.success).to.be.false;
-      expect(this.userError(result)).to.equal('No item set configured for the giveItem shop action.');
+      expect(this.userError(result)).to.equal('No item set is set on this listing for the giveItem shop action.');
       expect(this.client.stubs.itemSet.itemSetControllerGetOne).to.not.have.been.called;
       expect(this.client.stubs.gameserver.gameServerControllerGiveItems).to.not.have.been.called;
       expect(this.pms()).to.deep.equal([]);
@@ -242,7 +232,6 @@ const tests = [
     name: 'No player fails the action',
     module: MODULE,
     permissions: 'ROOT',
-    userConfig,
     test: async function () {
       const result = await this.runShopAction('giveItem', { ...trigger, withPlayer: false });
 

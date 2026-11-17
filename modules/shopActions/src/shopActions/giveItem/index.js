@@ -1,7 +1,7 @@
 import { takaro, data, TakaroUserError } from '@takaro/helpers';
 
 const SET_MISSING =
-  'The item set configured for the giveItem shop action no longer exists. Reconfigure the shopActions module.';
+  'The item set on this listing for the giveItem shop action no longer exists. Pick another item set on the listing.';
 
 function list(lines) {
   return lines.map((line) => `${line.name} x${line.amount}`).join(', ');
@@ -23,7 +23,7 @@ async function readSet(setId) {
     throw new TakaroUserError(SET_MISSING);
   }
   if (set.lines.length === 0) {
-    throw new TakaroUserError('The item set configured for the giveItem shop action has no items.');
+    throw new TakaroUserError('The item set on this listing for the giveItem shop action has no items.');
   }
   return set;
 }
@@ -47,10 +47,10 @@ async function giveLines(set) {
 }
 
 async function main() {
-  const setId = data.module.userConfig.giveItem?.itemSet;
+  const setId = data.shopActionArguments?.itemSet;
 
   if (!setId) {
-    throw new TakaroUserError('No item set configured for the giveItem shop action.');
+    throw new TakaroUserError('No item set is set on this listing for the giveItem shop action.');
   }
 
   if (!data.player) {

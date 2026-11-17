@@ -271,6 +271,7 @@ if (version.shopActions && version.shopActions.length > 0) {
     shopActions[action.name] = {
       description: action.description ?? null,
       function: `src/shopActions/${action.name}/index.js`,
+      ...(action.argumentSchema ? { argumentSchema: JSON.parse(action.argumentSchema) } : {}),
     };
     console.error(`  shopAction: ${action.name}`);
   }

@@ -1,10 +1,10 @@
 import { takaro, data, TakaroUserError } from '@takaro/helpers';
 
 async function main() {
-  const roleId = data.module.userConfig.grantRole?.roleId;
+  const roleId = data.shopActionArguments?.roleId;
 
   if (!roleId) {
-    throw new TakaroUserError('No roleId configured for the grantRole shop action.');
+    throw new TakaroUserError('No role is set on this listing for the grantRole shop action.');
   }
 
   if (!data.player) {
