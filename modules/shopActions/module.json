@@ -93,5 +93,5 @@
       "function": "src/shopActions/executeCommand/index.js"
     }
   },
-  "minTakaroVersion": "2.3.0"
+  "minTakaroVersion": "2.3.3"
 }

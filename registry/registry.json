@@ -640,7 +640,7 @@
             "console.execute",
             "items.give"
           ],
-          "minTakaroVersion": "2.3.0"
+          "minTakaroVersion": "2.3.3"
         }
       ]
     },
