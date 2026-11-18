@@ -19,9 +19,9 @@
     "registry:check": "npm run build && node dist/scripts/registry.js check"
   },
   "devDependencies": {
-    "@takaro/apiclient": "^0.7.5",
-    "@takaro/helpers": "0.0.0-dev.f39390c",
-    "@takaro/module-test": "0.0.0-dev.f39390c",
+    "@takaro/apiclient": "0.0.0-dev.5c432d0",
+    "@takaro/helpers": "0.0.0-dev.5c432d0",
+    "@takaro/module-test": "0.0.0-dev.5c432d0",
     "@types/chai": "4.3.20",
     "@types/node": "^22",
     "@types/sinon-chai": "3.2.12",
