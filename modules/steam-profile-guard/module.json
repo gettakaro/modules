@@ -1,0 +1,284 @@
+{
+  "name": "steam-profile-guard",
+  "author": "Takaro",
+  "description": "Steam Profile Guard: checks a player's Steam profile when they join and warns admins about likely alt or throwaway accounts. Rules: account younger than X days, private profile, Steam level below X, fewer than X hours in this game, VAC or game bans newer than X days, and family-shared copies (best effort). By default it only alerts admins (in-game PM to players with the alerts permission, plus an optional Discord channel); per rule you can kick or ban instead. Uses your own Steam Web API key (free). The Takaro instance must allow modules to reach api.steampowered.com (run sgtest; Takaro Cloud blocked it at release). Without a key, or when Steam is blocked, it falls back to the Steam data Takaro stores (age, level, VAC bans). Answers are cached in variables. Exempt players by permission, by the Steam ID whitelist or with sgallow <player>. sgcheck <player> shows a profile now, sgtest checks the API key. Players without a Steam ID are skipped.",
+  "summary": "Checks a joining player's Steam profile: account age, private profile, Steam level, hours in this game, recent VAC/game bans and family sharing. Alerts admins in-game and on Discord by default; per rule it can kick or ban. Full checks need your Steam Web API key and api.steampowered.com allowed for modules (sgtest checks); otherwise it uses Takaro's stored Steam data. Whitelist, exempt permission and sgallow.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "steamApiKey": {
+        "title": "Steam Web API key",
+        "type": "string",
+        "default": "",
+        "description": "Your own key from https://steamcommunity.com/dev/apikey. Needed for private-profile, game-hours and family-sharing checks and for fresh ban data. Also needs this Takaro instance to allow modules to reach api.steampowered.com. Empty or blocked: only the Steam data Takaro stores itself is used. Run sgtest to check."
+      },
+      "checkMode": {
+        "title": "When to check",
+        "type": "string",
+        "enum": [
+          "everyJoin",
+          "once"
+        ],
+        "default": "everyJoin",
+        "description": "everyJoin checks on every join (Steam answers are cached, see cache hours). once checks each player only the first time they join after the module is installed."
+      },
+      "cacheHours": {
+        "title": "Cache hours",
+        "type": "number",
+        "minimum": 1,
+        "default": 24,
+        "description": "How long a player's Steam data is reused before Steam is asked again."
+      },
+      "minAccountAgeDays": {
+        "title": "Min account age (days)",
+        "type": "number",
+        "minimum": 0,
+        "default": 30,
+        "description": "Flag Steam accounts younger than this. 0 turns it off. Not checked when the profile hides its creation date."
+      },
+      "accountAgeAction": {
+        "title": "Action: account too new",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the account is too new. Admins are always alerted."
+      },
+      "flagPrivateProfile": {
+        "title": "Flag private profiles",
+        "type": "boolean",
+        "default": false,
+        "description": "Flag players whose Steam profile is private or friends-only. Needs the API key."
+      },
+      "privateAction": {
+        "title": "Action: private profile",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the profile is private. Admins are always alerted."
+      },
+      "minSteamLevel": {
+        "title": "Min Steam level",
+        "type": "number",
+        "minimum": 0,
+        "default": 0,
+        "description": "Flag players below this Steam level. 0 turns it off. Not checked when the level is hidden."
+      },
+      "levelAction": {
+        "title": "Action: Steam level too low",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the Steam level is too low. Admins are always alerted."
+      },
+      "minGameHours": {
+        "title": "Min hours in this game",
+        "type": "number",
+        "minimum": 0,
+        "default": 0,
+        "description": "Flag players with fewer hours in this game on Steam. 0 turns it off. Needs the API key; not checked when the game list is hidden."
+      },
+      "appId": {
+        "title": "Steam app ID",
+        "type": "number",
+        "minimum": 0,
+        "default": 0,
+        "description": "Steam app ID of this game, for the hours and family-sharing checks. 0 = automatic for 7 Days to Die (251570) and Rust (252490); set it for other games (e.g. Valheim 892970)."
+      },
+      "hoursAction": {
+        "title": "Action: too few hours",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when the player has too few hours in this game. Admins are always alerted."
+      },
+      "checkBans": {
+        "title": "Check VAC and game bans",
+        "type": "boolean",
+        "default": true,
+        "description": "Flag players with VAC or game bans on Steam."
+      },
+      "banRecentDays": {
+        "title": "Only bans newer than (days)",
+        "type": "number",
+        "minimum": 0,
+        "default": 365,
+        "description": "Flag only when the last ban is newer than this many days. 0 flags any ban, however old."
+      },
+      "banAction": {
+        "title": "Action: VAC or game ban",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when a recent ban is found. Admins are always alerted."
+      },
+      "flagFamilySharing": {
+        "title": "Flag family sharing",
+        "type": "boolean",
+        "default": false,
+        "description": "Flag players who play a copy borrowed through Steam family sharing. Best effort: needs the API key and the app ID, and Steam does not report every case."
+      },
+      "familyAction": {
+        "title": "Action: family sharing",
+        "type": "string",
+        "enum": [
+          "alert",
+          "kick",
+          "ban"
+        ],
+        "default": "alert",
+        "description": "What happens when a borrowed copy is detected. Admins are always alerted."
+      },
+      "whitelist": {
+        "title": "Whitelist (Steam IDs)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [],
+        "description": "64-bit Steam IDs that are never checked. Admins can also use sgallow <player> in game."
+      },
+      "actionReason": {
+        "title": "Kick / ban reason",
+        "type": "string",
+        "default": "Your Steam profile does not meet this server's requirements. Contact an admin.",
+        "description": "Shown to a kicked or banned player."
+      },
+      "banDuration": {
+        "title": "Ban duration",
+        "x-component": "duration",
+        "type": "number",
+        "minimum": 0,
+        "default": 86400000,
+        "description": "How long the ban action bans for. 0 bans permanently."
+      },
+      "discordChannelId": {
+        "title": "Discord channel ID",
+        "type": "string",
+        "default": "",
+        "description": "Also post alerts in this Discord channel. Leave empty for in-game alerts only."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "steamApiKey": {
+      "ui:widget": "password"
+    },
+    "banDuration": {
+      "ui:widget": "duration"
+    }
+  },
+  "permissions": [
+    {
+      "permission": "STEAM_GUARD_ALERTS",
+      "friendlyName": "Steam Profile Guard: get alerts",
+      "description": "Online players with this permission get a PM when a joining player fails a Steam profile rule.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "STEAM_GUARD_MANAGE",
+      "friendlyName": "Steam Profile Guard: manage",
+      "description": "Allows sgcheck, sgallow, sgunallow and sgtest.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "STEAM_GUARD_EXEMPT",
+      "friendlyName": "Steam Profile Guard: exempt",
+      "description": "Players with this permission are never checked on join. Roles with ROOT (full access) count as exempt too.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "sgcheck": {
+      "trigger": "sgcheck",
+      "description": "Check a player's Steam profile now",
+      "helpText": "Usage: sgcheck <player>. Shows the profile and which rules it breaks. It does not kick, ban or alert others.",
+      "function": "src/commands/sgcheck/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to check",
+          "position": 0
+        }
+      ]
+    },
+    "sgallow": {
+      "trigger": "sgallow",
+      "description": "Stop checking a player's Steam profile",
+      "helpText": "Usage: sgallow <player>. The player is no longer checked on join on this server.",
+      "function": "src/commands/sgallow/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to allow",
+          "position": 0
+        }
+      ]
+    },
+    "sgunallow": {
+      "trigger": "sgunallow",
+      "description": "Check a player's Steam profile again",
+      "helpText": "Usage: sgunallow <player>. Undoes sgallow.",
+      "function": "src/commands/sgunallow/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "player",
+          "defaultValue": null,
+          "helpText": "The player to check again",
+          "position": 0
+        }
+      ]
+    },
+    "sgtest": {
+      "trigger": "sgtest",
+      "description": "Test the Steam Web API connection and key",
+      "helpText": "Usage: sgtest. Tells you whether Takaro can reach the Steam API and whether the API key works.",
+      "function": "src/commands/sgtest/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "check-on-join": {
+      "eventType": "player-connected",
+      "description": "Checks the joining player's Steam profile against the configured rules.",
+      "function": "src/hooks/check-on-join/index.js"
+    }
+  },
+  "cronJobs": {},
+  "functions": {
+    "spg-core": {
+      "function": "src/functions/spg-core.js"
+    }
+  }
+}
