@@ -1,0 +1,219 @@
+{
+  "name": "rob-and-crime",
+  "author": "Takaro",
+  "description": "Risk and reward for your economy. crime is a quick gamble: most times you get away with a reward, sometimes you pay a fine. rob <player> steals a share of an online player's wallet; if you get caught, you pay the victim a fine instead. Only the wallet can be robbed: savings in the bank module are always safe, which gives players a reason to bank. Cooldowns per robber, a protection window for victims, a minimum victim wallet and a ROB_IMMUNE permission for staff or VIPs keep it fair. Optional: failed crimes and robberies send the player to jail when the registry jail module is installed (skipped when it is not). crimestats shows your record and cooldowns. Works on every game.",
+  "summary": "crime = risky quick earn (reward range, fail chance, fine range). rob <player> = steal a % of an online player's wallet, never bank savings; caught = pay the victim a fine. Cooldowns, victim protection, min wallet, ROB_IMMUNE for staff/VIP, optional jail on fail via the jail module. crimestats shows your record. All games.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "crimeRewardMin": {
+        "title": "Crime reward min",
+        "type": "integer",
+        "default": 50,
+        "minimum": 0,
+        "description": "Smallest amount a successful crime pays."
+      },
+      "crimeRewardMax": {
+        "title": "Crime reward max",
+        "type": "integer",
+        "default": 200,
+        "minimum": 0,
+        "description": "Largest amount a successful crime pays."
+      },
+      "crimeFailChancePercent": {
+        "title": "Crime fail chance (%)",
+        "type": "integer",
+        "default": 40,
+        "minimum": 0,
+        "description": "Chance in percent that a crime fails.",
+        "maximum": 100
+      },
+      "crimeFineMin": {
+        "title": "Crime fine min",
+        "type": "integer",
+        "default": 25,
+        "minimum": 0,
+        "description": "Smallest fine when a crime fails."
+      },
+      "crimeFineMax": {
+        "title": "Crime fine max",
+        "type": "integer",
+        "default": 100,
+        "minimum": 0,
+        "description": "Largest fine when a crime fails. A player needs at least this much in their wallet to try a crime."
+      },
+      "crimeCooldownMinutes": {
+        "title": "Crime cooldown (minutes)",
+        "type": "integer",
+        "default": 30,
+        "minimum": 0,
+        "description": "How long a player waits between crimes, win or lose."
+      },
+      "crimeJailMinutes": {
+        "title": "Crime jail time (minutes)",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Optional. Minutes in jail when a crime fails. Needs the registry jail module installed with a jail spot set; otherwise it is skipped. 0 = off."
+      },
+      "crimeWinTexts": {
+        "title": "Crime win texts",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "You picked a pocket at the market and got away with {amount}.",
+          "You sold fake treasure maps and made {amount}.",
+          "You cracked an old safe and found {amount}.",
+          "You smuggled a crate past the guards and earned {amount}."
+        ],
+        "description": "One is picked at random when a crime works. {amount} = the reward with currency name, {player} = the player's name. One line each."
+      },
+      "crimeFailTexts": {
+        "title": "Crime fail texts",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "The guards caught you shoplifting. You paid a fine of {amount}.",
+          "Your getaway ride never showed up. Fine: {amount}.",
+          "The safe had an alarm. You paid {amount} to make it go away."
+        ],
+        "description": "One is picked at random when a crime fails. {amount} = the fine with currency name, {player} = the player's name. One line each."
+      },
+      "robPercentMin": {
+        "title": "Rob min (% of wallet)",
+        "type": "number",
+        "default": 5,
+        "minimum": 0,
+        "description": "Smallest share of the victim's wallet a successful robbery takes, in percent.",
+        "maximum": 100
+      },
+      "robPercentMax": {
+        "title": "Rob max (% of wallet)",
+        "type": "number",
+        "default": 20,
+        "minimum": 0,
+        "description": "Largest share of the victim's wallet a successful robbery takes, in percent.",
+        "maximum": 100
+      },
+      "robMaxAmount": {
+        "title": "Rob max amount",
+        "type": "integer",
+        "default": 1000,
+        "minimum": 0,
+        "description": "Most one robbery can take. 0 = no cap."
+      },
+      "robFailChancePercent": {
+        "title": "Rob fail chance (%)",
+        "type": "integer",
+        "default": 50,
+        "minimum": 0,
+        "description": "Chance in percent that a robbery fails.",
+        "maximum": 100
+      },
+      "robFinePercent": {
+        "title": "Rob fine (% of max loot)",
+        "type": "number",
+        "default": 50,
+        "minimum": 0,
+        "description": "When a robbery fails, the robber pays the victim this percentage of the most they could have stolen.",
+        "maximum": 1000
+      },
+      "robFineMin": {
+        "title": "Rob fine min",
+        "type": "integer",
+        "default": 50,
+        "minimum": 0,
+        "description": "Smallest fine for a failed robbery. A robber needs at least the fine in their wallet to try."
+      },
+      "robCooldownMinutes": {
+        "title": "Rob cooldown (minutes)",
+        "type": "integer",
+        "default": 60,
+        "minimum": 0,
+        "description": "How long a robber waits between robberies, win or lose."
+      },
+      "victimProtectionMinutes": {
+        "title": "Victim protection (minutes)",
+        "type": "integer",
+        "default": 120,
+        "minimum": 0,
+        "description": "After being robbed, a player cannot be robbed again for this long. 0 = off."
+      },
+      "minVictimBalance": {
+        "title": "Minimum victim wallet",
+        "type": "integer",
+        "default": 200,
+        "minimum": 0,
+        "description": "Players with less than this in their wallet cannot be robbed."
+      },
+      "robJailMinutes": {
+        "title": "Rob jail time (minutes)",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "description": "Optional. Minutes in jail when a robbery fails. Needs the registry jail module installed with a jail spot set; otherwise it is skipped. 0 = off."
+      },
+      "announce": {
+        "title": "Announce robberies",
+        "type": "boolean",
+        "default": true,
+        "description": "Tell the whole server when someone robs a player or gets caught trying."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "ROB_IMMUNE",
+      "friendlyName": "Cannot be robbed",
+      "description": "Players with this permission cannot be robbed (staff, VIPs, new players). They can still rob others.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "crime": {
+      "trigger": "crime",
+      "description": "Try a quick crime: win a reward or pay a fine",
+      "helpText": "Do a crime. You may get a reward or pay a fine. Has a cooldown.",
+      "function": "src/commands/crime/index.js",
+      "arguments": []
+    },
+    "rob": {
+      "trigger": "rob",
+      "description": "Try to steal from an online player's wallet",
+      "helpText": "/rob <player>: steal a share of their wallet. If you get caught you pay them a fine. Bank savings are safe.",
+      "function": "src/commands/rob/index.js",
+      "arguments": [
+        {
+          "name": "target",
+          "type": "player",
+          "helpText": "The online player to rob",
+          "position": 0,
+          "defaultValue": null
+        }
+      ]
+    },
+    "crimestats": {
+      "trigger": "crimestats",
+      "description": "Your crime and robbery record, and your cooldowns",
+      "helpText": "Shows your crimes, robberies, fines, losses and when you can go again.",
+      "function": "src/commands/crimestats/index.js",
+      "arguments": []
+    }
+  },
+  "functions": {
+    "crime-helpers": {
+      "function": "src/functions/crime-helpers.js"
+    }
+  }
+}
