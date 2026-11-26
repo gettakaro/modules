@@ -83,7 +83,8 @@ export async function checkAndClaim(site, identity) {
   try {
     const body = await callSite(site, 'post', { action: 'post', object: 'votes', element: 'claim', ...identity });
     console.log(`vote-rewards: ${site.name} claim -> ${body}`);
-    return body === '1' ? 'claimed-now' : STATUS.CLAIMED;
+    if (body === '1') return 'claimed-now';
+    return body === '0' ? STATUS.CLAIMED : STATUS.UNEXPECTED;
   } catch (err) {
     console.error(`vote-rewards: claiming on ${site.name} failed: ${describeError(err)}`);
     return STATUS.UNREACHABLE;
@@ -97,30 +98,134 @@ function currencyMultiplier(pog) {
   return Number.isFinite(count) && count > 1 ? count : 1;
 }
 
-/** Gives one vote's reward. Returns a short text of what was given, e.g. "100 coins and 2x Stone axe". */
-async function giveReward(config, multiplier, currencyName) {
+// Claimed votes wait in a pending queue (one Takaro variable each) until their reward is fully given.
+// A run takes an entry by deleting its variable first: only one run can delete it, so a reward is never
+// paid twice. If giving fails, the entry goes back with its progress and is retried on the next vote command.
+const PENDING_PREFIX = 'vote_rewards_pending:';
+
+function scope() {
+  return { gameServerId: data.gameServerId, playerId: data.player.id, moduleId: data.module.moduleId };
+}
+
+/** Adds one claimed vote to the player's pending queue. Returns false when it could not be stored. */
+async function addPending(entry) {
+  const key = `${PENDING_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    await takaro.variable.variableControllerCreate({ key, value: JSON.stringify(entry), ...scope() });
+    return true;
+  } catch (err) {
+    console.error(`vote-rewards: storing the pending reward for ${entry.site} failed: ${describeError(err)}`);
+    return false;
+  }
+}
+
+async function listPending() {
+  const { gameServerId, playerId, moduleId } = scope();
+  const res = await takaro.variable.variableControllerSearch({
+    filters: { gameServerId: [gameServerId], playerId: [playerId], moduleId: [moduleId] },
+    search: { key: [PENDING_PREFIX] },
+    limit: 100,
+  });
+  return (res.data.data ?? []).filter((row) => String(row.key).startsWith(PENDING_PREFIX));
+}
+
+/** Takes a pending entry so no other run can pay it. Returns null when another run already took it. */
+async function takePending(row) {
+  try {
+    await takaro.variable.variableControllerDelete(row.id);
+  } catch (err) {
+    console.log(`vote-rewards: pending reward ${row.key} was taken by another run: ${describeError(err)}`);
+    return null;
+  }
+  try {
+    return { site: 'the vote site', currencyDone: false, itemsDone: 0, ...JSON.parse(row.value) };
+  } catch {
+    return { site: 'the vote site', currencyDone: false, itemsDone: 0 };
+  }
+}
+
+/**
+ * Gives one vote's reward, continuing where an earlier try stopped. Updates entry.currencyDone and
+ * entry.itemsDone as it goes and throws on the first failure. Returns a short text of what was given.
+ */
+async function giveReward(entry, config, multiplier, currencyName) {
   const { gameServerId, player } = data;
   const parts = [];
 
   const currency = Math.floor((config.currency ?? 0) * multiplier);
-  if (currency > 0) {
-    await takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(gameServerId, player.id, { currency });
-    parts.push(`${currency} ${currencyName}`);
+  if (!entry.currencyDone) {
+    if (currency > 0) {
+      await takaro.playerOnGameserver.playerOnGameServerControllerAddCurrency(gameServerId, player.id, { currency });
+    }
+    entry.currencyDone = true;
   }
+  if (currency > 0) parts.push(`${currency} ${currencyName}`);
 
-  for (const reward of config.items ?? []) {
-    if (!reward?.item) continue;
+  const items = (config.items ?? []).filter((reward) => reward?.item);
+  for (let i = 0; i < items.length; i++) {
+    const reward = items[i];
     const amount = reward.amount ?? 1;
-    const item = (await takaro.item.itemControllerFindOne(reward.item)).data.data;
-    await takaro.gameserver.gameServerControllerGiveItem(gameServerId, player.id, {
-      name: reward.item,
-      amount,
-      quality: reward.quality ?? '',
-    });
-    parts.push(`${amount}x ${item?.name ?? reward.item}`);
+    if (i >= entry.itemsDone) {
+      await takaro.gameserver.gameServerControllerGiveItem(gameServerId, player.id, {
+        name: reward.item,
+        amount,
+        quality: reward.quality ?? '',
+      });
+      entry.itemsDone = i + 1;
+    }
+    let itemName = reward.item;
+    try {
+      itemName = (await takaro.item.itemControllerFindOne(reward.item)).data.data?.name ?? reward.item;
+    } catch {
+      // Only the display name is missing; the item was given.
+    }
+    parts.push(`${amount}x ${itemName}`);
   }
 
   return parts.length ? parts.join(', ') : 'our thanks';
+}
+
+/** Pays every pending vote reward of this player. Returns how many were paid in full. */
+async function payPending(config, pog, base) {
+  const { gameServerId, player } = data;
+  let rows;
+  try {
+    rows = await listPending();
+  } catch (err) {
+    console.error(`vote-rewards: reading pending rewards failed: ${describeError(err)}`);
+    await player.pm('Your vote rewards could not be loaded right now. They are saved, type the vote command again later.');
+    return 0;
+  }
+  if (rows.length === 0) return 0;
+
+  const multiplier = currencyMultiplier(pog);
+  const currencyName = config.currency > 0 ? await getSetting('currencyName', gameServerId) : '';
+  let paid = 0;
+  for (const row of rows) {
+    const entry = await takePending(row);
+    if (!entry) continue;
+    let reward;
+    try {
+      reward = await giveReward(entry, config, multiplier, currencyName);
+    } catch (err) {
+      console.error(`vote-rewards: giving the reward for ${entry.site} failed: ${describeError(err)}`);
+      const saved = await addPending(entry);
+      await player.pm(
+        saved
+          ? `Your reward for voting on ${entry.site} could not be given right now. It is saved, type the vote command again later.`
+          : `Your vote on ${entry.site} was claimed, but the reward could not be given. Please tell an admin.`,
+      );
+      continue;
+    }
+    paid++;
+    await player.pm(fill(config.rewardMessage, { ...base, site: entry.site, reward }));
+    if (config.broadcastMessage) {
+      await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {
+        message: fill(config.broadcastMessage, { ...base, site: entry.site }),
+      });
+    }
+  }
+  return paid;
 }
 
 export async function runVoteCommand() {
@@ -148,36 +253,35 @@ export async function runVoteCommand() {
 
   const results = [];
   for (const site of sites) {
-    results.push({ site, status: await checkAndClaim(site, identity) });
+    const status = await checkAndClaim(site, identity);
+    if (status === 'claimed-now' && !(await addPending({ site: site.name, currencyDone: false, itemsDone: 0 }))) {
+      // The queue is unreachable: give the reward directly, once, so it is not lost.
+      results.push({ site, status: 'claimed-unqueued' });
+      continue;
+    }
+    results.push({ site, status });
   }
 
-  const claimed = results.filter((r) => r.status === 'claimed-now');
-  if (claimed.length > 0) {
-    const multiplier = currencyMultiplier(pog);
-    const currencyName = config.currency > 0 ? await getSetting('currencyName', gameServerId) : '';
-    for (const { site } of claimed) {
-      let reward;
-      try {
-        reward = await giveReward(config, multiplier, currencyName);
-      } catch (err) {
-        console.error(`vote-rewards: giving the reward for ${site.name} failed: ${describeError(err)}`);
-        await player.pm(
-          `Your vote on ${site.name} was claimed, but the reward could not be given. Please tell an admin.`,
-        );
-        continue;
-      }
+  let paid = 0;
+  for (const { site, status } of results) {
+    if (status !== 'claimed-unqueued') continue;
+    const entry = { site: site.name, currencyDone: false, itemsDone: 0 };
+    try {
+      const currencyName = config.currency > 0 ? await getSetting('currencyName', gameServerId) : '';
+      const reward = await giveReward(entry, config, currencyMultiplier(pog), currencyName);
+      paid++;
       await player.pm(fill(config.rewardMessage, { ...base, site: site.name, reward }));
-      if (config.broadcastMessage) {
-        await takaro.gameserver.gameServerControllerSendMessage(gameServerId, {
-          message: fill(config.broadcastMessage, { ...base, site: site.name }),
-        });
-      }
+    } catch (err) {
+      console.error(`vote-rewards: giving the reward for ${site.name} failed: ${describeError(err)}`);
+      await player.pm(`Your vote on ${site.name} was claimed, but the reward could not be given. Please tell an admin.`);
     }
   }
+  paid += await payPending(config, pog, base);
 
+  const claimedAny = results.some((r) => r.status === 'claimed-now' || r.status === 'claimed-unqueued');
   for (const { site, status } of results) {
     const values = { ...base, site: site.name, link: site.voteLink || site.name };
-    if (status === STATUS.NOT_VOTED && claimed.length === 0) {
+    if (status === STATUS.NOT_VOTED && !claimedAny && paid === 0) {
       await player.pm(fill(config.notVotedMessage, values));
     } else if (status === STATUS.CLAIMED) {
       await player.pm(fill(config.alreadyClaimedMessage, values));

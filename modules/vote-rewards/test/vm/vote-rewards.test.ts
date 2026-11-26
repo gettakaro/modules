@@ -231,11 +231,16 @@ const tests = [
   }),
 
   createModuleTest({
-    name: 'Reward that fails after the claim tells the player to contact an admin',
+    name: 'Reward that fails after the claim is saved as pending, with its progress',
     module: MODULE,
     permissions: CLAIM,
     player: { steamId: STEAM_ID },
-    userConfig: { sites: [site('givefail', { [STEAM_ID]: 1 })], currency: 0, items: [{ item: 'item-1', amount: 1 }] },
+    settings: { currencyName: 'coins' },
+    userConfig: {
+      sites: [site('givefail', { [STEAM_ID]: 1 })],
+      currency: 40,
+      items: [{ item: 'item-1', amount: 1 }],
+    },
     test: async function () {
       this.client.stubs.item.itemControllerFindOne?.resolves({ data: { data: { id: 'item-1', name: 'Axe' } } } as never);
       this.client.stubs.gameserver.gameServerControllerGiveItem?.rejects(new Error('Player is offline'));
@@ -243,10 +248,131 @@ const tests = [
       const result = await this.runCommand('vote');
 
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.player.id)).to.equal(40);
       expect(this.pms()).to.deep.equal([
-        'Your vote on givefail was claimed, but the reward could not be given. Please tell an admin.',
+        'Your reward for voting on givefail could not be given right now. It is saved, type the vote command again later.',
       ]);
       expect(this.messages.filter((m) => m.recipientGameId === undefined)).to.have.length(0);
+      const pending = this.variables.all.filter((row) => row.key.startsWith('vote_rewards_pending:'));
+      expect(pending).to.have.length(1);
+      expect(JSON.parse(pending[0].value)).to.deep.equal({ site: 'givefail', currencyDone: true, itemsDone: 0 });
+      expect(pending[0].playerId).to.equal(this.player.id);
+      expect(pending[0].gameServerId).to.equal(this.gameServerId);
+    },
+  }),
+
+  createModuleTest({
+    name: 'A pending reward is paid on the next vote, without paying the currency twice',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    settings: { currencyName: 'coins' },
+    userConfig: {
+      sites: [site('retry', { [STEAM_ID]: 2 })],
+      currency: 40,
+      items: [{ item: 'item-1', amount: 1 }],
+      broadcastMessage: '',
+    },
+    test: async function () {
+      this.client.stubs.item.itemControllerFindOne?.resolves({ data: { data: { id: 'item-1', name: 'Axe' } } } as never);
+      this.client.stubs.gameserver.gameServerControllerGiveItem?.onFirstCall().rejects(new Error('Player is offline'));
+
+      sites.get('retry')!.votes.set(STEAM_ID, 1);
+      await this.runCommand('vote');
+      expect(this.currency.balanceOf(this.player.id)).to.equal(40);
+
+      const second = await this.runCommand('vote');
+
+      expect(second.success, JSON.stringify(second.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.player.id)).to.equal(40);
+      expect(this.client.stubs.gameserver.gameServerControllerGiveItem).to.have.been.calledTwice;
+      expect(this.pms().slice(1)).to.deep.equal([
+        'Thanks for voting on retry! You received 40 coins, 1x Axe.',
+        'You already claimed your vote reward for retry. You can vote again 24 hours after your last vote.',
+      ]);
+      expect(this.variables.all.filter((row) => row.key.startsWith('vote_rewards_pending:'))).to.have.length(0);
+    },
+  }),
+
+  createModuleTest({
+    name: 'A pending entry taken by another run is skipped (no double pay)',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    userConfig: { sites: [site('taken', { [STEAM_ID]: 2 })], currency: 25, broadcastMessage: '' },
+    test: async function () {
+      await this.variables.create({
+        key: 'vote_rewards_pending:1-a',
+        value: JSON.stringify({ site: 'taken', currencyDone: false, itemsDone: 0 }),
+        gameServerId: this.gameServerId,
+        playerId: this.player.id,
+        moduleId: this.moduleId,
+      });
+      this.client.stubs.variable.variableControllerDelete?.rejects(new Error('Request failed with status code 404'));
+
+      const result = await this.runCommand('vote');
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.player.id)).to.equal(0);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Seeded pending reward is paid once even when no new vote exists',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    settings: { currencyName: 'coins' },
+    userConfig: { sites: [site('seeded')], currency: 30, broadcastMessage: '' },
+    test: async function () {
+      await this.variables.create({
+        key: 'vote_rewards_pending:1-b',
+        value: JSON.stringify({ site: 'seeded', currencyDone: false, itemsDone: 0 }),
+        gameServerId: this.gameServerId,
+        playerId: this.player.id,
+        moduleId: this.moduleId,
+      });
+
+      await this.runCommand('vote');
+      await this.runCommand('vote');
+
+      expect(this.currency.balanceOf(this.player.id)).to.equal(30);
+      expect(this.pms()).to.deep.equal([
+        'Thanks for voting on seeded! You received 30 coins.',
+        'No vote found on seeded in the last 24 hours. Vote at https://example.test/seeded, then type /vote.',
+      ]);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Site claim fails (POST error): friendly message, nothing queued',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    userConfig: { sites: [site('postfail', { [STEAM_ID]: 1 }, { claimAnswer: 'Error: database busy' })], currency: 10 },
+    test: async function () {
+      const result = await this.runCommand('vote');
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.currency.balanceOf(this.player.id)).to.equal(0);
+      expect(this.variables.all).to.have.length(0);
+      expect(this.pms()).to.deep.equal(['postfail gave an unexpected answer. Try again later or tell an admin.']);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Unknown host (404): friendly message instead of a crash',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    userConfig: { sites: [{ name: 'Gone', apiBase: `${BASE}/does-not-exist`, apiKey: 'k' }] },
+    test: async function () {
+      const result = await this.runCommand('vote');
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.pms()).to.deep.equal([
+        'Gone is not responding right now. Your vote is safe, try again in a few minutes.',
+      ]);
     },
   }),
 
