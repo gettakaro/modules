@@ -1,0 +1,334 @@
+{
+  "name": "restart-manager",
+  "author": "Takaro",
+  "description": "Scheduled server restarts that warn players and wait for a safe moment. Set restart times as cron expressions (default 04:00 UTC every day). Players get countdown warnings (default 30, 15, 5 and 1 minutes before). Before the shutdown the module can save the world and kick everyone, with a save and shutdown command per game (7 Days to Die saveworld, Rust server.save, Minecraft save-all); by default Takaro's own shutdown is used. Safe window: a restart waits while it would hurt players and tries again every few minutes, up to a max delay. Built-in checks: 7 Days to Die blood moon (game time and BloodMoonDay), at least N players online, a recent PvP kill, and your own console checks (run a command, wait while the output matches a pattern). Admins use restartnow <minutes> and restartcancel; everyone can type restartstatus. Optional Discord announcements.",
+  "summary": "Scheduled restarts with countdown warnings (30/15/5/1 min), optional save and kick-all, per-game save/shutdown commands (Takaro shutdown by default) and a safe window: wait during a 7 Days to Die blood moon, while N players are online, after a PvP kill or while a console check matches, up to a max delay. Admin restartnow/restartcancel, player restartstatus.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "schedules": {
+        "title": "Restart times (cron)",
+        "type": "array",
+        "description": "When the server restarts, in the time zone below. Cron format: minute hour day-of-month month day-of-week. '0 4 * * *' = every day 04:00, '0 */6 * * *' = every 6 hours, '0 6 * * mon' = Monday 06:00. Empty = only restarts by command.",
+        "default": [
+          "0 4 * * *"
+        ],
+        "items": {
+          "type": "string",
+          "title": "Cron expression"
+        }
+      },
+      "timezone": {
+        "title": "Time zone",
+        "type": "string",
+        "default": "UTC",
+        "description": "IANA time zone for the restart times, e.g. 'Europe/Berlin' or 'America/New_York'. Unknown names fall back to UTC."
+      },
+      "warningMinutes": {
+        "title": "Warnings (minutes before)",
+        "type": "array",
+        "description": "Broadcast a warning this many minutes before each restart. The biggest number is when the countdown starts.",
+        "default": [
+          30,
+          15,
+          5,
+          1
+        ],
+        "items": {
+          "type": "number",
+          "title": "Minutes",
+          "minimum": 1,
+          "maximum": 1440
+        }
+      },
+      "saveBeforeShutdown": {
+        "title": "Save the world first",
+        "type": "boolean",
+        "default": true,
+        "description": "Run this game's save command (see Game commands) right before the shutdown."
+      },
+      "kickAllBeforeShutdown": {
+        "title": "Kick everyone first",
+        "type": "boolean",
+        "default": false,
+        "description": "Kick all online players (with the kick message) right before the shutdown."
+      },
+      "gameCommands": {
+        "title": "Game commands",
+        "type": "object",
+        "description": "Console commands per game. An empty shutdown command uses Takaro's own shutdown (recommended). An empty save command skips saving.",
+        "default": {
+          "sevenDaysToDie": {
+            "saveCommand": "saveworld",
+            "shutdownCommand": ""
+          },
+          "rust": {
+            "saveCommand": "server.save",
+            "shutdownCommand": ""
+          },
+          "minecraft": {
+            "saveCommand": "save-all",
+            "shutdownCommand": ""
+          },
+          "other": {
+            "saveCommand": "",
+            "shutdownCommand": ""
+          }
+        },
+        "properties": {
+          "sevenDaysToDie": {
+            "title": "7 Days to Die",
+            "type": "object",
+            "properties": {
+              "saveCommand": { "title": "Save command", "type": "string", "default": "saveworld" },
+              "shutdownCommand": { "title": "Shutdown command (empty = Takaro shutdown)", "type": "string", "default": "" }
+            }
+          },
+          "rust": {
+            "title": "Rust",
+            "type": "object",
+            "properties": {
+              "saveCommand": { "title": "Save command", "type": "string", "default": "server.save" },
+              "shutdownCommand": { "title": "Shutdown command (empty = Takaro shutdown)", "type": "string", "default": "" }
+            }
+          },
+          "minecraft": {
+            "title": "Minecraft",
+            "type": "object",
+            "properties": {
+              "saveCommand": { "title": "Save command", "type": "string", "default": "save-all" },
+              "shutdownCommand": { "title": "Shutdown command (empty = Takaro shutdown)", "type": "string", "default": "" }
+            }
+          },
+          "other": {
+            "title": "Other games",
+            "type": "object",
+            "properties": {
+              "saveCommand": { "title": "Save command", "type": "string", "default": "" },
+              "shutdownCommand": { "title": "Shutdown command (empty = Takaro shutdown)", "type": "string", "default": "" }
+            }
+          }
+        }
+      },
+      "maxDelayMinutes": {
+        "title": "Max delay (minutes)",
+        "type": "number",
+        "default": 60,
+        "minimum": 0,
+        "maximum": 1440,
+        "description": "How long a restart may wait for a safe moment, counted from its planned time. After that it restarts anyway. 0 = never wait (all safe-window checks off)."
+      },
+      "checkEveryMinutes": {
+        "title": "Check again every (minutes)",
+        "type": "number",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 60,
+        "description": "While a restart is on hold, check this often whether it is safe now."
+      },
+      "resumeCountdownMinutes": {
+        "title": "Countdown after a hold (minutes)",
+        "type": "number",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 60,
+        "description": "When a restart on hold may go ahead, players get this many minutes of warning first."
+      },
+      "minMinutesBetweenRestarts": {
+        "title": "Min minutes between restarts",
+        "type": "number",
+        "default": 60,
+        "minimum": 0,
+        "description": "Skip a scheduled restart that comes this soon after the last one (for example after a late or manual restart)."
+      },
+      "bloodMoonDelay": {
+        "title": "Wait for the blood moon (7 Days to Die)",
+        "type": "boolean",
+        "default": true,
+        "description": "On 7 Days to Die servers, do not restart during the horde night window. Uses the console commands gettime and ggs BloodMoonDay. Ignored on other games."
+      },
+      "bloodMoonStartHour": {
+        "title": "Blood moon window starts (game hour)",
+        "type": "number",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 23,
+        "description": "In-game hour on the blood moon day from which restarts wait. The horde starts at 22."
+      },
+      "bloodMoonEndHour": {
+        "title": "Blood moon window ends (game hour)",
+        "type": "number",
+        "default": 6,
+        "minimum": 0,
+        "maximum": 23,
+        "description": "In-game hour on the morning after from which restarts may run again. The horde ends at 4."
+      },
+      "bloodMoonFrequency": {
+        "title": "Blood moon every (days, fallback)",
+        "type": "number",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 100,
+        "description": "Only used when the server does not report BloodMoonDay: a blood moon every this many days."
+      },
+      "delayWhenPlayersOnline": {
+        "title": "Wait while this many players are online",
+        "type": "number",
+        "default": 0,
+        "minimum": 0,
+        "description": "Hold the restart while at least this many players are online. 0 = off."
+      },
+      "pvpQuietMinutes": {
+        "title": "Wait after a PvP kill (minutes)",
+        "type": "number",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 120,
+        "description": "Hold the restart until no player killed another player for this many minutes. Needs a game that reports the attacker on player deaths. 0 = off."
+      },
+      "consoleConditions": {
+        "title": "Console checks",
+        "type": "array",
+        "default": [],
+        "description": "Your own safe-window checks: the restart waits while the output of the command matches the pattern (a regular expression, case-insensitive). Example: command 'gettime', pattern 'Day (7|14|21|28),' with reason 'blood moon day'.",
+        "items": {
+          "type": "object",
+          "title": "Console check",
+          "required": [
+            "command",
+            "pattern"
+          ],
+          "properties": {
+            "command": { "type": "string", "title": "Console command" },
+            "pattern": { "type": "string", "title": "Wait while output matches (regex)" },
+            "reason": { "type": "string", "title": "Reason shown to players", "default": "the server is busy" }
+          }
+        }
+      },
+      "warningMessage": {
+        "title": "Warning message",
+        "type": "string",
+        "default": "Server restart in {time}. Find a safe spot and log out in time.",
+        "description": "Placeholders: {time} (e.g. '5 minutes') {minutes} {prefix}"
+      },
+      "postponedMessage": {
+        "title": "On hold message",
+        "type": "string",
+        "default": "The server restart is on hold: {reason}. It runs when it is safe.",
+        "description": "Sent when a restart waits for a safe moment. Placeholders: {reason} {time} (max wait left) {prefix}"
+      },
+      "forcedMessage": {
+        "title": "Forced message",
+        "type": "string",
+        "default": "The server restart can not wait any longer ({reason}). Restart in {time}.",
+        "description": "Sent when the max delay is reached. Placeholders: {reason} {time} {prefix}"
+      },
+      "restartingMessage": {
+        "title": "Restarting message",
+        "type": "string",
+        "default": "The server is restarting now. See you in a few minutes!",
+        "description": "Sent right before the save and shutdown. Placeholders: {prefix}"
+      },
+      "cancelMessage": {
+        "title": "Cancel message",
+        "type": "string",
+        "default": "The planned server restart was cancelled.",
+        "description": "Sent when an admin cancels a restart players were already warned about. Placeholders: {prefix}"
+      },
+      "kickMessage": {
+        "title": "Kick reason",
+        "type": "string",
+        "default": "Server restart. Please reconnect in a few minutes.",
+        "description": "Shown to kicked players when 'Kick everyone first' is on."
+      },
+      "bloodMoonReason": {
+        "title": "Reason text: blood moon",
+        "type": "string",
+        "default": "blood moon"
+      },
+      "playersReason": {
+        "title": "Reason text: players online",
+        "type": "string",
+        "default": "{count} players online",
+        "description": "Placeholders: {count}"
+      },
+      "pvpReason": {
+        "title": "Reason text: PvP",
+        "type": "string",
+        "default": "a PvP fight in the last {minutes} minutes",
+        "description": "Placeholders: {minutes}"
+      },
+      "discordChannelId": {
+        "title": "Discord channel ID",
+        "type": "string",
+        "default": "",
+        "description": "Also post the first warning, holds, cancels and the restart itself to this Discord channel. Empty = off. Takaro's Discord bot must be in your server."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "RESTART_MANAGER_MANAGE",
+      "friendlyName": "Manage restarts",
+      "description": "Restart the server with restartnow and cancel or skip restarts with restartcancel.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "restartstatus": {
+      "trigger": "restartstatus",
+      "description": "Shows when the next server restart is, or why it is on hold.",
+      "helpText": "restartstatus = time until the next server restart.",
+      "function": "src/commands/restartstatus/index.js",
+      "arguments": []
+    },
+    "restartnow": {
+      "trigger": "restartnow",
+      "description": "Admin: restart the server in N minutes with warnings (0 = right away).",
+      "helpText": "restartnow [minutes] = restart with a countdown (default 5). restartnow 0 restarts right away. Skips the safe-window checks.",
+      "function": "src/commands/restartnow/index.js",
+      "arguments": [
+        {
+          "name": "minutes",
+          "type": "number",
+          "helpText": "Minutes until the restart (0-1440, default 5)",
+          "position": 0,
+          "defaultValue": "5"
+        }
+      ]
+    },
+    "restartcancel": {
+      "trigger": "restartcancel",
+      "description": "Admin: cancel the restart that is counting down, or skip the next scheduled one.",
+      "helpText": "restartcancel = stop the current countdown or hold. With nothing counting down it skips the next scheduled restart.",
+      "function": "src/commands/restartcancel/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "on-player-death": {
+      "eventType": "player-death",
+      "description": "Remembers the last PvP kill for the 'Wait after a PvP kill' check.",
+      "function": "src/hooks/on-player-death/index.js"
+    }
+  },
+  "cronJobs": {
+    "tick": {
+      "temporalValue": "* * * * *",
+      "description": "Every minute: start the countdown for scheduled restarts, send warnings, check the safe window and restart.",
+      "function": "src/cronjobs/tick/index.js"
+    }
+  },
+  "functions": {
+    "rm-helpers": {
+      "function": "src/functions/rm-helpers.js"
+    }
+  }
+}
