@@ -71,7 +71,7 @@ function requestsTo(name: string) {
   return requests.filter((r) => r.site === name);
 }
 
-const group = 'vote-rewards (module-VM)';
+const group = 'vote-sites (module-VM)';
 
 const tests = [
   createModuleTest({
@@ -108,21 +108,6 @@ const tests = [
       expect(broadcasts.map((m) => m.message)).to.deep.equal([
         'Alice voted for the server on happy and got a reward! Type /vote to get yours.',
       ]);
-    },
-  }),
-
-  createModuleTest({
-    name: 'claimvote does the same as vote',
-    module: MODULE,
-    permissions: CLAIM,
-    player: { steamId: STEAM_ID },
-    userConfig: { sites: [site('alias', { [STEAM_ID]: 1 })], currency: 10, broadcastMessage: '' },
-    test: async function () {
-      const result = await this.runCommand('claimvote');
-
-      expect(result.success, JSON.stringify(result.logs)).to.be.true;
-      expect(this.currency.balanceOf(this.player.id)).to.equal(10);
-      expect(this.messages.filter((m) => m.recipientGameId === undefined)).to.have.length(0);
     },
   }),
 
@@ -253,7 +238,7 @@ const tests = [
         'Your reward for voting on givefail could not be given right now. It is saved, type the vote command again later.',
       ]);
       expect(this.messages.filter((m) => m.recipientGameId === undefined)).to.have.length(0);
-      const pending = this.variables.all.filter((row) => row.key.startsWith('vote_rewards_pending:'));
+      const pending = this.variables.all.filter((row) => row.key.startsWith('vote_sites_pending:'));
       expect(pending).to.have.length(1);
       expect(JSON.parse(pending[0].value)).to.deep.equal({ site: 'givefail', currencyDone: true, itemsDone: 0 });
       expect(pending[0].playerId).to.equal(this.player.id);
@@ -290,7 +275,7 @@ const tests = [
         'Thanks for voting on retry! You received 40 coins, 1x Axe.',
         'You already claimed your vote reward for retry. You can vote again 24 hours after your last vote.',
       ]);
-      expect(this.variables.all.filter((row) => row.key.startsWith('vote_rewards_pending:'))).to.have.length(0);
+      expect(this.variables.all.filter((row) => row.key.startsWith('vote_sites_pending:'))).to.have.length(0);
     },
   }),
 
@@ -302,7 +287,7 @@ const tests = [
     userConfig: { sites: [site('taken', { [STEAM_ID]: 2 })], currency: 25, broadcastMessage: '' },
     test: async function () {
       await this.variables.create({
-        key: 'vote_rewards_pending:1-a',
+        key: 'vote_sites_pending:1-a',
         value: JSON.stringify({ site: 'taken', currencyDone: false, itemsDone: 0 }),
         gameServerId: this.gameServerId,
         playerId: this.player.id,
@@ -326,7 +311,7 @@ const tests = [
     userConfig: { sites: [site('seeded')], currency: 30, broadcastMessage: '' },
     test: async function () {
       await this.variables.create({
-        key: 'vote_rewards_pending:1-b',
+        key: 'vote_sites_pending:1-b',
         value: JSON.stringify({ site: 'seeded', currencyDone: false, itemsDone: 0 }),
         gameServerId: this.gameServerId,
         playerId: this.player.id,

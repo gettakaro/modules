@@ -73,20 +73,20 @@ export async function checkAndClaim(site, identity) {
   try {
     check = parseCheck(await callSite(site, 'get', { object: 'votes', element: 'claim', ...identity }));
   } catch (err) {
-    console.error(`vote-rewards: checking ${site.name} failed: ${describeError(err)}`);
+    console.error(`vote-sites: checking ${site.name} failed: ${describeError(err)}`);
     return STATUS.UNREACHABLE;
   }
-  console.log(`vote-rewards: ${site.name} check -> ${check}`);
+  console.log(`vote-sites: ${site.name} check -> ${check}`);
   if (check !== STATUS.UNCLAIMED) return check;
 
   // The claim call is the guard against double rewards: only the run that flips the vote to claimed gets "1".
   try {
     const body = await callSite(site, 'post', { action: 'post', object: 'votes', element: 'claim', ...identity });
-    console.log(`vote-rewards: ${site.name} claim -> ${body}`);
+    console.log(`vote-sites: ${site.name} claim -> ${body}`);
     if (body === '1') return 'claimed-now';
     return body === '0' ? STATUS.CLAIMED : STATUS.UNEXPECTED;
   } catch (err) {
-    console.error(`vote-rewards: claiming on ${site.name} failed: ${describeError(err)}`);
+    console.error(`vote-sites: claiming on ${site.name} failed: ${describeError(err)}`);
     return STATUS.UNREACHABLE;
   }
 }
@@ -101,7 +101,7 @@ function currencyMultiplier(pog) {
 // Claimed votes wait in a pending queue (one Takaro variable each) until their reward is fully given.
 // A run takes an entry by deleting its variable first: only one run can delete it, so a reward is never
 // paid twice. If giving fails, the entry goes back with its progress and is retried on the next vote command.
-const PENDING_PREFIX = 'vote_rewards_pending:';
+const PENDING_PREFIX = 'vote_sites_pending:';
 
 function scope() {
   return { gameServerId: data.gameServerId, playerId: data.player.id, moduleId: data.module.moduleId };
@@ -114,7 +114,7 @@ async function addPending(entry) {
     await takaro.variable.variableControllerCreate({ key, value: JSON.stringify(entry), ...scope() });
     return true;
   } catch (err) {
-    console.error(`vote-rewards: storing the pending reward for ${entry.site} failed: ${describeError(err)}`);
+    console.error(`vote-sites: storing the pending reward for ${entry.site} failed: ${describeError(err)}`);
     return false;
   }
 }
@@ -134,7 +134,7 @@ async function takePending(row) {
   try {
     await takaro.variable.variableControllerDelete(row.id);
   } catch (err) {
-    console.log(`vote-rewards: pending reward ${row.key} was taken by another run: ${describeError(err)}`);
+    console.log(`vote-sites: pending reward ${row.key} was taken by another run: ${describeError(err)}`);
     return null;
   }
   try {
@@ -192,7 +192,7 @@ async function payPending(config, pog, base) {
   try {
     rows = await listPending();
   } catch (err) {
-    console.error(`vote-rewards: reading pending rewards failed: ${describeError(err)}`);
+    console.error(`vote-sites: reading pending rewards failed: ${describeError(err)}`);
     await player.pm('Your vote rewards could not be loaded right now. They are saved, type the vote command again later.');
     return 0;
   }
@@ -208,7 +208,7 @@ async function payPending(config, pog, base) {
     try {
       reward = await giveReward(entry, config, multiplier, currencyName);
     } catch (err) {
-      console.error(`vote-rewards: giving the reward for ${entry.site} failed: ${describeError(err)}`);
+      console.error(`vote-sites: giving the reward for ${entry.site} failed: ${describeError(err)}`);
       const saved = await addPending(entry);
       await player.pm(
         saved
@@ -272,7 +272,7 @@ export async function runVoteCommand() {
       paid++;
       await player.pm(fill(config.rewardMessage, { ...base, site: site.name, reward }));
     } catch (err) {
-      console.error(`vote-rewards: giving the reward for ${site.name} failed: ${describeError(err)}`);
+      console.error(`vote-sites: giving the reward for ${site.name} failed: ${describeError(err)}`);
       await player.pm(`Your vote on ${site.name} was claimed, but the reward could not be given. Please tell an admin.`);
     }
   }
@@ -300,7 +300,7 @@ export async function runReminder() {
   const config = data.module.userConfig;
   const sites = (config.sites ?? []).filter((site) => site?.apiKey && site?.apiBase);
   if (sites.length === 0 || !config.reminderMessage) {
-    console.log('vote-rewards: no vote sites or reminder message configured, skipping reminder');
+    console.log('vote-sites: no vote sites or reminder message configured, skipping reminder');
     return;
   }
   const prefix = await getSetting('commandPrefix', gameServerId);

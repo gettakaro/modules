@@ -739,8 +739,8 @@
       ]
     },
     {
-      "name": "vote-rewards",
-      "description": "Reward players for voting on server-list sites, for any game. Add vote sites as config entries (common server-list vote API, e.g. 7daystodie-servers.com, rust-servers.net, minecraft-mp.com). Players type vote after voting and receive currency and items. Matches voters by Steam ID or in-game name. Includes a VIP currency multiplier and an optional vote reminder.",
+      "name": "vote-sites",
+      "description": "Reward players for voting on third-party server-list sites, for any game. Add vote sites as config entries (common server-list vote API, e.g. 7daystodie-servers.com, rust-servers.net, minecraft-mp.com). Players type vote after voting and receive currency and items. Matches voters by Steam ID or in-game name. Includes a VIP currency multiplier and an optional vote reminder.",
       "latestVersion": "1.0.0",
       "versions": [
         "1.0.0"
@@ -748,7 +748,7 @@
       "versionDetails": [
         {
           "version": "1.0.0",
-          "sha256": "fa20dbdf66f884ba8c3f970734cf45179de7e0ceb4292fb6aff14048bcd92f46",
+          "sha256": "b99aab365f0313d8633de502b7bbe9848b5977e3fcd7e01be133cfa1db63ac3e",
           "requiredCapabilities": [
             "chat.send",
             "items.give"
