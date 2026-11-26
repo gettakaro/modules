@@ -4,6 +4,24 @@
   "description": "Modules made and reviewed by the Takaro team.",
   "modules": [
     {
+      "name": "advent-calendar",
+      "description": "Daily door calendar (default Dec 1-24): players type advent once a day for currency, items or a role, with a bigger gift on the last door. Missed doors stay locked except with the catch-up permission (VIP). New-door announcements, join reminders, optional broadcasts and an admin preview. Reusable for Halloween or any event.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "f8ce2cbbd5e21c04151d672ad109d8a269ec0b30416bc1cf27f6353a1f0ba110",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "afk-kick",
       "description": "AFK Kick — periodically checks player positions and warns/kicks idle players. A permission exempts specific players from AFK detection.",
       "latestVersion": "1.0.0",

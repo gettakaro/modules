@@ -1,0 +1,316 @@
+{
+  "name": "advent-calendar",
+  "author": "Takaro",
+  "description": "A daily door calendar for any season. From the start date (default Dec 1, 24 doors) players type `advent` once a day to open today's door and get its gift: currency, items and/or a role. The last door holds a bigger gift. Missed doors stay locked, except for players with the catch-up permission (VIP, optional limit). New doors are announced, players are reminded on join, and openings can be broadcast. Admins check the setup with `adventpreview [door]`. Reuse it for Halloween, anniversaries or any event by changing the start date, number of days and event name.",
+  "summary": "Daily door calendar (default Dec 1-24): players type advent once a day for currency, items or a role, with a bigger gift on the last door. Missed doors stay locked except with the catch-up permission (VIP). New-door announcements, join reminders, optional broadcasts and an admin preview. Reusable for Halloween or any event.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "eventName": {
+        "title": "Event name",
+        "type": "string",
+        "default": "Advent calendar",
+        "description": "Shown in all messages, e.g. 'Advent calendar', 'Halloween calendar', 'Anniversary week'."
+      },
+      "startDate": {
+        "title": "Start date",
+        "type": "string",
+        "default": "12-01",
+        "description": "First door. MM-DD repeats every year (12-01 = Dec 1). YYYY-MM-DD runs only in that year."
+      },
+      "numberOfDays": {
+        "title": "Number of doors (days)",
+        "type": "number",
+        "default": 24,
+        "minimum": 1,
+        "maximum": 366,
+        "description": "One door per day from the start date. 24 = Dec 1 to Dec 24."
+      },
+      "utcOffsetHours": {
+        "title": "Time zone offset (hours from UTC)",
+        "type": "number",
+        "default": 0,
+        "minimum": -12,
+        "maximum": 14,
+        "description": "When a new door opens: local midnight. 0 = UTC, 1 = CET, -5 = US Eastern, 5.5 = India."
+      },
+      "dailyCurrency": {
+        "title": "Currency per door",
+        "type": "number",
+        "default": 50,
+        "minimum": 0,
+        "description": "Currency for every normal door. 0 = none."
+      },
+      "dailyItems": {
+        "x-component": "item",
+        "title": "Items per door",
+        "type": "array",
+        "default": [],
+        "description": "Items for every normal door. Empty = none.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount"
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "lastDayCurrency": {
+        "title": "Last door currency",
+        "type": "number",
+        "default": 500,
+        "minimum": 0,
+        "description": "Currency for the last door (the big gift)."
+      },
+      "lastDayItems": {
+        "x-component": "item",
+        "title": "Last door items",
+        "type": "array",
+        "default": [],
+        "description": "Items for the last door.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount"
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          }
+        }
+      },
+      "lastDayRoleId": {
+        "x-component": "role",
+        "title": "Last door role",
+        "type": "string",
+        "default": "",
+        "description": "Optional role given with the last door. Empty = none."
+      },
+      "roleDays": {
+        "title": "Role length (days)",
+        "type": "number",
+        "default": 0,
+        "minimum": 0,
+        "description": "How long a reward role lasts. 0 = forever."
+      },
+      "doors": {
+        "title": "Custom doors",
+        "type": "array",
+        "default": [],
+        "description": "Give a door its own gift. A row replaces the normal (or last door) gift for that day.",
+        "items": {
+          "type": "object",
+          "title": "Door",
+          "required": [
+            "day"
+          ],
+          "properties": {
+            "day": {
+              "type": "number",
+              "title": "Door number",
+              "minimum": 1
+            },
+            "currency": {
+              "type": "number",
+              "title": "Currency",
+              "minimum": 0,
+              "default": 0
+            },
+            "items": {
+              "x-component": "item",
+              "type": "array",
+              "title": "Items",
+              "default": [],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "item": {
+                    "type": "string",
+                    "title": "Item"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "title": "Amount"
+                  },
+                  "quality": {
+                    "type": "string",
+                    "title": "Quality"
+                  }
+                }
+              }
+            },
+            "roleId": {
+              "x-component": "role",
+              "type": "string",
+              "title": "Role",
+              "default": ""
+            }
+          }
+        }
+      },
+      "broadcast": {
+        "title": "Broadcast openings",
+        "type": "string",
+        "enum": [
+          "off",
+          "lastDay",
+          "all"
+        ],
+        "default": "lastDay",
+        "description": "Tell the whole server when someone opens a door: off, only the last door, or every door."
+      },
+      "broadcastMessage": {
+        "title": "Broadcast message",
+        "type": "string",
+        "default": "{player} opened door {door} of the {event} and got {reward}! Type {prefix}advent",
+        "description": "Placeholders: {player} {door} {reward} {event} {prefix} {currency}"
+      },
+      "announceNewDoor": {
+        "title": "Announce new doors",
+        "type": "boolean",
+        "default": true,
+        "description": "Broadcast once when a new door opens (checked every 15 minutes)."
+      },
+      "announceMessage": {
+        "title": "New door message",
+        "type": "string",
+        "default": "Door {door} of the {event} is open! Type {prefix}advent to get your gift.",
+        "description": "Placeholders: {door} {total} {event} {prefix} {currency}"
+      },
+      "lastDoorAnnounceMessage": {
+        "title": "Last door message",
+        "type": "string",
+        "default": "The last door of the {event} is open: door {door} has the biggest gift! Type {prefix}advent",
+        "description": "Placeholders: {door} {total} {event} {prefix} {currency}"
+      },
+      "remindOnJoin": {
+        "title": "Remind on join",
+        "type": "boolean",
+        "default": true,
+        "description": "PM players who join and have not opened today's door yet."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "dailyItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "lastDayItems": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "lastDayRoleId": {
+      "ui:widget": "role"
+    },
+    "doors": {
+      "items": {
+        "items": {
+          "items": {
+            "item": {
+              "ui:widget": "item"
+            }
+          }
+        },
+        "roleId": {
+          "ui:widget": "role"
+        }
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "ADVENT_CALENDAR_CATCH_UP",
+      "friendlyName": "Advent calendar: open missed doors",
+      "description": "Open doors of past days with advent <door>. Count = how many missed doors per event (0 = no limit). Give it to VIPs.",
+      "canHaveCount": true
+    },
+    {
+      "permission": "ADVENT_CALENDAR_MANAGE",
+      "friendlyName": "Advent calendar: admin preview",
+      "description": "Use adventpreview to check dates and the gift of every door.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "advent": {
+      "trigger": "advent",
+      "description": "Open today's door of the calendar.",
+      "helpText": "advent = open today's door. advent <door> = open a missed door (catch-up permission).",
+      "function": "src/commands/advent/index.js",
+      "arguments": [
+        {
+          "name": "day",
+          "type": "number",
+          "helpText": "Door number (default: today)",
+          "position": 0,
+          "defaultValue": "0"
+        }
+      ]
+    },
+    "adventpreview": {
+      "trigger": "adventpreview",
+      "description": "Admin: show the calendar setup or the gift of one door.",
+      "helpText": "adventpreview = dates and gifts overview. adventpreview <door> = gift of that door.",
+      "function": "src/commands/adventpreview/index.js",
+      "arguments": [
+        {
+          "name": "day",
+          "type": "number",
+          "helpText": "Door number (default: overview)",
+          "position": 0,
+          "defaultValue": "0"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "on-join": {
+      "eventType": "player-connected",
+      "description": "Deliver queued items and remind players of today's door.",
+      "function": "src/hooks/on-join/index.js"
+    }
+  },
+  "cronJobs": {
+    "announce": {
+      "temporalValue": "*/15 * * * *",
+      "description": "Broadcast once when a new door opens.",
+      "function": "src/cronjobs/announce/index.js"
+    }
+  },
+  "functions": {
+    "advent-helpers": {
+      "function": "src/functions/advent-helpers.js"
+    }
+  }
+}
