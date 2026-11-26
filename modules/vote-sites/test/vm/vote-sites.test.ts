@@ -14,6 +14,7 @@ interface SiteState {
   votes: Map<string, Vote>;
   failWith?: number;
   claimAnswer?: string;
+  badKeyAnswer?: string;
 }
 interface Request {
   site: string;
@@ -39,7 +40,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (params.key !== site.key) {
-    res.writeHead(200).end('Error: server key not found');
+    res.writeHead(200).end(site.badKeyAnswer ?? 'Error: server key not found');
     return;
   }
   const voter = params.steamid ?? params.username ?? '';
@@ -192,6 +193,22 @@ const tests = [
       expect(result.success, JSON.stringify(result.logs)).to.be.true;
       expect(this.currency.balanceOf(this.player.id)).to.equal(0);
       expect(this.pms()).to.deep.equal(['The vote key for badkey is not set up correctly. Please tell an admin.']);
+    },
+  }),
+
+  createModuleTest({
+    name: 'Wrong key, 7daystodie-servers.com wording ("invalid server key"), counts as a bad key',
+    module: MODULE,
+    permissions: CLAIM,
+    player: { steamId: STEAM_ID },
+    userConfig: {
+      sites: [{ ...site('badkey2', {}, { badKeyAnswer: 'Error: invalid server key' }), apiKey: 'wrong' }],
+    },
+    test: async function () {
+      const result = await this.runCommand('vote');
+
+      expect(result.success, JSON.stringify(result.logs)).to.be.true;
+      expect(this.pms()).to.deep.equal(['The vote key for badkey2 is not set up correctly. Please tell an admin.']);
     },
   }),
 

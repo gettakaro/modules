@@ -43,7 +43,7 @@ export function voterIdentity(player, identifyBy) {
 }
 
 function describeError(err) {
-  if (err?.response) return `HTTP ${err.response.status}: ${JSON.stringify(err.response.data)}`;
+  if (err?.response) return `HTTP ${err.response.status}: ${JSON.stringify(err.response.data).slice(0, 200)}`;
   return `${err?.name ?? 'Error'}: ${err?.message ?? err}`;
 }
 
@@ -63,28 +63,30 @@ function parseCheck(body) {
   if (body === '0') return STATUS.NOT_VOTED;
   if (body === '1') return STATUS.UNCLAIMED;
   if (body === '2') return STATUS.CLAIMED;
-  if (/key not found|invalid key/i.test(body)) return STATUS.BAD_KEY;
+  // Real answers: "Error: invalid server key" (7daystodie-servers.com), "Error: server key not found" (rust-servers.net).
+  if (/server key|invalid key|key not found/i.test(body)) return STATUS.BAD_KEY;
   return STATUS.UNEXPECTED;
 }
 
 /** Checks one site and, when there is an unclaimed vote, marks it claimed. Never throws. */
 export async function checkAndClaim(site, identity) {
-  let check;
+  let body;
   try {
-    check = parseCheck(await callSite(site, 'get', { object: 'votes', element: 'claim', ...identity }));
+    body = await callSite(site, 'get', { object: 'votes', element: 'claim', ...identity });
   } catch (err) {
     console.error(`vote-sites: checking ${site.name} failed: ${describeError(err)}`);
     return STATUS.UNREACHABLE;
   }
-  console.log(`vote-sites: ${site.name} check -> ${check}`);
+  const check = parseCheck(body);
+  console.log(`vote-sites: ${site.name} check -> ${check}${check === STATUS.UNEXPECTED ? ` (${body.slice(0, 200)})` : ''}`);
   if (check !== STATUS.UNCLAIMED) return check;
 
   // The claim call is the guard against double rewards: only the run that flips the vote to claimed gets "1".
   try {
-    const body = await callSite(site, 'post', { action: 'post', object: 'votes', element: 'claim', ...identity });
-    console.log(`vote-sites: ${site.name} claim -> ${body}`);
-    if (body === '1') return 'claimed-now';
-    return body === '0' ? STATUS.CLAIMED : STATUS.UNEXPECTED;
+    const claim = await callSite(site, 'post', { action: 'post', object: 'votes', element: 'claim', ...identity });
+    console.log(`vote-sites: ${site.name} claim -> ${claim.slice(0, 200)}`);
+    if (claim === '1') return 'claimed-now';
+    return claim === '0' ? STATUS.CLAIMED : STATUS.UNEXPECTED;
   } catch (err) {
     console.error(`vote-sites: claiming on ${site.name} failed: ${describeError(err)}`);
     return STATUS.UNREACHABLE;
