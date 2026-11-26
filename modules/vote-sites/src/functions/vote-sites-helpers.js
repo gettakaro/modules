@@ -92,7 +92,7 @@ export async function checkAndClaim(site, identity) {
 }
 
 function currencyMultiplier(pog) {
-  const perm = checkPermission(pog, 'VOTE_REWARDS_MULTIPLIER');
+  const perm = checkPermission(pog, 'VOTE_SITES_MULTIPLIER');
   if (!perm || typeof perm !== 'object') return 1;
   const count = Number(perm.count);
   return Number.isFinite(count) && count > 1 ? count : 1;
@@ -232,7 +232,7 @@ export async function runVoteCommand() {
   const { gameServerId, player, pog } = data;
   const config = data.module.userConfig;
 
-  if (!checkPermission(pog, 'VOTE_REWARDS_CLAIM')) {
+  if (!checkPermission(pog, 'VOTE_SITES_CLAIM')) {
     throw new TakaroUserError('You are not allowed to claim vote rewards on this server.');
   }
 

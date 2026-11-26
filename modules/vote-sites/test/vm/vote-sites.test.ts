@@ -60,7 +60,7 @@ const BASE = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 after(() => server.close());
 
 const STEAM_ID = '76561198000000001';
-const CLAIM = [{ permission: 'VOTE_REWARDS_CLAIM' }];
+const CLAIM = [{ permission: 'VOTE_SITES_CLAIM' }];
 
 function site(name: string, votes: Record<string, Vote> = {}, extra: Partial<SiteState> = {}) {
   sites.set(name, { key: `key-${name}`, votes: new Map(Object.entries(votes)), ...extra });
@@ -364,7 +364,7 @@ const tests = [
   createModuleTest({
     name: 'VIP multiplier count multiplies the currency',
     module: MODULE,
-    permissions: [...CLAIM, { permission: 'VOTE_REWARDS_MULTIPLIER', count: 3 }],
+    permissions: [...CLAIM, { permission: 'VOTE_SITES_MULTIPLIER', count: 3 }],
     player: { steamId: STEAM_ID },
     userConfig: { sites: [site('vip', { [STEAM_ID]: 1 })], currency: 100 },
     test: async function () {
@@ -376,7 +376,7 @@ const tests = [
   }),
 
   createModuleTest({
-    name: 'Without VOTE_REWARDS_CLAIM the player is refused and no site is called',
+    name: 'Without VOTE_SITES_CLAIM the player is refused and no site is called',
     module: MODULE,
     permissions: [],
     player: { steamId: STEAM_ID },
