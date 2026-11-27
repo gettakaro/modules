@@ -597,6 +597,26 @@
       ]
     },
     {
+      "name": "restart-manager",
+      "description": "Scheduled restarts with countdown warnings (30/15/5/1 min), optional save and kick-all, per-game save/shutdown commands (Takaro shutdown by default) and a safe window: wait during a 7 Days to Die blood moon, while N players are online, after a PvP kill or while a console check matches, up to a max delay. Admin restartnow/restartcancel, player restartstatus.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "f9ce3952618104c105845cf15dc96ce31e97a12e3b512c55223d8cd4079612ce",
+          "requiredCapabilities": [
+            "chat.send",
+            "console.execute",
+            "moderation.kick",
+            "server.shutdown"
+          ]
+        }
+      ]
+    },
+    {
       "name": "server-toolkit",
       "description": "Cross-game utility commands for server info, rules, moderation, and simple economy administration.",
       "latestVersion": "1.0.0",
