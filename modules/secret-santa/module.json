@@ -1,0 +1,173 @@
+{
+  "name": "secret-santa",
+  "author": "Takaro",
+  "description": "A yearly Secret Santa event for your community. Players sign up with santa join until the sign-up end date (default Dec 15). Then the names are drawn at random: everybody gets one other player, nobody draws themselves, and odd numbers work too. Each Santa sends an anonymous currency gift with santa gift <amount> [note] before the gift deadline (default Dec 24). The money is held until the reveal day (default Dec 25), when every receiver gets their gift and the server sees who was whose Santa. Daily PM reminders, sign-up broadcasts and a reminder on join. Admins can see the status, draw early, reveal early and reset. All dates are configurable.",
+  "summary": "Yearly Secret Santa: players sign up with santa join (default until Dec 15), names are drawn at random (no self-draw, odd counts work), every Santa sends an anonymous currency gift with santa gift <amount> [note] by Dec 24, and on Dec 25 the gifts are paid out and the Santas revealed. PM reminders, daily sign-up broadcast, admin status/draw/reveal/reset. Dates configurable.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "signupStart": {
+        "type": "string",
+        "title": "Sign-up start (MM-DD)",
+        "default": "11-01",
+        "pattern": "^[0-9]{2}-[0-9]{2}$",
+        "description": "First day players can sign up, as month-day (11-01 = Nov 1)."
+      },
+      "signupEnd": {
+        "type": "string",
+        "title": "Sign-up end (MM-DD)",
+        "default": "12-15",
+        "pattern": "^[0-9]{2}-[0-9]{2}$",
+        "description": "Last day to sign up. The names are drawn automatically the day after."
+      },
+      "giftDeadline": {
+        "type": "string",
+        "title": "Gift deadline (MM-DD)",
+        "default": "12-24",
+        "pattern": "^[0-9]{2}-[0-9]{2}$",
+        "description": "Last day a Santa can send their gift. Must be after the sign-up end."
+      },
+      "revealDate": {
+        "type": "string",
+        "title": "Reveal day (MM-DD)",
+        "default": "12-25",
+        "pattern": "^[0-9]{2}-[0-9]{2}$",
+        "description": "Day the gifts are paid out and the Santas revealed. Must be after the gift deadline. All four dates must fall in one calendar year."
+      },
+      "utcOffsetHours": {
+        "type": "integer",
+        "title": "Time zone (hours from UTC)",
+        "default": 0,
+        "minimum": -12,
+        "maximum": 14,
+        "description": "Your server's time zone, used to decide when a day starts. 1 = CET, -5 = US Eastern."
+      },
+      "minParticipants": {
+        "type": "integer",
+        "title": "Minimum players",
+        "default": 3,
+        "minimum": 2,
+        "description": "Fewer sign-ups than this at the draw cancels the event for this year."
+      },
+      "minGift": {
+        "type": "integer",
+        "title": "Minimum gift",
+        "default": 100,
+        "minimum": 1,
+        "description": "Smallest gift a Santa can send, in your server currency."
+      },
+      "maxGift": {
+        "type": "integer",
+        "title": "Maximum gift",
+        "default": 1000,
+        "minimum": 0,
+        "description": "Largest gift a Santa can send. 0 = no maximum."
+      },
+      "fallbackGift": {
+        "type": "integer",
+        "title": "Fallback gift from the server",
+        "default": 0,
+        "minimum": 0,
+        "description": "If a Santa sends nothing, the server gives their receiver this much at the reveal, so nobody goes empty-handed. 0 = off."
+      },
+      "reminderHour": {
+        "type": "integer",
+        "title": "Reminder hour",
+        "default": 18,
+        "minimum": 0,
+        "maximum": 23,
+        "description": "Local hour (see time zone) after which the daily sign-up broadcast and gift reminders go out, once per day."
+      },
+      "dailySignupBroadcast": {
+        "type": "boolean",
+        "title": "Daily sign-up broadcast",
+        "default": true,
+        "description": "While sign-up is open, broadcast once a day that players can join."
+      },
+      "dailyReminders": {
+        "type": "boolean",
+        "title": "Daily gift reminders",
+        "default": true,
+        "description": "Once a day, PM online Santas who have not sent their gift yet."
+      },
+      "remindOnConnect": {
+        "type": "boolean",
+        "title": "Remind on join",
+        "default": true,
+        "description": "PM players when they join the server: sign-up is open, or their gift is still missing."
+      },
+      "announceJoins": {
+        "type": "boolean",
+        "title": "Announce sign-ups",
+        "default": true,
+        "description": "Broadcast a short line when someone signs up."
+      },
+      "revealBroadcastLines": {
+        "type": "integer",
+        "title": "Reveal lines in public chat",
+        "default": 20,
+        "minimum": 0,
+        "maximum": 100,
+        "description": "At the reveal, how many 'X was the Secret Santa of Y' lines to broadcast. The rest is told 'type santa to see yours'. 0 = only the summary."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "SECRET_SANTA_MANAGE",
+      "friendlyName": "Manage Secret Santa",
+      "description": "See the full status, draw the names early, reveal early and reset the event.",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "santa": {
+      "trigger": "santa",
+      "description": "Secret Santa. santa = your status, santa join, santa leave, santa gift <amount> [note]. Admins: santa admin, santa pair, santa reveal, santa reset.",
+      "helpText": "santa = your status. santa join / santa leave = sign up or leave (before the draw). santa gift <amount> [note] = send your anonymous gift. Admins (SECRET_SANTA_MANAGE): santa admin, santa pair (draw now), santa reveal (reveal now), santa reset.",
+      "function": "src/commands/santa/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "helpText": "Empty for your status, or join, leave, gift, admin, pair, reveal, reset.",
+          "position": 0,
+          "defaultValue": "show"
+        },
+        {
+          "name": "details",
+          "type": "string",
+          "helpText": "For gift: <amount> [note].",
+          "position": 1,
+          "defaultValue": "-"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "santa-connect": {
+      "eventType": "player-connected",
+      "description": "Reminds a joining player to sign up or send their gift, and tells receivers who were offline at the reveal about their gift.",
+      "function": "src/hooks/santa-connect/index.js"
+    }
+  },
+  "cronJobs": {
+    "santa-tick": {
+      "temporalValue": "*/10 * * * *",
+      "description": "Every 10 minutes: draw the names after sign-up ends, reveal on the reveal day, daily sign-up broadcast and gift reminders.",
+      "function": "src/cronjobs/santa-tick/index.js"
+    }
+  },
+  "functions": {
+    "santa-helpers": {
+      "function": "src/functions/santa-helpers.js"
+    }
+  }
+}
