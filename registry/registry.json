@@ -597,6 +597,23 @@
       ]
     },
     {
+      "name": "rob-and-crime",
+      "description": "crime = risky quick earn (reward range, fail chance, fine range). rob <player> = steal a % of an online player's wallet, never bank savings; caught = pay the victim a fine. Cooldowns, victim protection, min wallet, ROB_IMMUNE for staff/VIP, optional jail on fail via the jail module. crimestats shows your record. All games.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "58d7e343fda0b68a6edb1a2c72fcefb4bdcabc7f7f71cc337e8351d66d28e3af",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "server-toolkit",
       "description": "Cross-game utility commands for server info, rules, moderation, and simple economy administration.",
       "latestVersion": "1.0.0",
