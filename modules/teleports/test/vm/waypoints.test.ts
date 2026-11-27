@@ -1,7 +1,7 @@
 import { expect } from '../../../../test/support/expect.ts';
 import { describe } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { executeVM } from '@takaro/helpers';
+import { executeVM, type FunctionExecutionData } from '@takaro/helpers';
 import {
   buildCommandData,
   createModuleTest,
@@ -64,7 +64,7 @@ async function runWaypoint(t: ModuleTest, trigger: string) {
   );
   return executeVM({
     fn: template.function.code,
-    data: toJobPayload({ ...data, itemId: template.id }),
+    data: toJobPayload({ ...data, itemId: template.id }) as unknown as FunctionExecutionData,
     userModules: t.installation.version.functions
       .filter((fn) => Boolean(fn.name))
       .map((fn) => ({ name: fn.name as string, code: fn.code })),
