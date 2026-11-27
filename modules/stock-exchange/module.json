@@ -1,0 +1,396 @@
+{
+  "name": "stock-exchange",
+  "author": "Takaro",
+  "description": "A stock market that cannot print money. Some stocks move with real server activity (monster kills, player deaths, players online, teleports), others move at random. Prices are pulled back to a base price, stay between a floor and a ceiling and move at most a set percent per update. Every trade pays a fee into a pool that is paid back as dividends to shareholders, with a bonus for long holders. Sell lock after buying, max shares per player, news only after a move.",
+  "summary": "Stock market tied to server activity, with fees, dividends from the fee pool, sell lock and safe price limits.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "stocks": {
+        "type": "array",
+        "title": "Stocks",
+        "items": {
+          "type": "object",
+          "title": "Stock",
+          "required": [
+            "id",
+            "name",
+            "driver",
+            "basePrice"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "title": "Ticker",
+              "minLength": 1,
+              "maxLength": 8,
+              "pattern": "^[A-Za-z0-9]+$",
+              "description": "Short code players type, e.g. DEF. One word, letters and digits. Not case sensitive."
+            },
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "minLength": 1,
+              "description": "Company name shown in chat."
+            },
+            "driver": {
+              "type": "string",
+              "title": "Price driver",
+              "enum": [
+                "random",
+                "kills",
+                "deaths",
+                "players",
+                "travel"
+              ],
+              "default": "random",
+              "description": "What moves the price besides random noise. kills = entity/monster kills, deaths = player deaths, players = players online, travel = teleport commands, random = noise only."
+            },
+            "basePrice": {
+              "type": "integer",
+              "title": "Base price",
+              "minimum": 1,
+              "description": "Normal price. The price is pulled back here and the floor/ceiling are a percent of it."
+            },
+            "volatilityPercent": {
+              "type": "number",
+              "title": "Volatility (%)",
+              "minimum": 0,
+              "maximum": 50,
+              "default": 3,
+              "description": "Biggest random move per update, in percent."
+            }
+          }
+        },
+        "default": [
+          {
+            "id": "DEF",
+            "name": "Defense Corp",
+            "driver": "kills",
+            "basePrice": 100,
+            "volatilityPercent": 2
+          },
+          {
+            "id": "MED",
+            "name": "Field Medics",
+            "driver": "deaths",
+            "basePrice": 80,
+            "volatilityPercent": 2
+          },
+          {
+            "id": "IDX",
+            "name": "Server Index",
+            "driver": "players",
+            "basePrice": 200,
+            "volatilityPercent": 1
+          },
+          {
+            "id": "TRVL",
+            "name": "Travel Inc",
+            "driver": "travel",
+            "basePrice": 60,
+            "volatilityPercent": 2
+          },
+          {
+            "id": "GOLD",
+            "name": "Gold Rush",
+            "driver": "random",
+            "basePrice": 150,
+            "volatilityPercent": 5
+          },
+          {
+            "id": "TECH",
+            "name": "Tech Works",
+            "driver": "random",
+            "basePrice": 120,
+            "volatilityPercent": 4
+          },
+          {
+            "id": "FARM",
+            "name": "Farm Fresh",
+            "driver": "random",
+            "basePrice": 40,
+            "volatilityPercent": 3
+          }
+        ],
+        "description": "The listed stocks. Changes apply at once. A removed stock can still be sold at its last price but not bought."
+      },
+      "maxMovePercent": {
+        "type": "number",
+        "title": "Max move per update (%)",
+        "default": 10,
+        "minimum": 1,
+        "description": "A price never moves more than this percent in one update.",
+        "maximum": 100
+      },
+      "reversionPercent": {
+        "type": "number",
+        "title": "Pull back to base (%)",
+        "default": 15,
+        "minimum": 0,
+        "description": "Each update closes this percent of the gap between the price and its base price. Stops prices from running away.",
+        "maximum": 100
+      },
+      "signalStrengthPercent": {
+        "type": "number",
+        "title": "Signal strength (%)",
+        "default": 10,
+        "minimum": 0,
+        "description": "How hard server activity moves signal stocks. Activity at double the usual level moves the price up by this percent (before the max move cap).",
+        "maximum": 100
+      },
+      "floorPercent": {
+        "type": "integer",
+        "title": "Price floor (% of base)",
+        "default": 25,
+        "minimum": 1,
+        "description": "Lowest price, as a percent of the base price. Never below 1.",
+        "maximum": 100
+      },
+      "ceilingPercent": {
+        "type": "integer",
+        "title": "Price ceiling (% of base)",
+        "default": 400,
+        "minimum": 100,
+        "description": "Highest price, as a percent of the base price.",
+        "maximum": 10000
+      },
+      "feePercent": {
+        "type": "number",
+        "title": "Trade fee (%)",
+        "default": 3,
+        "minimum": 0,
+        "description": "Fee on every buy and every sell, in percent of the trade value. Rounded up. 0 = no percent fee.",
+        "maximum": 50
+      },
+      "minFee": {
+        "type": "integer",
+        "title": "Minimum fee",
+        "default": 1,
+        "minimum": 0,
+        "description": "Smallest fee per trade. 0 allowed (then a 0% fee means free trading)."
+      },
+      "sellLockMinutes": {
+        "type": "integer",
+        "title": "Sell lock after buying (minutes)",
+        "default": 60,
+        "minimum": 0,
+        "description": "After a buy, that stock cannot be sold for this long. 0 = no lock.",
+        "maximum": 10080
+      },
+      "maxSharesPerStock": {
+        "type": "integer",
+        "title": "Max shares per stock",
+        "default": 100,
+        "minimum": 1,
+        "description": "Most shares of one stock a player may hold. The STOCK_MAX_SHARES permission count overrides it."
+      },
+      "newsMinMovePercent": {
+        "type": "number",
+        "title": "News threshold (%)",
+        "default": 5,
+        "minimum": 0,
+        "description": "After an update, a news line is broadcast for stocks that moved at least this percent. 0 = no news.",
+        "maximum": 100
+      },
+      "maxNewsLines": {
+        "type": "integer",
+        "title": "Max news lines",
+        "default": 3,
+        "minimum": 0,
+        "description": "Most news lines per update.",
+        "maximum": 20
+      },
+      "dividendPayoutPercent": {
+        "type": "number",
+        "title": "Dividend payout (% of pool)",
+        "default": 50,
+        "minimum": 0,
+        "description": "Share of the fee pool paid to shareholders on each dividend run. The rest stays in the pool.",
+        "maximum": 100
+      },
+      "holdStreakDays": {
+        "type": "number",
+        "title": "Hold streak (days)",
+        "default": 7,
+        "minimum": 0,
+        "description": "A holding kept this long without selling it to zero gets the hold bonus on dividends. 0 = off.",
+        "maximum": 365
+      },
+      "holdBonusPercent": {
+        "type": "number",
+        "title": "Hold bonus (%)",
+        "default": 25,
+        "minimum": 0,
+        "description": "Extra dividend weight for holdings on a hold streak.",
+        "maximum": 1000
+      },
+      "travelCommands": {
+        "type": "array",
+        "title": "Travel commands",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "tp",
+          "teleport",
+          "warp",
+          "home"
+        ],
+        "description": "A command counts as travel for travel stocks when its name or trigger contains one of these words. Empty = every command counts."
+      },
+      "historyLength": {
+        "type": "integer",
+        "title": "Price history length",
+        "default": 8,
+        "minimum": 2,
+        "description": "How many past prices the stock command shows.",
+        "maximum": 48
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {},
+  "permissions": [
+    {
+      "permission": "STOCK_ADMIN",
+      "friendlyName": "Stock market admin",
+      "description": "Allows marketadmin (fees in, dividends out, money in the market).",
+      "canHaveCount": false
+    },
+    {
+      "permission": "STOCK_FEE_DISCOUNT",
+      "friendlyName": "Stock fee discount",
+      "description": "Lowers the trade fee by the count in percent (count 50 = half fee).",
+      "canHaveCount": true
+    },
+    {
+      "permission": "STOCK_MAX_SHARES",
+      "friendlyName": "Stock max shares",
+      "description": "Max shares per stock for this player (count). Overrides the config value.",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "market": {
+      "trigger": "market",
+      "description": "List all stocks with price and last move.",
+      "helpText": "Shows every stock, its price and its last move.",
+      "function": "src/commands/market/index.js",
+      "arguments": []
+    },
+    "stock": {
+      "trigger": "stock",
+      "description": "Details of one stock.",
+      "helpText": "stock <ticker>: price, range, what moves it, recent prices and your holding.",
+      "function": "src/commands/stock/index.js",
+      "arguments": [
+        {
+          "name": "ticker",
+          "type": "string",
+          "helpText": "Stock ticker, e.g. DEF.",
+          "position": 0,
+          "defaultValue": "none"
+        }
+      ]
+    },
+    "buy": {
+      "trigger": "buy",
+      "description": "Buy shares.",
+      "helpText": "buy <ticker> <shares>: buy shares at the current price plus the fee.",
+      "function": "src/commands/buy/index.js",
+      "arguments": [
+        {
+          "name": "ticker",
+          "type": "string",
+          "helpText": "Stock ticker, e.g. DEF.",
+          "position": 0,
+          "defaultValue": "none"
+        },
+        {
+          "name": "amount",
+          "type": "string",
+          "helpText": "Number of shares.",
+          "position": 1,
+          "defaultValue": "none"
+        }
+      ]
+    },
+    "sell": {
+      "trigger": "sell",
+      "description": "Sell shares.",
+      "helpText": "sell <ticker> <shares|all>: sell at the current price minus the fee.",
+      "function": "src/commands/sell/index.js",
+      "arguments": [
+        {
+          "name": "ticker",
+          "type": "string",
+          "helpText": "Stock ticker, e.g. DEF.",
+          "position": 0,
+          "defaultValue": "none"
+        },
+        {
+          "name": "amount",
+          "type": "string",
+          "helpText": "Number of shares or all.",
+          "position": 1,
+          "defaultValue": "none"
+        }
+      ]
+    },
+    "portfolio": {
+      "trigger": "portfolio",
+      "description": "Your shares, value and profit.",
+      "helpText": "Shows your holdings, their value, profit, sell locks and hold streaks.",
+      "function": "src/commands/portfolio/index.js",
+      "arguments": []
+    },
+    "marketadmin": {
+      "trigger": "marketadmin",
+      "description": "Admin market stats.",
+      "helpText": "Fees in, dividends out, fee pool, money in the market, top holders, activity signals (STOCK_ADMIN).",
+      "function": "src/commands/marketadmin/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {
+    "on-entity-killed": {
+      "eventType": "entity-killed",
+      "description": "Counts kills for kills-driven stocks.",
+      "function": "src/hooks/on-entity-killed/index.js"
+    },
+    "on-player-death": {
+      "eventType": "player-death",
+      "description": "Counts player deaths for deaths-driven stocks.",
+      "function": "src/hooks/on-player-death/index.js"
+    },
+    "on-command-executed": {
+      "eventType": "command-executed",
+      "description": "Counts teleport commands for travel-driven stocks.",
+      "function": "src/hooks/on-command-executed/index.js"
+    }
+  },
+  "cronJobs": {
+    "update-prices": {
+      "temporalValue": "*/15 * * * *",
+      "description": "Moves prices (signals + noise + pull back), then posts news for big moves.",
+      "function": "src/cronjobs/update-prices/index.js"
+    },
+    "pay-dividends": {
+      "temporalValue": "0 20 * * *",
+      "description": "Pays part of the fee pool to shareholders, with a hold-streak bonus.",
+      "function": "src/cronjobs/pay-dividends/index.js"
+    }
+  },
+  "functions": {
+    "stx-helpers": {
+      "function": "src/functions/stx-helpers.js"
+    }
+  }
+}

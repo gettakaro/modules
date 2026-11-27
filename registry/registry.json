@@ -663,6 +663,23 @@
       ]
     },
     {
+      "name": "stock-exchange",
+      "description": "Stock market tied to server activity, with fees, dividends from the fee pool, sell lock and safe price limits.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "7c4f164f625b453c81d29fb32d70dd151eab098b74311d5dcf5f9015ec6a7788",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "teleport-requests",
       "description": "Teleport Requests (/tpa): ask to teleport to an online player (tpa) or ask them to come to you (tpahere). They answer with tpaccept or tpdeny. Requests expire, one open request per player (tpcancel). Optional cooldown, currency cost (charged only after a successful teleport) and height offset. Players can block others with tpblock. Needs a game that supports teleporting players.",
       "latestVersion": "1.0.0",
