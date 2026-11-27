@@ -1,0 +1,197 @@
+{
+  "name": "vote-sites",
+  "author": "Takaro",
+  "description": "Reward players for voting for your server on server-list sites, for any game. Players type vote after voting. The module asks each configured vote site whether the player voted in the last 24 hours and has not claimed yet, marks the vote as claimed and hands out currency and items. A reward that cannot be given right away (for example an item while the player is offline) is saved and given on the next vote command, never twice. Vote sites are config entries using the common server-list vote API (for example 7daystodie-servers.com, rust-servers.net, ark-servers.net, minecraft-mp.com). Voters are matched by Steam ID or, if you choose, by in-game name. Grant the VOTE_SITES_CLAIM permission to the roles that may claim. An optional cron job reminds players to vote; it is off by default. For votes on the Takaro Server List itself, use the official voteRewards module; this module covers third-party server-list sites.",
+  "summary": "Reward players for voting on third-party server-list sites, for any game. Add vote sites as config entries (common server-list vote API, e.g. 7daystodie-servers.com, rust-servers.net, minecraft-mp.com). Players type vote after voting and receive currency and items. Matches voters by Steam ID or in-game name. Includes a VIP currency multiplier and an optional vote reminder.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "sites": {
+        "type": "array",
+        "title": "Vote sites",
+        "description": "Server-list sites players can vote on, for any game. Each site with an unclaimed vote gives one reward. Takaro Cloud only lets modules reach allowlisted hosts; ask Takaro to add your vote site if it is not reachable.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Vote site",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Shown to players, for example the site name.",
+              "minLength": 1
+            },
+            "apiBase": {
+              "type": "string",
+              "title": "API base URL",
+              "description": "Base URL of the vote site, for example https://7daystodie-servers.com, https://rust-servers.net or https://minecraft-mp.com. The module calls <apiBase>/api/ with the common server-list vote API.",
+              "pattern": "^https?://[^\\s/?#]+"
+            },
+            "apiKey": {
+              "type": "string",
+              "title": "Server API key",
+              "description": "Your server's API key from the vote site.",
+              "minLength": 1
+            },
+            "voteLink": {
+              "type": "string",
+              "title": "Vote link",
+              "description": "Page where players vote for your server. Shown when a player has not voted yet.",
+              "default": ""
+            }
+          },
+          "required": [
+            "name",
+            "apiBase",
+            "apiKey"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "currency": {
+        "type": "integer",
+        "title": "Currency per vote",
+        "description": "Currency given for each claimed vote. 0 gives none. Needs the economy to be enabled.",
+        "minimum": 0,
+        "default": 100
+      },
+      "items": {
+        "x-component": "item",
+        "type": "array",
+        "title": "Items per vote",
+        "description": "Items given for each claimed vote.",
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Item",
+          "properties": {
+            "item": {
+              "type": "string",
+              "title": "Item"
+            },
+            "amount": {
+              "type": "integer",
+              "title": "Amount",
+              "minimum": 1,
+              "default": 1
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality"
+            }
+          },
+          "required": [
+            "item"
+          ]
+        }
+      },
+      "identifyBy": {
+        "type": "string",
+        "title": "Match voters by",
+        "description": "How the vote site finds the player's vote. steamId: Steam ID only (safest). steamIdThenUsername: Steam ID, or the in-game name for players without one. username: in-game name only, for games without Steam IDs. Name matching lets anyone with the same name claim the vote.",
+        "enum": [
+          "steamId",
+          "steamIdThenUsername",
+          "username"
+        ],
+        "default": "steamId"
+      },
+      "rewardMessage": {
+        "type": "string",
+        "title": "Reward message",
+        "description": "Private message after a vote is claimed. Placeholders: {player}, {site}, {reward}.",
+        "default": "Thanks for voting on {site}! You received {reward}."
+      },
+      "broadcastMessage": {
+        "type": "string",
+        "title": "Broadcast message",
+        "description": "Sent to everyone when a vote is claimed. Leave empty to turn it off. Placeholders: {player}, {site}, {prefix}.",
+        "default": "{player} voted for the server on {site} and got a reward! Type {prefix}vote to get yours."
+      },
+      "notVotedMessage": {
+        "type": "string",
+        "title": "Not voted message",
+        "description": "Private message when the player has no vote on a site. Placeholders: {player}, {site}, {link}, {prefix}.",
+        "default": "No vote found on {site} in the last 24 hours. Vote at {link}, then type {prefix}vote."
+      },
+      "alreadyClaimedMessage": {
+        "type": "string",
+        "title": "Already claimed message",
+        "description": "Private message when the player's vote on a site was already claimed. Placeholders: {player}, {site}.",
+        "default": "You already claimed your vote reward for {site}. You can vote again 24 hours after your last vote."
+      },
+      "reminderMessage": {
+        "type": "string",
+        "title": "Reminder message",
+        "description": "Broadcast by the vote reminder cron job. The cron job is off by default: enable it and set its schedule in the module's system config. Placeholders: {links}, {prefix}.",
+        "default": "Enjoying the server? Vote for us at {links} and type {prefix}vote for a reward!"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "items": {
+      "items": {
+        "item": {
+          "ui:widget": "item"
+        }
+      }
+    },
+    "sites": {
+      "items": {
+        "apiKey": {
+          "ui:widget": "password"
+        }
+      }
+    }
+  },
+  "defaultSystemConfig": {
+    "cronJobs": {
+      "vote-reminder": {
+        "enabled": false
+      }
+    }
+  },
+  "permissions": [
+    {
+      "permission": "VOTE_SITES_CLAIM",
+      "friendlyName": "Claim vote rewards",
+      "description": "Allows a player to claim rewards for voting on server-list sites.",
+      "canHaveCount": false
+    },
+    {
+      "permission": "VOTE_SITES_MULTIPLIER",
+      "friendlyName": "Vote reward multiplier",
+      "description": "Multiplies the vote currency reward by the count, for example 2 for double currency. Items are not multiplied.",
+      "canHaveCount": true
+    }
+  ],
+  "commands": {
+    "vote": {
+      "trigger": "vote",
+      "description": "Claim your reward after voting for the server.",
+      "helpText": "Vote for the server on a server-list site, then type this to claim your reward.",
+      "function": "src/commands/vote/index.js",
+      "arguments": []
+    }
+  },
+  "hooks": {},
+  "cronJobs": {
+    "vote-reminder": {
+      "temporalValue": "0 */3 * * *",
+      "description": "Broadcast a reminder to vote for the server. Off by default; change the schedule to set how often.",
+      "function": "src/cronjobs/vote-reminder/index.js"
+    }
+  },
+  "functions": {
+    "vote-sites-helpers": {
+      "function": "src/functions/vote-sites-helpers.js"
+    }
+  }
+}

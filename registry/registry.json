@@ -757,6 +757,24 @@
       ]
     },
     {
+      "name": "vote-sites",
+      "description": "Reward players for voting on third-party server-list sites, for any game. Add vote sites as config entries (common server-list vote API, e.g. 7daystodie-servers.com, rust-servers.net, minecraft-mp.com). Players type vote after voting and receive currency and items. Matches voters by Steam ID or in-game name. Includes a VIP currency multiplier and an optional vote reminder.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "bfe040f55ba3ffd8eb48da2dd8d3a62c097abff21fc36b9dc7c50719f85fdc7e",
+          "requiredCapabilities": [
+            "chat.send",
+            "items.give"
+          ]
+        }
+      ]
+    },
+    {
       "name": "voteRewards",
       "description": "Rewards players who vote for this game server on the Takaro Server List. List the server publicly on its Public page first. Only verified votes are rewarded: the voter signed in with a Takaro account linked to their player, or with a linked Steam account. In-game items and commands for an offline player wait until they next join, or until they run the claimvote command.",
       "latestVersion": "1.0.0",
