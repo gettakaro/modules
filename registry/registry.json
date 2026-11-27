@@ -74,6 +74,23 @@
       ]
     },
     {
+      "name": "chat-board-games",
+      "description": "Player vs player board games in chat: tic-tac-toe, connect-four and rock-paper-scissors. Challenge an online player, they accept or decline, the board is printed one chat line per row. Optional currency bet: both stakes are held until the end, the winner takes the pot, draws, declines and expired challenges are refunded. Turn reminders, turn timeouts, forfeit, stats and a leaderboard. Works on every game.",
+      "latestVersion": "1.0.0",
+      "versions": [
+        "1.0.0"
+      ],
+      "versionDetails": [
+        {
+          "version": "1.0.0",
+          "sha256": "04823cd763c32052b46b173ea6179a52e2afc334d69e642c435da10e325a6311",
+          "requiredCapabilities": [
+            "chat.send"
+          ]
+        }
+      ]
+    },
+    {
       "name": "chat-faq-bot",
       "description": "Answers common player questions in chat automatically. Match FAQ entries by keywords (any/all words) or regex, reply privately or publicly, with server and per-player cooldowns so it never spams. Placeholders {player} {prefix} {currency} plus your own. Players type faq to see topics; admins use faqlist and faqtest.",
       "latestVersion": "1.0.0",

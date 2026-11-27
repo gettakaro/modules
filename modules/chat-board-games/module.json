@@ -1,0 +1,262 @@
+{
+  "name": "chat-board-games",
+  "author": "Takaro",
+  "description": "Player vs player board games in chat: tic-tac-toe, connect-four and rock-paper-scissors. Challenge an online player, they accept or decline, the board is printed one chat line per row. Optional currency bet: both stakes are held until the end, the winner takes the pot, draws, declines and expired challenges are refunded. Turn reminders, turn timeouts, forfeit, stats and a leaderboard. Works on every game.",
+  "version": "1.0.0",
+  "supportedGames": [
+    "all"
+  ],
+  "config": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "enableTicTacToe": {
+        "type": "boolean",
+        "title": "Enable tic-tac-toe",
+        "default": true,
+        "description": "Allow tic-tac-toe (3x3, squares 1-9)."
+      },
+      "enableConnectFour": {
+        "type": "boolean",
+        "title": "Enable connect-four",
+        "default": true,
+        "description": "Allow connect-four (7 columns x 6 rows)."
+      },
+      "enableRockPaperScissors": {
+        "type": "boolean",
+        "title": "Enable rock-paper-scissors",
+        "default": true,
+        "description": "Allow rock-paper-scissors."
+      },
+      "rpsBestOf": {
+        "type": "integer",
+        "title": "Rock-paper-scissors: best of",
+        "default": 1,
+        "enum": [
+          1,
+          3,
+          5
+        ],
+        "description": "Rounds in a rock-paper-scissors match (1, 3 or 5). Same picks are replayed."
+      },
+      "minBet": {
+        "type": "integer",
+        "title": "Minimum bet",
+        "default": 1,
+        "minimum": 0,
+        "description": "Smallest bet when a player bets. Playing without a bet is always allowed."
+      },
+      "maxBet": {
+        "type": "integer",
+        "title": "Maximum bet",
+        "default": 1000,
+        "minimum": 0,
+        "description": "Largest bet per player. 0 = bets off (friendly games only)."
+      },
+      "houseFeePercent": {
+        "type": "integer",
+        "title": "House fee (%)",
+        "default": 0,
+        "minimum": 0,
+        "description": "Percent of the pot kept by the server when someone wins. 0 = winner takes all. Draws are always refunded in full.",
+        "maximum": 50
+      },
+      "challengeTimeoutMinutes": {
+        "type": "integer",
+        "title": "Challenge timeout (minutes)",
+        "default": 2,
+        "minimum": 1,
+        "description": "Open challenges expire after this many minutes and the bet is refunded. Checked once a minute.",
+        "maximum": 60
+      },
+      "turnTimeoutMinutes": {
+        "type": "integer",
+        "title": "Turn timeout (minutes)",
+        "default": 3,
+        "minimum": 1,
+        "description": "A player who does not move for this many minutes runs out of time. Checked once a minute.",
+        "maximum": 60
+      },
+      "turnTimeoutAction": {
+        "type": "string",
+        "title": "On turn timeout",
+        "default": "forfeit",
+        "enum": [
+          "forfeit",
+          "refund"
+        ],
+        "description": "forfeit = the slow player loses and the other wins the pot. refund = the game is cancelled and both stakes are refunded."
+      },
+      "reminderMinutes": {
+        "type": "integer",
+        "title": "Turn reminder (minutes)",
+        "default": 1,
+        "minimum": 0,
+        "description": "Remind the player whose turn it is after this many idle minutes (once per turn). 0 = no reminders.",
+        "maximum": 60
+      },
+      "announceResults": {
+        "type": "boolean",
+        "title": "Announce results",
+        "default": true,
+        "description": "Broadcast a one-line result to the whole server when a game ends."
+      },
+      "leaderboardSize": {
+        "type": "integer",
+        "title": "Leaderboard size",
+        "default": 5,
+        "minimum": 1,
+        "description": "How many players gametop shows.",
+        "maximum": 20
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "BOARD_GAMES_MANAGE",
+      "friendlyName": "Manage board games",
+      "description": "Allows listing running board games and cancelling one (all stakes refunded).",
+      "canHaveCount": false
+    }
+  ],
+  "commands": {
+    "challenge": {
+      "trigger": "challenge",
+      "description": "Challenge an online player to tic-tac-toe, connect-four or rock-paper-scissors, with an optional currency bet.",
+      "helpText": "challenge <player> <ttt|c4|rps> [bet] - the bet is taken now and held until the game ends.",
+      "function": "src/commands/challenge/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "helpText": "Player name (full chat line is read, spaces allowed).",
+          "position": 0,
+          "defaultValue": "-"
+        },
+        {
+          "name": "game",
+          "type": "string",
+          "helpText": "ttt, c4 or rps.",
+          "position": 1,
+          "defaultValue": "-"
+        },
+        {
+          "name": "bet",
+          "type": "string",
+          "helpText": "Optional bet per player.",
+          "position": 2,
+          "defaultValue": "-"
+        }
+      ]
+    },
+    "accept": {
+      "trigger": "accept",
+      "description": "Accept the board game challenge aimed at you. Your bet is held until the game ends.",
+      "helpText": "accept - accept the open challenge.",
+      "function": "src/commands/accept/index.js",
+      "arguments": []
+    },
+    "decline": {
+      "trigger": "decline",
+      "description": "Decline the board game challenge aimed at you. The challenger gets their bet back.",
+      "helpText": "decline - refuse the open challenge.",
+      "function": "src/commands/decline/index.js",
+      "arguments": []
+    },
+    "move": {
+      "trigger": "move",
+      "description": "Make your move: a square 1-9 (tic-tac-toe), a column 1-7 (connect-four) or rock/paper/scissors.",
+      "helpText": "move <square|column|rock|paper|scissors>",
+      "function": "src/commands/move/index.js",
+      "arguments": [
+        {
+          "name": "move",
+          "type": "string",
+          "helpText": "Square, column or rock/paper/scissors.",
+          "position": 0,
+          "defaultValue": "-"
+        }
+      ]
+    },
+    "board": {
+      "trigger": "board",
+      "description": "Show your current game, board and whose turn it is.",
+      "helpText": "board - show your game.",
+      "function": "src/commands/board/index.js",
+      "arguments": []
+    },
+    "forfeit": {
+      "trigger": "forfeit",
+      "description": "Give up your running game (the other player wins the pot) or withdraw your open challenge (refunded).",
+      "helpText": "forfeit - give up or withdraw.",
+      "function": "src/commands/forfeit/index.js",
+      "arguments": []
+    },
+    "gamestats": {
+      "trigger": "gamestats",
+      "description": "Show your board game wins, losses, draws and bet result, or another player's.",
+      "helpText": "gamestats [player]",
+      "function": "src/commands/gamestats/index.js",
+      "arguments": [
+        {
+          "name": "player",
+          "type": "string",
+          "helpText": "Optional player name.",
+          "position": 0,
+          "defaultValue": "-"
+        }
+      ]
+    },
+    "gametop": {
+      "trigger": "gametop",
+      "description": "Board game leaderboard by wins, for all games or one game.",
+      "helpText": "gametop [ttt|c4|rps]",
+      "function": "src/commands/gametop/index.js",
+      "arguments": [
+        {
+          "name": "game",
+          "type": "string",
+          "helpText": "Optional game.",
+          "position": 0,
+          "defaultValue": "-"
+        }
+      ]
+    },
+    "boardgames": {
+      "trigger": "boardgames",
+      "description": "How to play. Admins: boardgames list and boardgames cancel <player> (refunds all stakes).",
+      "helpText": "boardgames = help. boardgames list / boardgames cancel <player> need BOARD_GAMES_MANAGE.",
+      "function": "src/commands/boardgames/index.js",
+      "arguments": [
+        {
+          "name": "action",
+          "type": "string",
+          "helpText": "Empty for help, list or cancel.",
+          "position": 0,
+          "defaultValue": "-"
+        },
+        {
+          "name": "player",
+          "type": "string",
+          "helpText": "For cancel: player name.",
+          "position": 1,
+          "defaultValue": "-"
+        }
+      ]
+    }
+  },
+  "cronJobs": {
+    "cbg-tick": {
+      "temporalValue": "* * * * *",
+      "description": "Expires old challenges (refund), sends turn reminders and ends games where a player ran out of time.",
+      "function": "src/cronjobs/cbg-tick/index.js"
+    }
+  },
+  "functions": {
+    "cbg-helpers": {
+      "function": "src/functions/cbg-helpers.js"
+    }
+  }
+}
